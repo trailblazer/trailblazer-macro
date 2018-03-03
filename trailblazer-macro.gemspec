@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.name          = "trailblazer-macro"
   spec.version       = Trailblazer::Macro::VERSION
   spec.authors       = ["Nick Sutterer", "Marc Tich"]
-  spec.email         = ["apotonick@gmail.com", "m.tichelaar@gmail.com"]
+  spec.email         = ["apotonick@gmail.com", "marc@mudsu.com"]
   spec.description   = "Macros for Trailblazer's operation"
   spec.summary       = "Macros for Trailblazer's operation: Policy, Wrap, Rescue and more."
   spec.homepage      = "http://trailblazer.to"
