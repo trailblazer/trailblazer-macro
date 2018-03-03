@@ -1,6 +1,5 @@
 require "trailblazer"
 require "trailblazer/macro/version"
-require "trailblazer/macro/contract"
 
 require "trailblazer/operation/model"
 require "trailblazer/operation/policy"
