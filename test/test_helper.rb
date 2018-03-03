@@ -2,6 +2,12 @@ require "pp"
 require "trailblazer/macro"
 require "minitest/autorun"
 
+require "reform"
+require "reform/form/active_model/validations"
+Reform::Form.class_eval do
+  include Reform::Form::ActiveModel::Validations
+end
+
 module Mock
   class Result
     def initialize(bool); @bool = bool end

@@ -7,8 +7,8 @@ Gem::Specification.new do |spec|
   spec.version       = Trailblazer::Macro::VERSION
   spec.authors       = ["Nick Sutterer"]
   spec.email         = ["apotonick@gmail.com"]
-  spec.description   = 'Trailblazer Operation Macros'
-  spec.summary       = 'A Macro collection for Trailblazer Operation'
+  spec.description   = "Trailblazer Operation Macros"
+  spec.summary       = "A Macro collection for Trailblazer Operation"
   spec.homepage      = "http://trailblazer.to"
   spec.license       = "LGPL-3.0"
 
@@ -17,14 +17,22 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 
-  spec.add_development_dependency "trailblazer", ">= 2.1.0.beta4", "< 2.2.0"
-  spec.add_development_dependency "trailblazer-activity",  ">= 0.5.0", "< 0.6.0"
-  spec.add_development_dependency "trailblazer-operation", ">= 0.2.3", "< 0.3.0"
-  spec.add_development_dependency "trailblazer-macro-contract", ">= 2.1.0.beta4", "< 2.2.0"
   spec.add_development_dependency "bundler"
+
+  spec.add_development_dependency "trailblazer", ">= 2.1.0.beta4", "< 2.2.0"
+  spec.add_development_dependency "trailblazer-activity", ">= 0.5.0", "< 0.6.0"
+  spec.add_development_dependency "trailblazer-macro-contract", ">= 2.1.0.beta4", "< 2.2.0"
+  spec.add_development_dependency "trailblazer-operation", ">= 0.2.3", "< 0.3.0"
+
+  spec.add_development_dependency "reform"
+  spec.add_development_dependency "reform-rails"
+
   spec.add_development_dependency "minitest"
   spec.add_development_dependency "nokogiri"
   spec.add_development_dependency "rake"
 
-  spec.required_ruby_version = '>= 2.0.0'
+  spec.add_development_dependency "roar"
+  spec.add_development_dependency "multi_json"
+
+  spec.required_ruby_version = ">= 2.0.0"
 end

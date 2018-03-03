@@ -1,3 +1,12 @@
 require "trailblazer"
 require "trailblazer/macro/version"
 require "trailblazer/macro/contract"
+
+require "trailblazer/macro/model"
+require "trailblazer/macro/policy"
+require "trailblazer/macro/policy/guard"
+require "trailblazer/macro/policy/pundit"
+require "trailblazer/macro/nested"
+require "trailblazer/macro/representer"
+require "trailblazer/macro/rescue"
+require "trailblazer/macro/wrap"
