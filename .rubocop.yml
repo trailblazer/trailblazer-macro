@@ -1,0 +1,16 @@
+inherit_from: .rubocop_todo.yml
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Naming/MethodName:
+  Exclude:
+    - 'test/docs/macro_test.rb'
+    - 'lib/trailblazer/macro/model.rb'
+    - 'lib/trailblazer/macro/wrap.rb'
+    - 'lib/trailblazer/macro/policy/pundit.rb'
+    - 'lib/trailblazer/macro/rescue.rb'
+    - 'lib/trailblazer/macro/nested.rb'
+    - 'lib/trailblazer/macro/policy/guard.rb'
+    - 'lib/trailblazer/macro/wrap.rb'
+    - 'lib/trailblazer/macro/policy.rb'
