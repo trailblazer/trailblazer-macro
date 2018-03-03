@@ -11,3 +11,5 @@ matrix:
       gemfile: Gemfile
     - rvm: 2.4.1
       gemfile: Gemfile
+    - rvm: 2.5.0
+      gemfile: Gemfile
