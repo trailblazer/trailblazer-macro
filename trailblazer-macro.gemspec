@@ -5,10 +5,10 @@ require 'trailblazer/macro/version'
 Gem::Specification.new do |spec|
   spec.name          = "trailblazer-macro"
   spec.version       = Trailblazer::Macro::VERSION
-  spec.authors       = ["Nick Sutterer"]
-  spec.email         = ["apotonick@gmail.com"]
-  spec.description   = "Trailblazer Operation Macros"
-  spec.summary       = "A Macro collection for Trailblazer Operation"
+  spec.authors       = ["Nick Sutterer", "Marc Tich"]
+  spec.email         = ["apotonick@gmail.com", "m.tichelaar@gmail.com"]
+  spec.description   = "Macros for Trailblazer's operation"
+  spec.summary       = "Macros for Trailblazer's operation: Policy, Wrap, Rescue and more."
   spec.homepage      = "http://trailblazer.to"
   spec.license       = "LGPL-3.0"
 
@@ -19,10 +19,7 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler"
 
-  spec.add_development_dependency "trailblazer", ">= 2.1.0.beta4", "< 2.2.0"
-  spec.add_development_dependency "trailblazer-activity", ">= 0.5.0", "< 0.6.0"
-  spec.add_development_dependency "trailblazer-macro-contract", ">= 2.1.0.beta4", "< 2.2.0"
-  spec.add_development_dependency "trailblazer-operation", ">= 0.2.3", "< 0.3.0"
+  spec.add_development_dependency "trailblazer-operation", ">= 0.2.4", "< 0.3.0"
 
   spec.add_development_dependency "reform"
   spec.add_development_dependency "reform-rails"
