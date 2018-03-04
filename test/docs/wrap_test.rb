@@ -63,6 +63,31 @@ When raise:   return {Railway.fail!}
   it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
 
 =begin
+Tracing with Wrap()
+=end
+  it do
+    options = { seq: [] }
+    #:trace-call
+    result  = Memo::Create.trace( options )
+    #:trace-call end
+    result.wtf.gsub("\n", "").must_match /.*Start.*find_model.*Wrap.*update.*rehash.*success.*notify.*success/
+=begin
+#:trace-success
+result.wtf? #=>
+|-- #<Trailblazer::Activity::Start semantic=:default>
+|-- find_model
+|-- Wrap/85
+|   |-- #<Trailblazer::Activity::Start semantic=:default>
+|   |-- update
+|   |-- rehash
+|   `-- #<Trailblazer::Operation::Railway::End::Success semantic=:success>
+|-- notify
+`-- #<Trailblazer::Operation::Railway::End::Success semantic=:success>
+#:trace-success end
+=end
+  end
+
+=begin
 When success: return the block's returns
 When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
 =end
@@ -137,9 +162,9 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 
 =begin
 When success: return the block's returns
-When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: true}
+When raise:   return {Railway.fail!} or {Railway.pass!}
 =end
-  class WrapWithCustomEndsTest < Minitest::Spec
+  class WrapWithTransactionTest < Minitest::Spec
     Memo = Module.new
 
     module Sequel
@@ -186,6 +211,58 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 
 =begin
 When success: return the block's returns
+When raise:   return {Railway.fail!} or {Railway.pass!}
+=end
+  class WrapWithCustomEndsTest < Minitest::Spec
+    Memo   = Module.new
+    Sequel = WrapWithTransactionTest::Sequel
+
+    #:custom-handler
+    class MyTransaction
+      MyFailSignal = Class.new(Trailblazer::Activity::Signal)
+
+      def self.call((ctx, flow_options), *, &block)
+        result = Sequel.transaction { yield }
+
+        signal = result ? Trailblazer::Operation::Railway.pass! : MyFailSignal
+
+        [ signal, [ctx, flow_options] ]
+      end
+    end
+    #:custom-handler end
+
+    #:custom
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Wrap( MyTransaction ) {
+        step :update
+        step :rehash
+      },
+        Output(:success) => End(:transaction_worked),
+        Output(MyTransaction::MyFailSignal, :failure) => End(:transaction_failed)
+      step :notify
+      fail :log_error
+      #~methods
+      include DocsWrapTest::Methods
+      #~methods end
+    end
+    #:custom end
+
+    it do
+      result = Memo::Create.( { seq: [] } )
+      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:transaction_worked>}
+    end
+
+    it do
+      result = Memo::Create.( { seq: [], rehash_raise: true } )
+      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:transaction_failed>}
+    end
+  end
+
+=begin
+When success: return the block's returns
 When raise:   return {Railway.pass!} and go "successful"
 =end
   class WrapGoesIntoPassFromRescueTest < Minitest::Spec
@@ -218,8 +295,6 @@ When raise:   return {Railway.pass!} and go "successful"
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
   end
-
-
 
 
 
