@@ -12,6 +12,7 @@ class Trailblazer::Operation
       rescue *exceptions => exception
         # DISCUSS: should we deprecate this signature and rather apply the Task API here?
         handler.call(exception, options, **circuit_options) # FIXME: when there's an error here, it shows the wrong exception!
+
         [ Trailblazer::Operation::Railway.fail!, [options, flow_options] ]
       end
     }

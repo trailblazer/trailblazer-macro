@@ -35,3 +35,5 @@ Memo = Struct.new(:id, :body) do
     nil
   end
 end
+
+require_relative "lib/methods"

@@ -4,30 +4,6 @@ class DocsWrapTest < Minitest::Spec
   module Memo
   end
 
-  module Methods
-    def find_model(ctx, seq:, **)
-      seq << :find_model
-    end
-
-    def update(ctx, seq:, **)
-      seq << :update
-    end
-
-    def notify(ctx, seq:, **)
-      seq << :notify
-    end
-
-    def rehash(ctx, seq:, rehash_raise:false, **)
-      seq << :rehash
-      raise if rehash_raise
-      true
-    end
-
-    def log_error(ctx, seq:, **)
-      seq << :log_error
-    end
-  end
-
 =begin
 When success: return the block's returns
 When raise:   return {Railway.fail!}
@@ -54,7 +30,7 @@ When raise:   return {Railway.fail!}
     step :notify
     fail :log_error
     #~methods
-    include Methods
+    include Test::Methods
     #~methods end
   end
   #:wrap end
@@ -114,7 +90,7 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       fail :log_error
 
       #~methods
-      include DocsWrapTest::Methods
+      include Test::Methods
       #~methods end
     end
 
@@ -151,7 +127,7 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
       step :notify
       fail :log_error
       #~methods
-      include DocsWrapTest::Methods
+      include Test::Methods
       #~methods end
     end
     #:fail-fast end
@@ -200,7 +176,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       step :notify
       fail :log_error
       #~methods
-      include DocsWrapTest::Methods
+      include Test::Methods
       #~methods end
     end
     #:transaction end
@@ -243,7 +219,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       step :notify
       fail :log_error
       #~methods
-      include DocsWrapTest::Methods
+      include Test::Methods
       #~methods end
     end
     #:custom end
@@ -288,7 +264,7 @@ When raise:   return {Railway.pass!} and go "successful"
       fail :log_error
 
       #~methods
-      include DocsWrapTest::Methods
+      include Test::Methods
       #~methods end
     end
 

@@ -38,117 +38,45 @@ class NestedRescueTest < Minitest::Spec
 end
 
 class RescueTest < Minitest::Spec
-  RecordNotFound = Class.new(RuntimeError)
+  class RescueWithoutHandlerTest < Minitest::Spec
+    Memo = Class.new
 
-  Song = Struct.new(:id, :title) do
-    def self.find(id)
-      raise if id == "RuntimeError!"
-      id.nil? ? raise(RecordNotFound) : new(id)
-    end
-
-    def lock!
-      true
-    end
-  end
-
-  #:simple
-  class Create < Trailblazer::Operation
-    class MyContract < Reform::Form
-      property :title
-    end
-
-    step Rescue {
-      step Model(Song, :find)
-      step Contract::Build( constant: MyContract )
-    }
-    step Contract::Validate()
-    step Contract::Persist( method: :sync )
-  end
-  #:simple end
-
-  it { Create.( params: {id: 1, title: "Prodigal Son"} )["contract.default"].model.inspect.must_equal %{#<struct RescueTest::Song id=1, title="Prodigal Son">} }
-  it { Create.( params: {id: nil} ).inspect(:model).must_equal %{<Result:false [nil] >} }
-
-  #-
-  # Rescue ExceptionClass, handler: ->(*) { }
-  class WithExceptionNameTest < Minitest::Spec
-  #
-  class MyContract < Reform::Form
-    property :title
-  end
-  #:name
-  class Create < Trailblazer::Operation
-    step Rescue( RecordNotFound, KeyError, handler: :rollback! ) {
-      step Model( Song, :find )
-      step Contract::Build( constant: MyContract )
-    }
-    step Contract::Validate()
-    step Contract::Persist( method: :sync )
-
-    def rollback!(exception, options)
-      options["x"] = exception.class
-    end
-  end
-  #:name end
-
-    it { Create.( params: {id: 1, title: "Prodigal Son"} )["contract.default"].model.inspect.must_equal %{#<struct RescueTest::Song id=1, title="Prodigal Son">} }
-    it { Create.( params: {id: 1, title: "Prodigal Son"} ).inspect("x").must_equal %{<Result:true [nil] >} }
-    it { Create.( params: {id: nil} ).inspect(:model, "x").must_equal %{<Result:false [nil, RescueTest::RecordNotFound] >} }
-    it { assert_raises(RuntimeError) { Create.( params: {id: "RuntimeError!"} ) } }
-  end
-
-
-  #-
-  # cdennl use-case
-  class CdennlRescueAndTransactionTest < Minitest::Spec
-    module Sequel
-      cattr_accessor :result
-
-      def self.transaction
-        yield.tap do |res|
-          self.result = res
-        end
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Rescue() do
+        step :update
+        step :rehash
       end
+      step :notify
+      fail :log_error
+      #~methods
+      include Test::Methods
+      #~methods end
     end
 
-  #:example
-  class Create < Trailblazer::Operation
-    class MyContract < Reform::Form
-      property :title
-    end
-
-    step Rescue( RecordNotFound, handler: :rollback! ) {
-      step Wrap (->(*, &block) { Sequel.transaction do block.call end }) {
-        step Model( Song, :find )
-        step ->(options, *) { options[:model].lock! } # lock the model.
-        step Contract::Build( constant: MyContract )
-        step Contract::Validate( )
-        step Contract::Persist( method: :sync )
-      }
-    }
-    failure :error! # handle all kinds of errors.
-
-    def rollback!(exception, options)
-      #~ex
-      options["x"] = exception.class
-      #~ex end
-    end
-
-    def error!(options, *)
-      #~ex
-      options["err"] = true
-      #~ex end
-    end
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
   end
-  #:example end
 
-    it { Create.( params: {id: 1, title: "Pie"} ).inspect(:model, "x", "err").must_equal %{<Result:true [#<struct RescueTest::Song id=1, title=\"Pie\">, nil, nil] >} }
-    # raise exceptions in Model:
-    it { Create.( params: {id: nil} ).inspect(:model, "x").must_equal %{<Result:false [nil, RescueTest::RecordNotFound] >} }
-    it { assert_raises(RuntimeError) { Create.( params: {id: "RuntimeError!"} ) } }
-    it do
-      Create.( params: {id: 1, title: "Pie"} )
-      Sequel.result.first.must_be_kind_of Trailblazer::Operation::Railway::End::Success
+  class RescueWithHandlerTest < Minitest::Spec
+    Memo = Class.new
+
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Rescue() do
+        step :update
+        step :rehash
+      end
+      step :notify
+      fail :log_error
+      #~methods
+      include Test::Methods
+      #~methods end
     end
+
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
   end
+
+
 end
