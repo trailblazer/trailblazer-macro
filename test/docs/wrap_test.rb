@@ -32,17 +32,20 @@ class DocsWrapTest < Minitest::Spec
 When success: return the block's returns
 When raise:   return {Railway.fail!}
 =end
-  class Memo::Create < Trailblazer::Operation
-    class HandleUnsafeProcess
-      def self.call((ctx), *, &block)
-        begin
-          yield # calls the wrapped steps
-        rescue
-          [ Trailblazer::Operation::Railway.fail!, [ctx, {}] ]
-        end
+  #:wrap-handler
+  class HandleUnsafeProcess
+    def self.call((ctx, flow_options), *, &block)
+      begin
+        yield # calls the wrapped steps
+      rescue
+        [ Trailblazer::Operation::Railway.fail!, [ctx, flow_options] ]
       end
     end
+  end
+  #:wrap-handler end
 
+  #:wrap
+  class Memo::Create < Trailblazer::Operation
     step :find_model
     step Wrap( HandleUnsafeProcess ) {
       step :update
@@ -50,11 +53,11 @@ When raise:   return {Railway.fail!}
     }
     step :notify
     fail :log_error
-
     #~methods
     include Methods
     #~methods end
   end
+  #:wrap end
 
   it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
   it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
@@ -101,17 +104,20 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
   class WrapGoesIntoFailFastViaFastTrackTest < Minitest::Spec
     Memo = Module.new
 
-    class Memo::Create < Trailblazer::Operation
-      class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
-          begin
-            yield # calls the wrapped steps
-          rescue
-            [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
-          end
+    #:fail-fast-handler
+    class HandleUnsafeProcess
+      def self.call((ctx), *, &block)
+        begin
+          yield # calls the wrapped steps
+        rescue
+          [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
         end
       end
+    end
+    #:fail-fast-handler end
 
+    #:fail-fast
+    class Memo::Create < Trailblazer::Operation
       step :find_model
       step Wrap( HandleUnsafeProcess ) {
         step :update
@@ -119,14 +125,63 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
       }, fast_track: true
       step :notify
       fail :log_error
-
       #~methods
       include DocsWrapTest::Methods
       #~methods end
     end
+    #:fail-fast end
 
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >} }
+  end
+
+=begin
+When success: return the block's returns
+When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: true}
+=end
+  class WrapWithCustomEndsTest < Minitest::Spec
+    Memo = Module.new
+
+    module Sequel
+      def self.transaction
+        begin
+          end_event, (ctx, flow_options) = yield
+          true
+        rescue
+          false
+        end
+      end
+    end
+
+    #:transaction-handler
+    class MyTransaction
+      def self.call((ctx, flow_options), *, &block)
+        result = Sequel.transaction { yield }
+
+        signal = result ? Trailblazer::Operation::Railway.pass! : Trailblazer::Operation::Railway.fail!
+
+        [ signal, [ctx, flow_options] ]
+      end
+    end
+    #:transaction-handler end
+
+    #:transaction
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Wrap( MyTransaction ) {
+        step :update
+        step :rehash
+      }
+      step :notify
+      fail :log_error
+      #~methods
+      include DocsWrapTest::Methods
+      #~methods end
+    end
+    #:transaction end
+
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
   end
 
 =begin
