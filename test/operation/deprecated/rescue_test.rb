@@ -80,7 +80,15 @@ class DeprecatedRescueTest < Minitest::Spec
       property :title
     end
 
-    step Rescue( RecordNotFound, handler: :rollback! ) {
+    class Rollback
+      def self.call(exception, options)
+        #~ex
+        options["x"] = exception.class
+        #~ex end
+      end
+    end
+
+    step Rescue( RecordNotFound, handler: Rollback ) {
       step Wrap (->(*, &block) { Sequel.transaction do block.call end }) {
         step Model( Song, :find )
         step ->(options, *) { options[:model].lock! } # lock the model.
@@ -91,11 +99,6 @@ class DeprecatedRescueTest < Minitest::Spec
     }
     failure :error! # handle all kinds of errors.
 
-    def rollback!(exception, options)
-      #~ex
-      options["x"] = exception.class
-      #~ex end
-    end
 
     def error!(options, *)
       #~ex
