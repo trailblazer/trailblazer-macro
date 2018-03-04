@@ -19,8 +19,8 @@ class NestedRescueTest < Minitest::Spec
       step ->(options, **) { options["c"] = true }
       failure ->(options, **) { options["inner-err"] = true }
     }
-    step ->(options, **) { options["e"] = true }, name: "nested/e"
-    failure ->(options, **) { options["outer-err"] = true }, name: "nested/failure"
+    step ->(options, **) { options["e"] = true }, id: "nested/e"
+    failure ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
   it { Trailblazer::Operation::Inspect.(NestedInsanity).must_match /\[>Rescue\(\d+\),>nested/ } # FIXME: better introspect tests for all id-generating macros.
