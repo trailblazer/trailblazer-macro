@@ -38,15 +38,19 @@ class NestedRescueTest < Minitest::Spec
 end
 
 class RescueTest < Minitest::Spec
+
+=begin
+plain Rescue()
+=end
   class RescueWithoutHandlerTest < Minitest::Spec
     Memo = Class.new
 
     class Memo::Create < Trailblazer::Operation
       step :find_model
-      step Rescue() do
+      step Rescue() {
         step :update
         step :rehash
-      end
+      }
       step :notify
       fail :log_error
       #~methods
@@ -54,19 +58,28 @@ class RescueTest < Minitest::Spec
       #~methods end
     end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
   end
 
+=begin
+Rescue( handler: X )
+=end
   class RescueWithHandlerTest < Minitest::Spec
     Memo = Class.new
 
+    class MyHandler
+      def self.call(exception, (ctx), *)
+        ctx[:exception_class] = exception.class
+      end
+    end
+
     class Memo::Create < Trailblazer::Operation
       step :find_model
-      step Rescue() do
+      step Rescue( RuntimeError, handler: MyHandler ) {
         step :update
         step :rehash
-      end
+      }
       step :notify
       fail :log_error
       #~methods
@@ -74,8 +87,8 @@ class RescueTest < Minitest::Spec
       #~methods end
     end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
+    it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
   end
 
 

@@ -5,8 +5,8 @@ class Trailblazer::Operation
     exceptions = [StandardError] unless exceptions.any?
     handler    = Trailblazer::Option(handler)
 
-    # This block is evaluated by {Wrap} which currently expects a binary return type.
-    rescue_block = ->((options, flow_options), **circuit_options, &nested_activity) {
+    # This block is evaluated by {Wrap}.
+    rescue_block = ->((options, flow_options), **circuit_options, &nested_activity) do
       begin
         nested_activity.call
       rescue *exceptions => exception
@@ -15,9 +15,9 @@ class Trailblazer::Operation
 
         [ Trailblazer::Operation::Railway.fail!, [options, flow_options] ]
       end
-    }
+    end
 
-    Wrap(rescue_block, id: "Rescue(#{rand(100)})", &block)
+    Wrap( rescue_block, id: "Rescue(#{rand(100)})", &block )
     # FIXME: name
     # [ step, name: "Rescue:#{block.source_location.last}" ]
   end
