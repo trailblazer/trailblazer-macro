@@ -34,6 +34,15 @@ end
 
 Note that Model is not designed for complex query logic - should you need that, you might want to use [Trailblazer Finder][trailblazer_finder_link] or simply write your own customized step.
 
+Due to a lot of requests, we have adjusted the `:find_by` method so you can specify a key to find by.
+```ruby
+class Song::Create < Trailblazer::Operation
+  step Policy::Guard( :authorize! )
+  step Model( Song, :find_by, :title )
+end
+```
+Not specifying the third parameter in the Model Macro for `:find_by`, will result in defaulting it back to `:id`.
+
 [trailblazer-finder-link]: https://github.com/trailblazer/trailblazer-finder/
 
 ## Policy Macro
