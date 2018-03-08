@@ -2,8 +2,11 @@ require "test_helper"
 
 class DocsModelTest < Minitest::Spec
   Song = Struct.new(:id, :title) do
-    def self.find_by(id:nil)
-      id.nil? ? nil : new(id)
+    def self.find_by(args)
+      key, value = args.flatten
+      return nil if value.nil?
+      return new(value) if key == :id
+      new(2, value) if key == :title
     end
 
     def self.[](id)
@@ -27,6 +30,7 @@ class DocsModelTest < Minitest::Spec
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=nil, title=nil>}
   end
 
+
   #:update
   class Update < Trailblazer::Operation
     step Model( Song, :find_by )
@@ -34,13 +38,29 @@ class DocsModelTest < Minitest::Spec
   end
   #:update end
 
+  #:update-with-find-by-key
+  class UpdateWithFindByKey < Trailblazer::Operation
+    step Model( Song, :find_by, :title )
+    # ..
+  end
+  #:update-with-find-by-key end
+
   it do
     #:update-ok
     result = Update.(params: { id: 1 })
-    result[:model] #=> #<struct Song id=1, title="Roxanne">
+    result[:model] #=> #<struct Song id=1, title="nil">
     #:update-ok end
 
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=1, title=nil>}
+  end
+
+  it do
+    #:update-with-find-by-key-ok
+    result = UpdateWithFindByKey.(params: { title: "Test" } )
+    result[:model] #=> #<struct Song id=2, title="Test">
+    #:update-with-find-by-key-ok end
+
+    result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=2, title="Test">}
   end
 
   it do
@@ -49,7 +69,16 @@ class DocsModelTest < Minitest::Spec
     result[:model] #=> nil
     result.success? #=> false
     #:update-fail end
+    result[:model].must_be_nil
+    result.success?.must_equal false
+  end
 
+  it do
+    #:update-with-find-by-key-fail
+    result = UpdateWithFindByKey.(params: {title: nil})
+    result[:model] #=> nil
+    result.success? #=> false
+    #:update-with-find-by-key-fail end
     result[:model].must_be_nil
     result.success?.must_equal false
   end
