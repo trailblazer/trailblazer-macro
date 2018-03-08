@@ -65,7 +65,7 @@ class ModelTest < Minitest::Spec
     Find.(params: {id: 9})[:model].inspect.must_equal %{#<struct ModelTest::Song id=9, title=nil>}
   end
 
-  # can't find model.
+  # can't find model by title.
   #- result object, model
   it do
     FindByKey.(params: {title: nil})["result.model"].failure?.must_equal true
@@ -73,7 +73,7 @@ class ModelTest < Minitest::Spec
     FindByKey.(params: {title: nil}).failure?.must_equal true
   end
 
-  #- result object, model
+  #- result object, model by title
   it do
     FindByKey.(params: {title: "Test"})["result.model"].success?.must_equal true
     FindByKey.(params: {title: "Test"})["x"].must_equal true
