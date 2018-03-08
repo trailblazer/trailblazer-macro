@@ -2,7 +2,25 @@
 All common Macro's for Trailblazer::Operation, will come here
 
 ## TODO
-Describe the Macro's that are included
+Describe the following Macro's:
+- Nested
+- Rescue
+- Wrap
+
+## Table of Contents
+- [Model Macro](#model-macro)
+- [Policy Macro](#policy-macro)
+  * [Policy::Pundit - Macro](#policy--pundit---macro)
+    + [Policy::Pundit - API](#policy--pundit---api)
+    + [Policy::Pundit - Name](#policy--pundit---name)
+    + [Policy::Pundit - Dependency Injection](#policy--pundit---dependency-injection)
+  * [Policy::Guard - Macro](#policy--guard---macro)
+    + [Policy::Guard - API](#policy--guard---api)
+    + [Policy::Guard - Callable](#policy--guard---callable)
+    + [Policy::Guard - Instance Method](#policy--guard---instance-method)
+    + [Policy::Guard - Name](#policy--guard---name)
+    + [Policy::Guard - Dependency Injection](#policy--guard---dependency-injection)
+    + [Policy::Guard - Position](#policy--guard---position)
 
 ## Model Macro
 Trailblazer also has a convenient Macro to handle model creation and basic finding by id. The Model macro literally does what our model! step did.
@@ -43,7 +61,7 @@ end
 
 The policy is evaluated in #setup!, raises an exception if false and suppresses running #process.
 
-### Pundit Macro
+### Policy::Pundit - Macro
 The Policy::Pundit Macro allows using Pundit-compatible policy classes in an operation.
 
 A Pundit policy has various rule methods and a special constructor that receives the current user and the current model.
@@ -83,7 +101,7 @@ Create.( {}, "current_user" => User.find(1) )
 
 Any other call will cause a policy breach and stop the pipe from executing after the Policy::Pundit step.
 
-#### API
+#### Policy::Pundit - API
 Add your polices using the Policy::Pundit macro. It accepts the policy class name, and the rule method to call.
 ```ruby
 class Create < Trailblazer::Operation
@@ -106,7 +124,7 @@ result["result.policy.default"]["policy"] #=> #<MyPolicy ...>
 
 Note that the actual policy instance is available via ["result.policy.#{name}"]["policy"] to be reinvoked with other rules (e.g. in the view layer).
 
-#### Name
+#### Policy::Pundit - Name
 You can add any number of Pundit policies to your pipe. Make sure to use name: to name them, though.
 ```ruby
 class Create < Trailblazer::Operation
@@ -122,7 +140,7 @@ result = Create.({}, "current_user" => Module)
 result["result.policy.after_model"].success? #=> true
 ```
 
-#### Dependency Injection
+#### Policy::Pundit - Dependency Injection
 Override a configured policy using dependency injection.
 ```ruby
 Create.({},
@@ -132,7 +150,7 @@ Create.({},
 ```
 You can inject it using "policy.#{name}.eval". It can be any object responding to call.
 
-### Guard Macro
+### Policy::Guard - Macro
 A guard is a step that helps you evaluating a condition and writing the result. If the condition was evaluated as falsey, the pipe won’t be further processed and a policy breach is reported in Result["result.policy.default"].
 
 ```ruby
@@ -159,7 +177,7 @@ result["x"] #=> nil
 result["result.policy.default"].success? #=> false
 ```
 
-#### API
+#### Policy::Guard - API
 The Policy::Guard macro helps you inserting your guard logic. If not defined, it will be evaluated where you insert it.
 ```ruby
 class Create < Trailblazer::Operation
@@ -169,7 +187,7 @@ end
 ```
 The options object is passed into the guard and allows you to read and inspect data like params or current_user. Please use kw args.
 
-#### Callable
+#### Policy::Guard - Callable
 As always, the guard can also be a Callable-marked object.
 ```ruby
 class MyGuard
@@ -189,7 +207,7 @@ class Create < Trailblazer::Operation
 end
 ```
 
-#### Instance Method
+#### Policy::Guard - Instance Method
 As always, you may also use an instance method to implement a guard.
 ```ruby
 class Create < Trailblazer::Operation
@@ -202,7 +220,7 @@ class Create < Trailblazer::Operation
 end
 ```
 
-#### Name
+#### Policy::Guard - Name
 The guard name defaults to default and can be set via name:. This allows having multiple guards.
 ```ruby
 class Create < Trailblazer::Operation
@@ -217,7 +235,7 @@ result = Create.({}, "current_user" => true)
 result["result.policy.user"].success? #=> true
 ```
 
-#### Dependency Injection
+#### Policy::Guard - Dependency Injection
 Instead of using the configured guard, you can inject any callable object that returns a Result object. Do so by overriding the policy.#{name}.eval path when calling the operation.
 ```ruby
 Create.({},
@@ -229,7 +247,7 @@ An easy way to let Trailblazer build a compatible object for you is using Guard.
 
 This is helpful to override a certain policy for testing, or to invoke it with special rights, e.g. for an admin.
 
-#### Position
+#### Policy::Guard - Position
 You may specify a position.
 ```ruby
 class Create < Trailblazer::Operation
@@ -246,4 +264,3 @@ puts Create["pipetree"].inspect(style: :rows) #=>
  # 2 ===============================>model!
 ```
 This is helpful if you maintain modules for operations with generic steps.
-
