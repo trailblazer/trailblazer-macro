@@ -1,6 +1,6 @@
 class Trailblazer::Operation
   def self.Model(model_class, action=nil, find_by_key=nil)
-    task = Trailblazer::Activity::TaskBuilder::Binary.call(Model.new)
+    task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     extension = Trailblazer::Activity::TaskWrap::Merge.new(
       Wrap::Inject::Defaults(
