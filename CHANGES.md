@@ -1,3 +1,7 @@
+# 2.1.0.beta4
+
+* New operation version.
+
 # 2.1.0.beta3
 
 * Fix `Wrap` which didn't deprecate `Module`s properly.
