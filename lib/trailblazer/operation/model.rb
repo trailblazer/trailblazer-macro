@@ -46,8 +46,8 @@ class Trailblazer::Operation
       end
 
       # Call any method on the model class and pass :id.
-      def pass_through!(model_class, params, action, *)
-        model_class.send(action, params[:id])
+      def pass_through!(model_class, params, action, find_by_key, *)
+        model_class.send(action, params[find_by_key])
       end
     end
   end
