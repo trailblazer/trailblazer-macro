@@ -118,7 +118,8 @@ class DocsGuardInjectionTest < Minitest::Spec
   it {
     result =
   #:di-call
-  Create.({},
+  Create.(
+    {},
     :current_user        => Module,
     "policy.default.eval" => Trailblazer::Operation::Policy::Guard.build(->(options, **) { false })
   )
