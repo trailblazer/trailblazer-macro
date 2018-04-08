@@ -27,6 +27,10 @@ When raise:   return {Railway.fail!}
       step :update
       step :rehash
     }
+    step Wrap( HandleUnsafeProcess ) {
+      step :update
+      step :rehash
+    }
     step :notify
     fail :log_error
     #~methods
@@ -35,7 +39,7 @@ When raise:   return {Railway.fail!}
   end
   #:wrap end
 
-  it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+  it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :update, :rehash, :notify]] >} }
   it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
 
 =begin
@@ -46,7 +50,7 @@ Tracing with Wrap()
     #:trace-call
     result  = Memo::Create.trace( options )
     #:trace-call end
-    result.wtf.gsub("\n", "").must_match /.*Start.*find_model.*Wrap.*update.*rehash.*success.*notify.*success/
+    result.wtf.gsub("\n", "").must_match /.*Start.*find_model.*Wrap.*HandleUnsafeProcess.*update.*rehash.*success.*notify.*success/
 =begin
 #:trace-success
 result.wtf? #=>
