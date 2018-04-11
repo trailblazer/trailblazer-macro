@@ -27,7 +27,7 @@ class Trailblazer::Operation
         action        = options["model.action"] || :new
         model_class   = options["model.class"]
         find_by_key   = options["model.find_by_key"] || :id
-        action        = :pass_through unless %i[new find_by find].include?(action)
+        action        = :pass_through unless %i[new find_by].include?(action)
 
         send("#{action}!", model_class, params, options["model.action"], find_by_key)
       end
@@ -36,16 +36,12 @@ class Trailblazer::Operation
         model_class.new
       end
 
-      def find!(model_class, params, *)
-        model_class.find(params[:id])
-      end
-
       # Doesn't throw an exception and will return false to divert to Left.
       def find_by!(model_class, params, action, find_by_key, *)
         model_class.find_by(find_by_key.to_sym => params[find_by_key])
       end
 
-      # Call any method on the model class and pass :id.
+      # Call any method on the model class and pass find_by_key, for example find(params[:id]).
       def pass_through!(model_class, params, action, find_by_key, *)
         model_class.send(action, params[find_by_key])
       end
