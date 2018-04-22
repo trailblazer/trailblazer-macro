@@ -1,4 +1,3 @@
-require "trailblazer/macro/version"
 require "trailblazer/operation"
 
 require "trailblazer/operation/inject"
