@@ -19,7 +19,7 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler"
 
-  spec.add_development_dependency "trailblazer-operation", ">= 0.2.5", "< 0.3.0"
+  spec.add_development_dependency "trailblazer-operation", ">= 0.3.0", "< 0.4.0"
 
   spec.add_development_dependency "minitest"
   spec.add_development_dependency "rake"
