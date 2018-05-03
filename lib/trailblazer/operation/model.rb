@@ -10,7 +10,7 @@ class Trailblazer::Operation
       )
     )
 
-    { task: task, id: "model.build", extension: [extension] }
+    { task: task, id: "model.build", Trailblazer::Activity::DSL::Extension.new(extension) => true }
   end
 
   class Model

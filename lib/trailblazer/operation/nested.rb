@@ -22,7 +22,7 @@ module Trailblazer
       {
         task:      task,
         id:        id,
-        extension: [Trailblazer::Activity::TaskWrap::Merge.new(task_wrap_extensions)],
+        Trailblazer::Activity::DSL::Extension.new(Trailblazer::Activity::TaskWrap::Merge.new(task_wrap_extensions)) => true,
         outputs:   operation.outputs
       }
     end
@@ -36,7 +36,7 @@ module Trailblazer
         # The returned {Nested} instance is a valid circuit element and will be `call`ed in the circuit.
         # It simply returns the nested activity's `signal,options,flow_options` return set.
         # The actual wiring - where to go with that - is done by the step DSL.
-        return Trailblazer::Operation::Callable(nested_operation, call: :__call__), nested_operation, false
+        return nested_operation, nested_operation, false
       end
 
       def self.nestable_object?(object)
@@ -71,7 +71,7 @@ module Trailblazer
 
           # Overwrite :task so task_wrap.call_task will call this activity.
           # This is a trick so we don't have to repeat logic from #call_task here.
-          wrap_ctx[:task] = Trailblazer::Operation::Callable( activity, call: :__call__ )
+          wrap_ctx[:task] = activity
 
           return Activity::Right, [wrap_ctx, original_args]
         end
