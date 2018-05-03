@@ -37,8 +37,6 @@ end
 class DocsGuardTest < Minitest::Spec
   #:callable
   class MyGuard
-    include Uber::Callable
-
     def call(options, pass:, **)
       pass
     end
