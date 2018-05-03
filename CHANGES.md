@@ -1,3 +1,9 @@
+# 2.1.0.beta6
+
+* Use newest operation.
+
+# 2.1.0.beta5
+
 # 2.1.0.beta4
 
 * New operation version.
