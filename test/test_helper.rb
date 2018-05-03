@@ -1,4 +1,5 @@
 require "pp"
+require "delegate" # Ruby 2.2
 require "trailblazer/macro"
 require "minitest/autorun"
 
