@@ -63,7 +63,7 @@ class NestedWithCallableAndInputTest < Minitest::Spec
     end
 
     # only let :title pass through.
-    def input_for_create( ctx )
+    def input_for_create( ctx, ** )
       { title: ctx[:title] }
     end
 
