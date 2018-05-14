@@ -1,3 +1,7 @@
+# 2.1.0.beta7
+
+* Nested :input, :output now uses activity's VariableMapping.
+
 # 2.1.0.beta6
 
 * Use newest operation.
