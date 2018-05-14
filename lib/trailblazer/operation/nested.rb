@@ -2,33 +2,41 @@
 module Trailblazer
   class Operation
     # {Nested} macro.
-    def self.Nested(callable, input:nil, output:nil, id: "Nested(#{callable})")
+    def self.Nested(callable, id: "Nested(#{callable})", input: nil, output: nil)
       task_wrap_extensions        = Module.new do
         extend Activity::Path::Plan()
       end
 
-      task, operation, is_dynamic = Nested.build(callable)
+      input_output = Nested.input_output_extensions_for(input, output) # TODO: deprecate this?
 
-      # TODO: move this to the generic step DSL
-      if input || output
-        task_wrap_extensions = InputOutput.plan( input, output )
-      end
+      task, operation, is_dynamic = Nested.build(callable)
 
       if is_dynamic
         task_wrap_extensions.task task.method(:compute_nested_activity), id: ".compute_nested_activity",  after: "Start.default", group: :start
         task_wrap_extensions.task task.method(:compute_return_signal),   id: ".compute_return_signal",    after: "task_wrap.call_task"
       end
 
-      {
+      options = {
         task:      task,
         id:        id,
         Trailblazer::Activity::DSL::Extension.new(Trailblazer::Activity::TaskWrap::Merge.new(task_wrap_extensions)) => true,
-        outputs:   operation.outputs
-      }
+        outputs:   operation.outputs,
+      }.merge(input_output)
     end
 
     # @private
     module Nested
+      def self.input_output_extensions_for(input, output)
+        return {} unless input || output
+
+        input  = input  || ->(original_ctx, **) { original_ctx }
+        output = output || ->(new_ctx, **)      { new_ctx.decompose.last } # merges "mutable" part into original, since it's in Unscoped.
+
+        {
+          Activity::TaskWrap::VariableMapping(input: input, output: output) => true
+        }
+      end
+
       # DISCUSS: use builders here?
       def self.build(nested_operation)
         return dynamic = Dynamic.new(nested_operation), dynamic, true unless nestable_object?(nested_operation)

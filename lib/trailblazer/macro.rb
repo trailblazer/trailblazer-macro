@@ -1,7 +1,6 @@
 require "trailblazer/operation"
 
 require "trailblazer/operation/inject"
-require "trailblazer/operation/input_output"
 
 require "trailblazer/operation/model"
 require "trailblazer/operation/policy"
