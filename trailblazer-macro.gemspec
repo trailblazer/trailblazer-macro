@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.description   = "Macros for Trailblazer's operation"
   spec.summary       = "Macros for Trailblazer's operation: Policy, Wrap, Rescue and more."
   spec.homepage      = "http://trailblazer.to"
-  spec.license       = "LGPL-3.0"
+  spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($INPUT_RECORD_SEPARATOR)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
@@ -19,7 +19,7 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler"
 
-  spec.add_development_dependency "trailblazer-operation", ">= 0.3.0", "< 0.4.0"
+  spec.add_development_dependency "trailblazer-operation", ">= 0.4.0", "< 0.5.0"
 
   spec.add_development_dependency "minitest"
   spec.add_development_dependency "rake"
