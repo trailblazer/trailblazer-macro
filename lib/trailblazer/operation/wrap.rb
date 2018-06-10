@@ -3,12 +3,12 @@ class Trailblazer::Operation
     operation_class = Wrap.create_operation(block)
     wrapped         = Wrap::Wrapped.new(operation_class, user_wrap)
 
-    { task: wrapped, id: id, outputs: operation_class.outputs }
+    {task: wrapped, id: id, outputs: operation_class.outputs}
   end
 
   module Wrap
     def self.create_operation(block)
-      Class.new( Nested.operation_class, &block ) # Usually resolves to Trailblazer::Operation.
+      Class.new(Nested.operation_class, &block) # Usually resolves to Trailblazer::Operation.
     end
 
     # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
@@ -46,16 +46,16 @@ class Trailblazer::Operation
         }
       end
 
-      def call( (ctx, flow_options), **circuit_options )
+      def call((ctx, flow_options), **circuit_options)
         block_calling_wrapped = -> {
           activity = @operation.to_h[:activity]
 
-          activity.( [ctx, flow_options], **circuit_options )
+          activity.([ctx, flow_options], **circuit_options)
         }
 
         # call the user's Wrap {} block in the operation.
         # This will invoke block_calling_wrapped above if the user block yields.
-        returned = @user_wrap.( [ctx, flow_options], **circuit_options, &block_calling_wrapped )
+        returned = @user_wrap.([ctx, flow_options], **circuit_options, &block_calling_wrapped)
 
         # {returned} can be
         #   1. {circuit interface return} from the begin block, because the wrapped OP passed

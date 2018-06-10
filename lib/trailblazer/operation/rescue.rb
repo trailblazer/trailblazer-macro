@@ -15,11 +15,11 @@ class Trailblazer::Operation
         # DISCUSS: should we deprecate this signature and rather apply the Task API here?
         handler.call(exception, ctx, **circuit_options) # FIXME: when there's an error here, it shows the wrong exception!
 
-        [ Trailblazer::Operation::Railway.fail!, [ctx, flow_options] ]
+        [Trailblazer::Operation::Railway.fail!, [ctx, flow_options]]
       end
     end
 
-    Wrap( rescue_block, id: "Rescue(#{rand(100)})", &block )
+    Wrap(rescue_block, id: "Rescue(#{rand(100)})", &block)
     # FIXME: name
     # [ step, name: "Rescue:#{block.source_location.last}" ]
   end
