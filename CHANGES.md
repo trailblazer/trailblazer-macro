@@ -1,6 +1,7 @@
-# 2.1.0.beta8
+# 2.1.0.rc1
 
-* Use `operation-0.4.0`.
+* Use `operation-0.4.1`.
+* Change back to MIT license.
 
 # 2.1.0.beta7
 
