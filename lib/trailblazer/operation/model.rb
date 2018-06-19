@@ -1,5 +1,5 @@
 class Trailblazer::Operation
-  def self.Model(model_class, action=nil, find_by_key=nil)
+  def self.Model(model_class, action = nil, find_by_key = nil)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     extension = Trailblazer::Activity::TaskWrap::Merge.new(
@@ -10,7 +10,7 @@ class Trailblazer::Operation
       )
     )
 
-    { task: task, id: "model.build", Trailblazer::Activity::DSL::Extension.new(extension) => true }
+    {task: task, id: "model.build", Trailblazer::Activity::DSL::Extension.new(extension) => true}
   end
 
   class Model

@@ -3,7 +3,7 @@ module Trailblazer
   class Operation
     # {Nested} macro.
     def self.Nested(callable, id: "Nested(#{callable})", input: nil, output: nil)
-      task_wrap_extensions        = Module.new do
+      task_wrap_extensions = Module.new do
         extend Activity::Path::Plan()
       end
 
@@ -48,7 +48,7 @@ module Trailblazer
       end
 
       def self.nestable_object?(object)
-        object.is_a?( Trailblazer::Activity::Interface )
+        object.is_a?(Trailblazer::Activity::Interface)
       end
 
       def self.operation_class
@@ -63,8 +63,8 @@ module Trailblazer
         def initialize(nested_activity)
           @nested_activity = Trailblazer::Option::KW(nested_activity)
           @outputs         = {
-            :success => Activity::Output( Railway::End::Success.new(semantic: :success), :success ),
-            :failure => Activity::Output( Railway::End::Failure.new(semantic: :failure), :failure ),
+            :success => Activity::Output(Railway::End::Success.new(semantic: :success), :success),
+            :failure => Activity::Output(Railway::End::Failure.new(semantic: :failure), :failure)
           }
         end
 

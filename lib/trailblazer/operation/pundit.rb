@@ -1,7 +1,7 @@
 class Trailblazer::Operation
   module Policy
     def self.Pundit(policy_class, action, name: :default)
-      Policy.step( Pundit.build(policy_class, action), name: name )
+      Policy.step(Pundit.build(policy_class, action), name: name)
     end
 
     module Pundit
@@ -17,7 +17,7 @@ class Trailblazer::Operation
 
         # Instantiate the actual policy object, and call it.
         def call((options), *)
-          policy = build_policy(options)          # this translates to Pundit interface.
+          policy = build_policy(options) # this translates to Pundit interface.
           result!(policy.send(@action), policy)
         end
 
@@ -27,7 +27,7 @@ class Trailblazer::Operation
         end
 
         def result!(success, policy)
-          data = { "policy" => policy }
+          data = {"policy" => policy}
           data["message"] = "Breach" if !success # TODO: how to allow messages here?
 
           Result.new(success, data)
