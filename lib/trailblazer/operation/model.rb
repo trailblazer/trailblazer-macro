@@ -2,15 +2,13 @@ class Trailblazer::Operation
   def self.Model(model_class, action = nil, find_by_key = nil)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
-    extension = Trailblazer::Activity::TaskWrap::Merge.new(
-      Wrap::Inject::Defaults(
-        "model.class"          => model_class,
-        "model.action"         => action,
-        "model.find_by_key"    => find_by_key
-      )
+    injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
+      "model.class"          => model_class,
+      "model.action"         => action,
+      "model.find_by_key"    => find_by_key
     )
 
-    {task: task, id: "model.build", Trailblazer::Activity::DSL::Extension.new(extension) => true}
+    {task: task, id: "model.build", extensions: [injection]}
   end
 
   class Model

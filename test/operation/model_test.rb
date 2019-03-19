@@ -13,15 +13,24 @@ class ModelTest < Minitest::Spec
 
   #---
   # use Model semantics, no customizations.
-  class Create < Trailblazer::Operation
-    step Model( Song, :new )
+  # class Create < Trailblazer::Operation
+  class Create < Trailblazer::Activity::Railway
+    step Trailblazer::Operation::Model( Song, :new )
   end
 
   # :new new.
   it { Create.(params: {})[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>} }
+  it do
 
-  class Update < Create
-    step Model( Song, :find ), override: true
+    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke Create, params: {}
+
+    ctx[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>}
+
+  end
+
+  # class Update < Create
+  class Update < Trailblazer::Activity::Railway
+    step Trailblazer::Operation::Model( Song, :find ), override: true
   end
 
   #---
@@ -35,16 +44,18 @@ class ModelTest < Minitest::Spec
 
   #---
   # :find_by, exceptionless.
-  class Find < Trailblazer::Operation
-    step Model Song, :find_by
+  # class Find < Trailblazer::Operation
+  class Find < Trailblazer::Activity::Railway
+    step Trailblazer::Operation::Model Song, :find_by
     step :process
 
     def process(options, **); options["x"] = true end
   end
 
   # :find_by, exceptionless.
-  class FindByKey < Trailblazer::Operation
-    step Model( Song, :find_by, :title )
+  # class FindByKey < Trailblazer::Operation
+  class FindByKey < Trailblazer::Activity::Railway
+    step Trailblazer::Operation::Model( Song, :find_by, :title )
     step :process
 
     def process(options, **); options["x"] = true end

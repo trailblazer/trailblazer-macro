@@ -22,7 +22,7 @@ end
 
 require "pp"
 
-Minitest::Spec::Operation = Trailblazer::Operation
+# Minitest::Spec::Operation = Trailblazer::Operation
 
 Memo = Struct.new(:id, :body) do
   def self.find(id)
@@ -32,3 +32,5 @@ Memo = Struct.new(:id, :body) do
 end
 
 require_relative "lib/methods"
+
+require "trailblazer/activity/dsl/linear"
