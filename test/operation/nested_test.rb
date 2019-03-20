@@ -16,7 +16,7 @@ class NestedTest < Minitest::Spec
 
   class A < Trailblazer::Operation
     extend ClassDependencies
-    self["A.class.data"] = "yes"                                   # class data on A
+    # self["A.class.data"] = "yes"                                   # class data on A
 
     pass ->(options, **) { options["mutable.data.from.A"] = "from A!" } # mutable data on A
     step Nested( B )
@@ -55,7 +55,7 @@ class NestedTest < Minitest::Spec
   #- Nested( ->{} )
   class SomeNestedWithProc < Trailblazer::Operation
     extend ClassDependencies
-    self["A.class.data"] = "yes"                                   # class data on A
+    # self["A.class.data"] = "yes"                                   # class data on A
 
     Decider = ->(options, use_class:raise, **) { use_class }
 
@@ -67,7 +67,7 @@ class NestedTest < Minitest::Spec
   #- Nested( Callable )
   class SomeNestedWithCallable < Trailblazer::Operation
     extend ClassDependencies
-    self["A.class.data"] = "yes"                                   # class data on A
+    # self["A.class.data"] = "yes"                                   # class data on A
 
     class Decider
       def self.call(options, use_class:raise, **)
@@ -83,7 +83,7 @@ class NestedTest < Minitest::Spec
   #- Nested( :method )
   class SomeNestedWithMethod < Trailblazer::Operation
     extend ClassDependencies
-    self["A.class.data"] = "yes"                                   # class data on A
+    # self["A.class.data"] = "yes"                                   # class data on A
 
     def decider(options, use_class:raise, **)
       use_class
@@ -201,8 +201,7 @@ class NestedTest < Minitest::Spec
   end
 
 
-  #---
-  #- :exec_context
+  # Nested() with an operation
   class Create < Trailblazer::Operation
     class Edit < Trailblazer::Operation
       step :c!
@@ -219,75 +218,4 @@ class NestedTest < Minitest::Spec
   end
 
   it { Create.().inspect(:a, :b, :c).must_equal %{<Result:true [2, 3, 1] >} }
-end
-
-class NestedWithFastTrackTest < Minitest::Spec
-  module Steps
-    def b(options, a:, **)
-      options["b"] = a+1
-    end
-
-    def f(options, **)
-      options["f"] = 3
-    end
-  end
-
-  class Edit < Trailblazer::Operation
-    pass :a, pass_fast: true
-
-    def a(options, **)
-      options["a"] = 1
-    end
-  end
-
-  class Update < Trailblazer::Operation
-    step Nested( Edit )
-    step :b
-    fail :f
-
-    include Steps
-  end
-
-  # from Nested straight to End.pass_fast.
-  it { Update.({}).inspect("a", "b", "f").must_equal %{<Result:true [1, nil, nil] >} }
-
-  #- Nested, pass_fast: true
-  class Upsert < Trailblazer::Operation
-    step Nested( Edit ), pass_fast: true # this option is unnecessary.
-    step :b
-    fail :f
-
-    include Steps
-  end
-
-  # from Nested straight to End.pass_fast.
-  it { Upsert.({}).inspect("a", "b", "f").must_equal %{<Result:true [1, nil, nil] >} }
-
-  #- mapping
-  #- Nested, :pass_fast => :failure
-  it "attaches :pass_fast => :failure" do
-    op = Class.new(Trailblazer::Operation) do
-      step Nested( Edit ), Output(:pass_fast) => Track(:failure)
-      step :b
-      fail :f
-
-      include Steps
-    end
-
-    # from Nested to :failure track.
-    op.({}).inspect("a", "b", "c", "f").must_equal %{<Result:false [1, nil, nil, 3] >}
-  end
-
-  it "goes straigt to End.failure" do
-    op = Class.new(Trailblazer::Operation) do
-      step Nested( Edit ), Output(:pass_fast) => "End.failure"
-      step :b
-      fail :f
-
-      include Steps
-    end
-
-    # from Nested straight to End.failure, no fail step will be visited.
-    op.({}).inspect("a", "b", "c", "f").must_equal %{<Result:false [1, nil, nil, nil] >}
-  end
 end

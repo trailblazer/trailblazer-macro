@@ -3,11 +3,15 @@ module Trailblazer
   class Operation
     # {Nested} macro.
     def self.Nested(callable, id: "Nested(#{callable})", input: nil, output: nil)
+      if callable.is_a?(Class) && callable < Nested.operation_class
+        warn %{[Trailblazer] Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(Create)` with `Subprocess(Create)`.}
+        return Nested.operation_class.Subprocess(callable)
+      end
+return
+
       task_wrap_extensions = Module.new do
         extend Activity::Path::Plan()
       end
-
-      input_output = Nested.input_output_extensions_for(input, output) # TODO: deprecate this?
 
       task, operation, is_dynamic = Nested.build(callable)
 
@@ -26,20 +30,9 @@ module Trailblazer
 
     # @private
     module Nested
-      def self.input_output_extensions_for(input, output)
-        return {} unless input || output
-
-        input  = input  || ->(original_ctx, **) { original_ctx }
-        output = output || ->(new_ctx, **)      { new_ctx.decompose.last } # merges "mutable" part into original, since it's in Unscoped.
-
-        {
-          Activity::TaskWrap::VariableMapping(input: input, output: output) => true
-        }
-      end
-
       # DISCUSS: use builders here?
       def self.build(nested_operation)
-        return dynamic = Dynamic.new(nested_operation), dynamic, true unless nestable_object?(nested_operation)
+        return dynamic = Dynamic.new(nested_operation), dynamic, true unless subprocess?(nested_operation)
 
         # The returned {Nested} instance is a valid circuit element and will be `call`ed in the circuit.
         # It simply returns the nested activity's `signal,options,flow_options` return set.
@@ -47,9 +40,6 @@ module Trailblazer
         return nested_operation, nested_operation, false
       end
 
-      def self.nestable_object?(object)
-        object.is_a?(Trailblazer::Activity::Interface)
-      end
 
       def self.operation_class
         Operation
