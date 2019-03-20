@@ -32,13 +32,11 @@ class Trailblazer::Operation
 
       task = Eval.new(name: name, path: path)
 
-      extension = Trailblazer::Activity::TaskWrap::Merge.new(
-        Trailblazer::Operation::Wrap::Inject::Defaults(
-          path => condition
-        )
+      injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
+        path => condition
       )
 
-      {task: task, id: path, Trailblazer::Activity::DSL::Extension.new(extension) => true}
+      {task: task, id: path, extensions: [injection]}
     end
   end
 end
