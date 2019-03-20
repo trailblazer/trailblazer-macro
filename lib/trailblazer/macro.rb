@@ -1,6 +1,5 @@
 require "trailblazer/activity"
-
-# require "trailblazer/operation/inject"
+require "trailblazer/operation"
 
 require "trailblazer/operation/model"
 require "trailblazer/operation/policy"

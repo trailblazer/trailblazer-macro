@@ -13,7 +13,7 @@ class Trailblazer::Operation
 
     # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
     class Wrapped #< Trailblazer::Operation # FIXME: the inheritance is only to satisfy Nested( Wrapped.new )
-      include Trailblazer::Activity::Interface
+      # include Trailblazer::Activity::Interface
 
       private def deprecate_positional_wrap_signature(user_wrap)
         parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters

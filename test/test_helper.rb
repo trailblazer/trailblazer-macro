@@ -1,7 +1,8 @@
-require "pp"
 require "delegate" # Ruby 2.2
-require "trailblazer/macro"
 require "minitest/autorun"
+
+require "trailblazer/macro"
+
 
 module Mock
   class Result
@@ -33,4 +34,4 @@ end
 
 require_relative "lib/methods"
 
-require "trailblazer/activity/dsl/linear"
+
