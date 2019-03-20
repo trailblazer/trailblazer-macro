@@ -14,7 +14,7 @@ class ModelTest < Minitest::Spec
   #---
   # use Model semantics, no customizations.
   # class Create < Trailblazer::Operation
-  class Create < Trailblazer::Activity::Railway
+  class Create < Trailblazer::Operation
     step Trailblazer::Operation::Model( Song, :new )
   end
 
@@ -22,14 +22,13 @@ class ModelTest < Minitest::Spec
   it { Create.(params: {})[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>} }
   it do
 
-    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke Create, params: {}
+    result = Create.(params: {})
 
-    ctx[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>}
-
+    result[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>}
   end
 
   # class Update < Create
-  class Update < Trailblazer::Activity::Railway
+  class Update < Trailblazer::Operation
     step Trailblazer::Operation::Model( Song, :find ), override: true
   end
 
@@ -45,7 +44,7 @@ class ModelTest < Minitest::Spec
   #---
   # :find_by, exceptionless.
   # class Find < Trailblazer::Operation
-  class Find < Trailblazer::Activity::Railway
+  class Find < Trailblazer::Operation
     step Trailblazer::Operation::Model Song, :find_by
     step :process
 
@@ -54,7 +53,7 @@ class ModelTest < Minitest::Spec
 
   # :find_by, exceptionless.
   # class FindByKey < Trailblazer::Operation
-  class FindByKey < Trailblazer::Activity::Railway
+  class FindByKey < Trailblazer::Operation
     step Trailblazer::Operation::Model( Song, :find_by, :title )
     step :process
 
