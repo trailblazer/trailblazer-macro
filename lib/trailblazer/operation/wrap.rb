@@ -1,20 +1,18 @@
 class Trailblazer::Operation
   def self.Wrap(user_wrap, id: "Wrap/#{rand(100)}", &block)
-    operation_class = Wrap.create_operation(block)
-    wrapped         = Wrap::Wrapped.new(operation_class, user_wrap)
+    activity = Class.new(Trailblazer::Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
 
-    {task: wrapped, id: id, outputs: operation_class.outputs}
+    outputs  = activity.to_h[:outputs]
+    outputs  = Hash[outputs.collect { |output| [output.semantic, output] }]
+
+    wrapped  = Wrap::Wrapped.new(activity, user_wrap, outputs)
+
+    {task: wrapped, id: id, outputs: outputs}
   end
 
   module Wrap
-    def self.create_operation(block)
-      Class.new(Nested.operation_class, &block) # Usually resolves to Trailblazer::Operation.
-    end
-
     # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
     class Wrapped #< Trailblazer::Operation # FIXME: the inheritance is only to satisfy Nested( Wrapped.new )
-      # include Trailblazer::Activity::Interface
-
       private def deprecate_positional_wrap_signature(user_wrap)
         parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters
 
@@ -26,7 +24,7 @@ class Trailblazer::Operation
         end
       end
 
-      def initialize(operation, user_wrap)
+      def initialize(operation, user_wrap, outputs)
         user_wrap = deprecate_positional_wrap_signature(user_wrap)
 
         @operation  = operation
@@ -34,7 +32,6 @@ class Trailblazer::Operation
 
         # Since in the user block, you can return Railway.pass! etc, we need to map
         # those to the actual wrapped operation's end.
-        outputs           = @operation.outputs
         @signal_to_output = {
           Railway.pass!      => outputs[:success].signal,
           Railway.fail!      => outputs[:failure].signal,
@@ -48,9 +45,7 @@ class Trailblazer::Operation
 
       def call((ctx, flow_options), **circuit_options)
         block_calling_wrapped = -> {
-          activity = @operation.to_h[:activity]
-
-          activity.([ctx, flow_options], **circuit_options)
+          @operation.([ctx, flow_options], **circuit_options)
         }
 
         # call the user's Wrap {} block in the operation.
@@ -73,10 +68,6 @@ class Trailblazer::Operation
         signal = @signal_to_output.fetch(signal, signal)
 
         return signal, [ctx, flow_options]
-      end
-
-      def outputs
-        @operation.outputs
       end
     end
   end # Wrap

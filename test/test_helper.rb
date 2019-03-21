@@ -32,7 +32,5 @@ Memo = Struct.new(:id, :body) do
   end
 end
 
-require_relative "lib/methods"
-
 require "trailblazer/activity/testing"
 T = Trailblazer::Activity::Testing

@@ -1,6 +1,14 @@
 require "test_helper"
 
 class DocsWrapTest < Minitest::Spec
+  module Rehash
+    def rehash(ctx, seq:, rehash_raise: false, **)
+      seq << :rehash
+      raise if rehash_raise
+      true
+    end
+  end
+
   module Memo
   end
 
@@ -30,7 +38,8 @@ When raise:   return {Railway.fail!}
     step :notify
     fail :log_error
     #~methods
-    include Test::Methods
+    include T.def_steps(:find_model, :update, :notify, :log_error)
+    include Rehash
     #~methods end
   end
   #:wrap end
@@ -90,7 +99,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       fail :log_error
 
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
 
@@ -127,7 +137,8 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
     #:fail-fast end
@@ -176,7 +187,8 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
     #:transaction end
@@ -219,7 +231,8 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
     #:custom end
@@ -264,7 +277,8 @@ When raise:   return {Railway.pass!} and go "successful"
       fail :log_error
 
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
 
