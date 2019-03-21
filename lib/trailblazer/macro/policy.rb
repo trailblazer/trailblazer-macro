@@ -1,4 +1,4 @@
-class Trailblazer::Operation
+module Trailblazer::Macro
   module Policy
     # Step: This generically `call`s a policy and then pushes its result to `options`.
     # You can use any callable object as a policy with this step.

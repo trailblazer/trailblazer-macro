@@ -1,4 +1,4 @@
-class Trailblazer::Operation
+module Trailblazer::Macro
   module Policy
     def self.Pundit(policy_class, action, name: :default)
       Policy.step(Pundit.build(policy_class, action), name: name)
@@ -30,7 +30,7 @@ class Trailblazer::Operation
           data = {"policy" => policy}
           data["message"] = "Breach" if !success # TODO: how to allow messages here?
 
-          Result.new(success, data)
+          Trailblazer::Operation::Result.new(success, data)
         end
       end
     end

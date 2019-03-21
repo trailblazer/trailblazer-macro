@@ -34,3 +34,11 @@ end
 
 require "trailblazer/activity/testing"
 T = Trailblazer::Activity::Testing
+
+module Rehash
+  def rehash(ctx, seq:, rehash_raise: false, **)
+    seq << :rehash
+    raise if rehash_raise
+    true
+  end
+end

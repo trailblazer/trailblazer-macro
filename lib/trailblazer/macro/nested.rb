@@ -1,13 +1,13 @@
 # per default, everything we pass into a circuit is immutable. it's the ops/act's job to allow writing (via a Context)
 module Trailblazer
-  class Operation
+  module Macro
     # {Nested} macro.
     def self.Nested(callable, id: "Nested(#{callable})", input: nil, output: nil)
       if callable.is_a?(Class) && callable < Nested.operation_class
         warn %{[Trailblazer] Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(Create)` with `Subprocess(Create)`.}
         return Nested.operation_class.Subprocess(callable)
       end
-return
+  return
 
       task_wrap_extensions = Module.new do
         extend Activity::Path::Plan()
@@ -23,7 +23,7 @@ return
       options = {
         task:      task,
         id:        id,
-        Trailblazer::Activity::DSL::Extension.new(Trailblazer::Activity::TaskWrap::Merge.new(task_wrap_extensions)) => true,
+        Activity::DSL::Extension.new(Activity::TaskWrap::Merge.new(task_wrap_extensions)) => true,
         outputs:   operation.outputs,
       }.merge(input_output)
     end
@@ -51,7 +51,7 @@ return
       # This is what {Nested} in 2.0 used to do, where the outcome could only be true/false (or success/failure).
       class Dynamic
         def initialize(nested_activity)
-          @nested_activity = Trailblazer::Option::KW(nested_activity)
+          @nested_activity = Option::KW(nested_activity)
           @outputs         = {
             :success => Activity::Output(Railway::End::Success.new(semantic: :success), :success),
             :failure => Activity::Output(Railway::End::Failure.new(semantic: :failure), :failure)

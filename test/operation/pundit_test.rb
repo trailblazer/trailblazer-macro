@@ -1,5 +1,4 @@
 require "test_helper"
-require "trailblazer/operation/policy"
 
 class PolicyTest < Minitest::Spec
   Song = Struct.new(:id) do

@@ -6,7 +6,7 @@ class DocsMacroTest < Minitest::Spec
     def self.MyPolicy(allowed_role: "admin")
       step = ->(input, options) { options["current_user"].type == allowed_role }
 
-      [ step, name: "my_policy.#{allowed_role}" ] # :before, :replace, etc. work, too.
+      {task: step, id: "my_policy.#{allowed_role}"} # :before, :replace, etc. work, too.
     end
   end
   #:simple end
@@ -28,7 +28,7 @@ class DocsMacroTest < Minitest::Spec
   end
 =end
 
-  it { Operation::Inspect.(Create).must_equal %{[>my_policy.manager]} }
+  it { Trailblazer::Operation::Inspect.(Create).must_equal %{[>my_policy.manager]} }
 end
 
 # injectable option

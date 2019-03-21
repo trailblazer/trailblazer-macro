@@ -1,14 +1,6 @@
 require "test_helper"
 
 class DocsWrapTest < Minitest::Spec
-  module Rehash
-    def rehash(ctx, seq:, rehash_raise: false, **)
-      seq << :rehash
-      raise if rehash_raise
-      true
-    end
-  end
-
   module Memo
   end
 

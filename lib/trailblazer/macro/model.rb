@@ -1,4 +1,4 @@
-class Trailblazer::Operation
+module Trailblazer::Macro
   def self.Model(model_class, action = nil, find_by_key = nil)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
@@ -15,7 +15,7 @@ class Trailblazer::Operation
     def call(options, params:,  **)
       builder                 = Model::Builder.new
       options[:model]         = model = builder.call(options, params)
-      options["result.model"] = result = Result.new(!model.nil?, {})
+      options["result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
 
       result.success?
     end

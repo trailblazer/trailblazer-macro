@@ -11,16 +11,16 @@ class NestedRescueTest < Minitest::Spec
       step ->(options, **) { options["a"] = true }
       step Rescue {
         step ->(options, **) { options["y"] = true }
-        success ->(options, **) { raise Y if options["raise-y"] }
+        pass ->(options, **) { raise Y if options["raise-y"] }
         step ->(options, **) { options["z"] = true }
       }
       step ->(options, **) { options["b"] = true }
-      success ->(options, **) { raise A if options["raise-a"] }
+      pass ->(options, **) { raise A if options["raise-a"] }
       step ->(options, **) { options["c"] = true }
-      failure ->(options, **) { options["inner-err"] = true }
+      fail ->(options, **) { options["inner-err"] = true }
     }
     step ->(options, **) { options["e"] = true }, id: "nested/e"
-    failure ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
+    fail ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
   it { Trailblazer::Operation::Inspect.(NestedInsanity).must_match /\[>Rescue\(\d+\),>nested/ } # FIXME: better introspect tests for all id-generating macros.
@@ -54,7 +54,8 @@ plain Rescue()
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
 
@@ -86,7 +87,8 @@ Rescue( handler: X )
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
     end
     #:rescue end
@@ -111,7 +113,8 @@ Rescue( handler: :instance_method )
       step :notify
       fail :log_error
       #~methods
-      include Test::Methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
       #~methods end
 
       def my_handler(exception, (ctx), *)
