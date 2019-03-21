@@ -29,7 +29,7 @@ class ModelTest < Minitest::Spec
 
   # class Update < Create
   class Update < Trailblazer::Operation
-    step Trailblazer::Operation::Model( Song, :find ), override: true
+    step Trailblazer::Operation::Model( Song, :find )#, override: true
   end
 
   #---

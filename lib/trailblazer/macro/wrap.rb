@@ -4,7 +4,7 @@ module Trailblazer
       activity = Class.new(Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
 
       outputs  = activity.to_h[:outputs]
-      outputs  = Hash[outputs.collect { |output| [output.semantic, output] }]
+      outputs  = Hash[outputs.collect { |output| [output.semantic, output] }] # TODO: make that a helper somewhere.
 
       wrapped  = Wrap::Wrapped.new(activity, user_wrap, outputs)
 
