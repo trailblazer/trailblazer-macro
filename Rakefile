@@ -1,8 +1,5 @@
 require "bundler/gem_tasks"
 require "rake/testtask"
-require "rubocop/rake_task"
-
-task :default => %i[test rubocop]
 
 Rake::TestTask.new(:test) do |test|
   test.libs << 'test'
@@ -10,8 +7,4 @@ Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
 
-RuboCop::RakeTask.new(:rubocop) do |task|
-  task.patterns = ['lib/**/*.rb', 'test/**/*.rb']
-  task.options << "--display-cop-names"
-  task.fail_on_error = false
-end
+task default: :test
