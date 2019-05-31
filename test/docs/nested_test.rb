@@ -79,5 +79,31 @@ class NestedInput < Minitest::Spec
   # update/failure
     create.(seq: [], what: update, d: false).inspect(:seq).must_equal %{<Result:false [[:a, :d]] >}
   end
+
+  let(:compute_edit) {
+    ->(ctx, what:, **) { what }
+  }
+
+  it "Nested(:method), :pass_fast => :fail_fast doesn't work with standard wiring" do
+    skip "we need to allow adding :outputs"
+
+    compute_edit = self.compute_edit
+
+    pass_fast = Class.new(Trailblazer::Operation) do
+      step :p, pass_fast: true
+      include T.def_steps(:p)
+    end
+
+    create = Class.new(Trailblazer::Operation) do
+      step :a
+      step Nested(compute_edit, auto_wire: [pass_fast]), Output(:pass_fast) => Track(:fail_fast)
+      step :b
+      include T.def_steps(:a, :b)
+    end
+
+
+    create.(seq: [], what: pass_fast).inspect(:seq).must_equal %{<Result:false [[:a, :c]] >}
+  end
 end
 
+# TODO: test with :input/:output, tracing

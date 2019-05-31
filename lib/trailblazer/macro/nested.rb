@@ -28,17 +28,6 @@ module Trailblazer
 
     # @private
     module Nested
-      # DISCUSS: use builders here?
-      def self.build(nested_operation)
-        return dynamic = Dynamic.new(nested_operation), dynamic, true unless subprocess?(nested_operation)
-
-        # The returned {Nested} instance is a valid circuit element and will be `call`ed in the circuit.
-        # It simply returns the nested activity's `signal,options,flow_options` return set.
-        # The actual wiring - where to go with that - is done by the step DSL.
-        return nested_operation, nested_operation, false
-      end
-
-
       def self.operation_class
         Operation
       end
@@ -48,8 +37,8 @@ module Trailblazer
       #
       # This is what {Nested} in 2.0 used to do, where the outcome could only be true/false (or success/failure).
       class Dynamic
-        def initialize(nested_activity)
-          @nested_activity = Option::KW(nested_activity)
+        def initialize(nested_activity_decider)
+          @nested_activity_decider = Option::KW(nested_activity_decider)
 
           @outputs         = {
             :success => Activity::Output(Activity::Railway::End::Success.new(semantic: :success), :success),
@@ -64,7 +53,7 @@ module Trailblazer
           (ctx, _), original_circuit_options = original_args
 
           # TODO: evaluate the option to get the actual "object" to call.
-          activity = @nested_activity.(ctx, original_circuit_options)
+          activity = @nested_activity_decider.(ctx, original_circuit_options)
 
           # Overwrite :task so task_wrap.call_task will call this activity.
           # This is a trick so we don't have to repeat logic from #call_task here.
