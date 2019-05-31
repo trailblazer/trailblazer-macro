@@ -70,7 +70,14 @@ class NestedInput < Minitest::Spec
     create.(seq: [], what: edit).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
 
   # update/success
-    create.(seq: [], what: update, c: false).inspect(:seq).must_equal %{<Result:true [[:a, :d, :b]] >}
+    create.(seq: [], what: update).inspect(:seq).must_equal %{<Result:true [[:a, :d, :b]] >}
+
+
+# wiring of fail:
+  # edit/failure
+    create.(seq: [], what: edit, c: false).inspect(:seq).must_equal %{<Result:false [[:a, :c]] >}
+  # update/failure
+    create.(seq: [], what: update, d: false).inspect(:seq).must_equal %{<Result:false [[:a, :d]] >}
   end
 end
 
