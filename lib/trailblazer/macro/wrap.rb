@@ -46,7 +46,7 @@ module Trailblazer
 
         def call((ctx, flow_options), **circuit_options)
           block_calling_wrapped = -> {
-            @operation.([ctx, flow_options], **circuit_options)
+            call_wrapped_activity([ctx, flow_options], circuit_options)
           }
 
           # call the user's Wrap {} block in the operation.
@@ -69,6 +69,10 @@ module Trailblazer
           signal = @signal_to_output.fetch(signal, signal)
 
           return signal, [ctx, flow_options]
+        end
+
+        def call_wrapped_activity((ctx, flow_options), **circuit_options)
+          @operation.to_h[:activity].([ctx, flow_options], **circuit_options) # :exec_context is this instance.
         end
       end
     end # Wrap

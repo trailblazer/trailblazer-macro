@@ -77,6 +77,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
           begin
             yield # calls the wrapped steps
           rescue
+            puts $!
+            ctx[:exception] = $!.message
             [ Trailblazer::Operation::Railway.fail!, [ctx, {}] ]
           end
         end
