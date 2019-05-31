@@ -2,30 +2,28 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
-    def self.Nested(callable, id: "Nested(#{callable})", input: nil, output: nil)
+    def self.Nested(callable, id: "Nested(#{callable})")
       if callable.is_a?(Class) && callable < Nested.operation_class
         warn %{[Trailblazer] Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(Create)` with `Subprocess(Create)`.}
         return Nested.operation_class.Subprocess(callable)
       end
-  return
 
-      task_wrap_extensions = Module.new do
-        extend Activity::Path::Plan()
-      end
+      # dynamic
+      task = Nested::Dynamic.new(callable)
 
-      task, operation, is_dynamic = Nested.build(callable)
+      merge = [
+        [Activity::TaskWrap::Pipeline.method(:insert_before), "task_wrap.call_task", ["Nested.compute_nested_activity", task.method(:compute_nested_activity)]],
+        [Activity::TaskWrap::Pipeline.method(:insert_after),  "task_wrap.call_task", ["Nested.compute_return_signal", task.method(:compute_return_signal)]],
+      ]
 
-      if is_dynamic
-        task_wrap_extensions.task task.method(:compute_nested_activity), id: ".compute_nested_activity",  after: "Start.default", group: :start
-        task_wrap_extensions.task task.method(:compute_return_signal),   id: ".compute_return_signal",    after: "task_wrap.call_task"
-      end
+      task_wrap_extension = Activity::TaskWrap::Extension(merge: merge)
 
-      options = {
-        task:      task,
-        id:        id,
-        Activity::DSL::Extension.new(Activity::TaskWrap::Merge.new(task_wrap_extensions)) => true,
-        outputs:   operation.outputs,
-      }.merge(input_output)
+      {
+        task:       task,
+        id:         id,
+        extensions: [task_wrap_extension],
+        outputs:    task.outputs,
+      }
     end
 
     # @private
@@ -52,35 +50,36 @@ module Trailblazer
       class Dynamic
         def initialize(nested_activity)
           @nested_activity = Option::KW(nested_activity)
+
           @outputs         = {
-            :success => Activity::Output(Railway::End::Success.new(semantic: :success), :success),
-            :failure => Activity::Output(Railway::End::Failure.new(semantic: :failure), :failure)
+            :success => Activity::Output(Activity::Railway::End::Success.new(semantic: :success), :success),
+            :failure => Activity::Output(Activity::Railway::End::Failure.new(semantic: :failure), :failure)
           }
         end
 
         attr_reader :outputs
 
         # TaskWrap step.
-        def compute_nested_activity((wrap_ctx, original_args), **circuit_options)
-          (ctx,), original_circuit_options = original_args
+        def compute_nested_activity(wrap_ctx, original_args)
+          (ctx, _), original_circuit_options = original_args
 
           # TODO: evaluate the option to get the actual "object" to call.
-          activity = @nested_activity.call(ctx, original_circuit_options)
+          activity = @nested_activity.(ctx, original_circuit_options)
 
           # Overwrite :task so task_wrap.call_task will call this activity.
           # This is a trick so we don't have to repeat logic from #call_task here.
           wrap_ctx[:task] = activity
 
-          return Activity::Right, [wrap_ctx, original_args]
+          return wrap_ctx, original_args
         end
 
-        def compute_return_signal((wrap_ctx, original_args), **circuit_options)
+        def compute_return_signal(wrap_ctx, original_args)
           # Translate the genuine nested signal to the generic Dynamic end (success/failure, only).
           # Note that here we lose information about what specific event was emitted.
-          wrap_ctx[:return_signal] = wrap_ctx[:return_signal].kind_of?(Railway::End::Success) ?
+          wrap_ctx[:return_signal] = wrap_ctx[:return_signal].kind_of?(Activity::Railway::End::Success) ?
             @outputs[:success].signal : @outputs[:failure].signal
 
-          return Activity::Right, [wrap_ctx, original_args]
+          return wrap_ctx, original_args
         end
       end
     end

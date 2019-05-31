@@ -9,6 +9,13 @@ class NestedInput < Minitest::Spec
     end
   end
 
+  let(:update) do
+    edit = Class.new(Trailblazer::Operation) do
+      step :d
+      include T.def_steps(:d)
+    end
+  end
+
   it "Nested(Edit), without any options" do
     edit = self.edit
 
@@ -42,6 +49,28 @@ class NestedInput < Minitest::Spec
     create.(seq: []).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
   # failure in Nested
     create.(seq: [], c: false).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
+  end
+
+  it "Nested(:method)" do
+    create = Class.new(Trailblazer::Operation) do
+      step :a
+      step Nested(:compute_edit)
+      step :b
+
+      def compute_edit(ctx, what:, **)
+        what
+      end
+
+      include T.def_steps(:a, :b)
+    end
+
+    # `edit` and `update` can be called from Nested()
+
+  # edit/success
+    create.(seq: [], what: edit).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
+
+  # update/success
+    create.(seq: [], what: update, c: false).inspect(:seq).must_equal %{<Result:true [[:a, :d, :b]] >}
   end
 end
 
