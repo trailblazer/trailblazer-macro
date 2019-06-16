@@ -1,5 +1,6 @@
 require "trailblazer/activity"
-require "trailblazer/operation"
+require "trailblazer/activity/dsl/linear" # TODO: remove this dependency
+require "trailblazer/operation" # TODO: remove this dependency
 
 require "trailblazer/macro/model"
 require "trailblazer/macro/policy"
@@ -21,8 +22,8 @@ module Trailblazer
 end
 
 # TODO: Forwardable.def_delegators(Operation, Macro, :Model, :Wrap) would be amazing. It really sucks to extend a foreign class.
-Trailblazer::Operation.singleton_class.extend Forwardable
-Trailblazer::Macro.forward_macros(Trailblazer::Operation)
+# Trailblazer::Operation.singleton_class.extend Forwardable
+# Trailblazer::Macro.forward_macros(Trailblazer::Operation)
 
 Trailblazer::Activity::FastTrack.singleton_class.extend Forwardable
 Trailblazer::Macro.forward_macros(Trailblazer::Activity::FastTrack) # monkey-patching sucks.

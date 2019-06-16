@@ -110,6 +110,8 @@ end
 class DocsGuardInjectionTest < Minitest::Spec
   #:di-op
   class Create < Trailblazer::Operation
+    extend Trailblazer::Operation::Container
+
     step Policy::Guard( ->(options, current_user:, **) { current_user == Module } )
   end
   #:di-op end
