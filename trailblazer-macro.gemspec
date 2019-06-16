@@ -27,7 +27,8 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "multi_json"
   spec.add_development_dependency "roar"
 
-  spec.add_dependency "trailblazer-activity-dsl-linear", ">= 0.1.2", "< 0.2.0"
+  spec.add_dependency "trailblazer-activity-dsl-linear", ">= 0.1.5", "< 0.2.0"  # TODO: this dependency will be removed.
+  spec.add_dependency "trailblazer-operation", ">= 0.5.0" # TODO: this dependency will be removed.
 
   spec.required_ruby_version = ">= 2.0.0"
 end
