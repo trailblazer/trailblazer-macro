@@ -4,7 +4,7 @@ require 'trailblazer/macro/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "trailblazer-macro"
-  spec.version       = Trailblazer::Macro::VERSION
+  spec.version       = Trailblazer::Version::Macro::VERSION
   spec.authors       = ["Nick Sutterer", "Marc Tich"]
   spec.email         = ["apotonick@gmail.com", "marc@mudsu.com"]
   spec.description   = "Macros for Trailblazer's operation"
