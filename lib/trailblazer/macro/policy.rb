@@ -14,8 +14,8 @@ module Trailblazer::Macro
         condition = options[@path] # this allows dependency injection.
         result    = condition.([options, flow_options], **circuit_options)
 
-        options["policy.#{@name}"]        = result["policy"] # assign the policy as a skill.
-        options["result.policy.#{@name}"] = result
+        options[:"policy.#{@name}"]        = result[:policy] # assign the policy as a skill.
+        options[:"result.policy.#{@name}"] = result
 
         # flow control
         signal = result.success? ? Trailblazer::Activity::Right : Trailblazer::Activity::Left # since we & this, it's only executed OnRight and the return boolean decides the direction, input is passed straight through.
@@ -28,7 +28,7 @@ module Trailblazer::Macro
     # policy-compatible  object at runtime.
     def self.step(condition, options, &block)
       name = options[:name]
-      path = "policy.#{name}.eval"
+      path = :"policy.#{name}.eval"
 
       task = Eval.new(name: name, path: path)
 

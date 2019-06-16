@@ -36,11 +36,11 @@ class DocsPunditProcTest < Minitest::Spec
   it do
   #:pundit-result
   result = Create.(params: {}, current_user: Module)
-  result["result.policy.default"].success? #=> true
-  result["result.policy.default"]["policy"] #=> #<MyPolicy ...>
+  result[:"result.policy.default"].success? #=> true
+  result[:"result.policy.default"][:policy] #=> #<MyPolicy ...>
   #:pundit-result end
-    result["result.policy.default"].success?.must_equal true
-    result["result.policy.default"]["policy"].is_a?(MyPolicy).must_equal true
+    result[:"result.policy.default"].success?.must_equal true
+    result[:"result.policy.default"][:policy].is_a?(MyPolicy).must_equal true
   end
 
   #---
@@ -82,7 +82,7 @@ class DocsPunditProcTest < Minitest::Spec
   #:di-call
   Create.(params: {},
     current_user:            Module,
-    "policy.default.eval" => Trailblazer::Operation::Policy::Pundit.build(AnotherPolicy, :create?)
+    :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit.build(AnotherPolicy, :create?)
   )
   #:di-call end
     result.inspect("").must_equal %{<Result:true [nil] >} }
@@ -104,9 +104,9 @@ class PunditWithNameTest < Minitest::Spec
   it {
   #:name-call
   result = Create.(params: {}, current_user: Module)
-  result["result.policy.after_model"].success? #=> true
+  result[:"result.policy.after_model"].success? #=> true
   #:name-call end
-    result["result.policy.after_model"].success?.must_equal true }
+    result[:"result.policy.after_model"].success?.must_equal true }
 end
 
 #---
