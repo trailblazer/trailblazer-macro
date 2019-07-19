@@ -1,6 +1,7 @@
 require "delegate" # Ruby 2.2
 require "minitest/autorun"
 
+require "trailblazer/developer"
 require "trailblazer/macro"
 
 

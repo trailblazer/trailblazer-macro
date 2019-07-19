@@ -29,7 +29,7 @@ class DocsPunditProcTest < Minitest::Spec
   end
   #:pundit end
 
-  it { Trailblazer::Operation::Inspect.(Create).must_equal %{[>model.build,>policy.default.eval]} }
+  it { Trailblazer::Developer.railway(Create).must_equal %{[>model.build,>policy.default.eval]} }
   it { Create.(params: {}, current_user: Module).inspect(:model).must_equal %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
   it { Create.(params: {}                          ).inspect(:model).must_equal %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
 
@@ -49,7 +49,7 @@ class DocsPunditProcTest < Minitest::Spec
     step Policy::Pundit( MyPolicy, :new? ), override: true
   end
 
-  it { Trailblazer::Operation::Inspect.(New).must_equal %{[>model.build,>policy.default.eval]} }
+  it { Trailblazer::Developer.railway(New).must_equal %{[>model.build,>policy.default.eval]} }
   it { New.(params: {}, current_user: Class ).inspect(:model).must_equal %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
   it { New.(params: {}, current_user: nil ).inspect(:model).must_equal %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
 
@@ -64,9 +64,9 @@ class DocsPunditProcTest < Minitest::Spec
     step Policy::Pundit( MyPolicy, :new?, name: "first" ), override: true
   end
 
-  it { Trailblazer::Operation::Inspect.(Edit).must_equal %{[>policy.first.eval,>policy.second.eval]} }
+  it { Trailblazer::Developer.railway(Edit).must_equal %{[>policy.first.eval,>policy.second.eval]} }
   it { Edit.(params: {}, current_user: Class).inspect(:model).must_equal %{<Result:false [nil] >} }
-  it { Trailblazer::Operation::Inspect.(Update).must_equal %{[>policy.first.eval,>policy.second.eval]} }
+  it { Trailblazer::Developer.railway(Update).must_equal %{[>policy.first.eval,>policy.second.eval]} }
   it { Update.(params: {}, current_user: Class).inspect(:model).must_equal %{<Result:true [nil] >} }
 
   #---

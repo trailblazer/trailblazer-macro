@@ -39,7 +39,7 @@ class ModelTest < Minitest::Spec
   it { Update.(params: { id: 1 })[:model].inspect.must_equal %{#<struct ModelTest::Song id=1, title=nil>} }
 
   # inherited inspect is ok
-  it { Trailblazer::Operation::Inspect.(Update).must_equal %{[>model.build]} }
+  it { Trailblazer::Developer.railway(Update).must_equal %{[>model.build]} }
 
   #---
   # :find_by, exceptionless.

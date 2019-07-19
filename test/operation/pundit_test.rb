@@ -52,7 +52,7 @@ class PolicyTest < Minitest::Spec
     step Model( Song, :new ), before: "policy.default.eval"
   end
 
-  it { Trailblazer::Operation::Inspect.(Show).must_equal %{[>model.build,>policy.default.eval,>process]} }
+  it { Trailblazer::Developer.railway(Show).must_equal %{[>model.build,>policy.default.eval,>process]} }
 
   # invalid because user AND model.
   it do

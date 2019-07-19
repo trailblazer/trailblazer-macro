@@ -29,7 +29,7 @@ class DocsGuardProcTest < Minitest::Spec
     step Policy::Guard( ->(options, current_user:, **) { current_user } ), override: true
   end
 
-  it { Trailblazer::Operation::Inspect.(New).must_equal %{[>policy.default.eval,>process]} }
+  it { Trailblazer::Developer.railway(New).must_equal %{[>policy.default.eval,>process]} }
 end
 
 #---
@@ -151,10 +151,10 @@ class DocsGuardPositionTest < Minitest::Spec
   end
   #:before end
 
-  it { Trailblazer::Operation::Inspect.(Create).must_equal %{[>policy.default.eval,>model!]} }
+  it { Trailblazer::Developer.railway(Create).must_equal %{[>policy.default.eval,>model!]} }
   it do
     #:before-pipe
-      Trailblazer::Operation::Inspect.(Create, style: :rows) #=>
+      Trailblazer::Developer.railway(Create, style: :rows) #=>
        # 0 ========================>operation.new
        # 1 ==================>policy.default.eval
        # 2 ===============================>model!

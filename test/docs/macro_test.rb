@@ -28,7 +28,7 @@ class DocsMacroTest < Minitest::Spec
   end
 =end
 
-  it { Trailblazer::Operation::Inspect.(Create).must_equal %{[>my_policy.manager]} }
+  it { Trailblazer::Developer.railway(Create).must_equal %{[>my_policy.manager]} }
 end
 
 # injectable option
