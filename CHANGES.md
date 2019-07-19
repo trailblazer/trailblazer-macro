@@ -1,3 +1,7 @@
+# 2.1.0.rc12
+
+* Dependency bumps.
+
 # 2.1.0.rc11
 
 * Works with `>= activity-0.8`.
