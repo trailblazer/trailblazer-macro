@@ -27,8 +27,8 @@ module Trailblazer::Macro
         end
 
         def result!(success, policy)
-          data = {"policy" => policy}
-          data["message"] = "Breach" if !success # TODO: how to allow messages here?
+          data = { policy: policy }
+          data[:message] = "Breach" if !success # TODO: how to allow messages here?
 
           Trailblazer::Operation::Result.new(success, data)
         end

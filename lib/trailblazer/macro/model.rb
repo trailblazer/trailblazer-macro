@@ -3,9 +3,9 @@ module Trailblazer::Macro
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
-      "model.class"          => model_class,
-      "model.action"         => action,
-      "model.find_by_key"    => find_by_key
+      :"model.class"          => model_class,
+      :"model.action"         => action,
+      :"model.find_by_key"    => find_by_key
     )
 
     {task: task, id: "model.build", extensions: [injection]}
@@ -15,19 +15,19 @@ module Trailblazer::Macro
     def call(options, params:,  **)
       builder                 = Model::Builder.new
       options[:model]         = model = builder.call(options, params)
-      options["result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
+      options[:"result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
 
       result.success?
     end
 
     class Builder
       def call(options, params)
-        action        = options["model.action"] || :new
-        model_class   = options["model.class"]
-        find_by_key   = options["model.find_by_key"] || :id
+        action        = options[:"model.action"] || :new
+        model_class   = options[:"model.class"]
+        find_by_key   = options[:"model.find_by_key"] || :id
         action        = :pass_through unless %i[new find_by].include?(action)
 
-        send("#{action}!", model_class, params, options["model.action"], find_by_key)
+        send("#{action}!", model_class, params, options[:"model.action"], find_by_key)
       end
 
       def new!(model_class, params, *)
