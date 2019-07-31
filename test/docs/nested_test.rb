@@ -16,22 +16,33 @@ class NestedInput < Minitest::Spec
     end
   end
 
+  class Validate < Trailblazer::Operation
+    step :validate
+    # ... more steps ...
+    include T.def_steps(:validate)
+  end
+
   it "Nested(Edit), without any options" do
-    edit = self.edit
+      module A
 
-    create = Class.new(Trailblazer::Operation) do
-      step :a
-      step Nested( edit )
-      step :b
+        create =
+        #:nested
+        class Create < Trailblazer::Operation
+          step :create
+          step Nested(Validate)
+          step :save
+          #~meths
+          include T.def_steps(:create, :save)
+          #~meths end
+        end
+        #:nested end
 
-      include T.def_steps(:a, :b)
-    end
-
-    # this will print a DEPRECATION warning.
-  # success
-    create.(seq: []).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
-  # failure in Nested
-    create.(seq: [], c: false).inspect(:seq).must_equal %{<Result:false [[:a, :c]] >}
+        # this will print a DEPRECATION warning.
+      # success
+        create.(seq: []).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+      # failure in Nested
+        create.(seq: [], validate: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
+      end
   end
 
   it "Nested(Edit), with Output rewiring" do
@@ -52,32 +63,42 @@ class NestedInput < Minitest::Spec
   end
 
   it "Nested(:method)" do
-    create = Class.new(Trailblazer::Operation) do
-      step :a
-      step Nested(:compute_edit)
-      step :b
+    module B
+      create =
+      #:nested-dynamic
+      class Create < Trailblazer::Operation
+        step :create
+        step Nested(:compute_nested)
+        step :save
 
-      def compute_edit(ctx, what:, **)
-        what
+        def compute_nested(ctx, params:, **)
+          params.is_a?(Hash) ? Validate : JsonValidate
+        end
+        #~meths
+        include T.def_steps(:create, :save)
+        #~meths end
       end
+      #:nested-dynamic end
 
-      include T.def_steps(:a, :b)
-    end
-
+      class JsonValidate < Validate
+        step :json
+        include T.def_steps(:json)
+      end
     # `edit` and `update` can be called from Nested()
 
   # edit/success
-    create.(seq: [], what: edit).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
+    create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
 
   # update/success
-    create.(seq: [], what: update).inspect(:seq).must_equal %{<Result:true [[:a, :d, :b]] >}
+    create.(seq: [], params: nil).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :json, :save]] >}
 
 
 # wiring of fail:
   # edit/failure
-    create.(seq: [], what: edit, c: false).inspect(:seq).must_equal %{<Result:false [[:a, :c]] >}
+    create.(seq: [], params: {}, validate: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
   # update/failure
-    create.(seq: [], what: update, d: false).inspect(:seq).must_equal %{<Result:false [[:a, :d]] >}
+    create.(seq: [], params: nil, json: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate, :json]] >}
+    end
   end
 
   let(:compute_edit) {
