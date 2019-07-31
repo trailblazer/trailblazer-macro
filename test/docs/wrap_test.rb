@@ -174,10 +174,12 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     #:transaction
     class Memo::Create < Trailblazer::Operation
       step :find_model
+      #:wrap-only
       step Wrap( MyTransaction ) {
         step :update
         step :rehash
       }
+      #:wrap-only end
       step :notify
       fail :log_error
       #~methods
