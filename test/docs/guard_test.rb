@@ -6,13 +6,13 @@ class DocsGuardProcTest < Minitest::Spec
   #:proc
   class Create < Trailblazer::Operation
     step Policy::Guard(->(options, pass:, **) { pass })
-    #~pipeonly
+    #:pipeonly
     step :process
 
     def process(options, **)
       options[:x] = true
     end
-    #~pipeonly end
+    #:pipeonly end
   end
   #:proc end
 
@@ -46,13 +46,15 @@ class DocsGuardTest < Minitest::Spec
   #:callable-op
   class Create < Trailblazer::Operation
     step Policy::Guard( MyGuard.new )
-    #~pipe-only
+    #:pipe-only
     step :process
 
+    #~methods
     def process(options, **)
       options[:x] = true
     end
-    #~pipe-only end
+    #~methods end
+    #:pipe-only end
   end
   #:callable-op end
 
@@ -72,10 +74,11 @@ class DocsGuardMethodTest < Minitest::Spec
     end
     #~pipe-onlyy
     step :process
-
+    #~methods
     def process(options, **)
       options[:x] = true
     end
+    #~methods end
     #~pipe-onlyy end
   end
   #:method end
