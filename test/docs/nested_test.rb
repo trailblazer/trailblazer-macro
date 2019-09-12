@@ -101,6 +101,35 @@ class NestedInput < Minitest::Spec
     end
   end
 
+  it "Nested(:method), input: :my_input" do
+    module C
+      create =
+      #:nested-dynamic
+      class Create < Trailblazer::Operation
+        step :create
+        step Nested(:compute_nested), input: ->(*) {{foo: :bar}}
+        step :save
+
+        def compute_nested(ctx, params:, **)
+          params.is_a?(Hash) ? Validate : JsonValidate
+        end
+
+        #~meths
+        include T.def_steps(:create, :save)
+        #~meths end
+      end
+      #:nested-dynamic end
+
+      class JsonValidate < Validate
+        step :json
+        include T.def_steps(:json)
+      end
+    # `edit` and `update` can be called from Nested()
+
+    create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+    end
+  end
+
   let(:compute_edit) {
     ->(ctx, what:, **) { what }
   }
