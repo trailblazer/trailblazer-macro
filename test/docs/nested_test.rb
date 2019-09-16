@@ -103,11 +103,10 @@ class NestedInput < Minitest::Spec
 
   it "Nested(:method), input: :my_input" do
     module C
-      create =
       #:nested-dynamic
       class Create < Trailblazer::Operation
         step :create
-        step Nested(:compute_nested), input: ->(*) {{foo: :bar}}
+        step Nested(:compute_nested), input: ->(ctx, *) {{foo: :bar, seq: ctx[:seq]}}
         step :save
 
         def compute_nested(ctx, params:, **)
@@ -124,10 +123,12 @@ class NestedInput < Minitest::Spec
         step :json
         include T.def_steps(:json)
       end
-    # `edit` and `update` can be called from Nested()
 
-    create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+    # `edit` and `update` can be called from Nested()
     end
+
+    C::Create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+    C::Create.(seq: [], params: nil).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :json, :save]] >}
   end
 
   let(:compute_edit) {
