@@ -1,3 +1,7 @@
+# 2.1.0.rc14
+
+* Remove the explicit `dsl-linear` dependency.
+
 # 2.1.0.rc13
 
 * Use symbol keys on `ctx`, only.
