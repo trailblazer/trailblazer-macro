@@ -1,3 +1,7 @@
+# 2.1.0
+
+* Finally.
+
 # 2.1.0.rc13
 
 * Use symbol keys on `ctx`, only.
