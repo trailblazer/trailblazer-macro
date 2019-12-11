@@ -27,5 +27,5 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "trailblazer-operation", ">= 0.6.0" # TODO: this dependency will be removed.
 
-  spec.required_ruby_version = ">= 2.0.0"
+  spec.required_ruby_version = ">= 2.2.0"
 end

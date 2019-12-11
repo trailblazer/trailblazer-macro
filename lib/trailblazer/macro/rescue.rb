@@ -20,7 +20,7 @@ module Trailblazer
         end
       end
 
-      Wrap(rescue_block, id: "Rescue(#{rand(100)})", &block)
+      Wrap(rescue_block, id: "Rescue(#{SecureRandom.hex(4)})", &block)
       # FIXME: name
       # [ step, name: "Rescue:#{block.source_location.last}" ]
     end
