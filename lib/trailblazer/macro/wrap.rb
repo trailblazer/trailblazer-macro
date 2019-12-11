@@ -1,6 +1,8 @@
+require 'securerandom'
+
 module Trailblazer
   module Macro
-    def self.Wrap(user_wrap, id: "Wrap/#{rand(100)}", &block)
+    def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
       activity = Class.new(Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
 
       outputs  = activity.to_h[:outputs]

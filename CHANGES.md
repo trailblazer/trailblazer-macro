@@ -1,3 +1,7 @@
+# 2.1.1
+
+* Fix case when Macros generate same id due to small entropy
+
 # 2.1.0
 
 * Finally.
