@@ -223,9 +223,9 @@ When raise:   return {Railway.pass!} and go "successful"
 =begin
 When success: return the block's returns
 When raise:   return {true} and go "successful"
-You can also return booleans in wrap.
+You can return boolean true in wrap.
 =end
-  class WrapGoesIntoBooleanFromRescueTest < Minitest::Spec
+  class WrapGoesIntoBooleanTrueFromRescueTest < Minitest::Spec
     Memo = Module.new
 
     class Memo::Create < Trailblazer::Operation
@@ -233,7 +233,7 @@ You can also return booleans in wrap.
         def self.call((ctx), *, &block)
           yield # calls the wrapped steps
         rescue
-          ctx[:wrap_boolean_return_value] # can be true/false/nil
+          true
         end
       end
 
@@ -252,17 +252,83 @@ You can also return booleans in wrap.
     end
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true, wrap_boolean_return_value: true } )
+      result = Memo::Create.( { seq: [], rehash_raise: true } )
       result.inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
     end
+  end
+
+=begin
+When success: return the block's returns
+When raise:   return {false} and go "failed"
+You can return boolean false in wrap.
+=end
+  class WrapGoesIntoBooleanFalseFromRescueTest < Minitest::Spec
+    Memo = Module.new
+
+    class Memo::Create < Trailblazer::Operation
+      class HandleUnsafeProcess
+        def self.call((ctx), *, &block)
+          yield # calls the wrapped steps
+        rescue
+          false
+        end
+      end
+
+      step :find_model
+      step Wrap( HandleUnsafeProcess ) {
+        step :update
+        step :rehash
+      }
+      step :notify
+      fail :log_error
+
+      #~methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
+      #~methods end
+    end
+
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true, wrap_boolean_return_value: false } )
+      result = Memo::Create.( { seq: [], rehash_raise: true } )
       result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
+  end
+
+=begin
+When success: return the block's returns
+When raise:   return {nil} and go "failed"
+You can return nil in wrap.
+=end
+  class WrapGoesIntoNilFromRescueTest < Minitest::Spec
+    Memo = Module.new
+
+    class Memo::Create < Trailblazer::Operation
+      class HandleUnsafeProcess
+        def self.call((ctx), *, &block)
+          yield # calls the wrapped steps
+        rescue
+          nil
+        end
+      end
+
+      step :find_model
+      step Wrap( HandleUnsafeProcess ) {
+        step :update
+        step :rehash
+      }
+      step :notify
+      fail :log_error
+
+      #~methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
+      #~methods end
+    end
+
     it "translates nil returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true, wrap_boolean_return_value: nil } )
+      result = Memo::Create.( { seq: [], rehash_raise: true } )
       result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
