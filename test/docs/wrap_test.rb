@@ -377,4 +377,44 @@ This one is mostly to show how one could wrap steps in a transaction
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
   end
+
+=begin
+When success: return {Railway.pass_fast!}
+When failure: return {Railway.fail!}
+This one is mostly to show how one could evaluate Wrap()'s return value based on Wrap() block's return
+=end
+  class WrapWithBlockReturnSignatureCheckTest < Minitest::Spec
+    Memo = Module.new
+
+    #:handler-with-signature-evaluator
+    class HandleUnsafeProcess
+      def self.call((_ctx, _flow_options), *, &block)
+        signal, (ctx, flow_options) = yield
+        evaluated_signal = if signal.to_h[:semantic] == :success
+                            Trailblazer::Operation::Railway.pass_fast!
+                          else
+                            Trailblazer::Operation::Railway.fail!
+                          end
+        [ evaluated_signal, [ctx, flow_options] ]
+      end
+    end
+    #:handler-with-signature-evaluator end
+
+    #:transaction
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Wrap( HandleUnsafeProcess ) {
+        step :update
+      }, fast_track: true # because Wrap can return pass_fast! now
+      step :notify
+      fail :log_error
+      #~methods
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      #~methods end
+    end
+    #:transaction end
+
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update]] >} }
+    it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :log_error]] >} }
+  end
 end
