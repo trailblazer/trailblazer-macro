@@ -349,7 +349,7 @@ This one is mostly to show how one could wrap steps in a transaction
     end
 
     #:transaction-handler
-    class HandleUnsafeProcess
+    class MyTransaction
       def self.call((ctx, flow_options), *, &block)
         Sequel.transaction { yield } # calls the wrapped steps
       rescue
@@ -361,7 +361,7 @@ This one is mostly to show how one could wrap steps in a transaction
     #:transaction
     class Memo::Create < Trailblazer::Operation
       step :find_model
-      step Wrap( HandleUnsafeProcess ) {
+      step Wrap( MyTransaction ) {
         step :update
         step :rehash
       }
