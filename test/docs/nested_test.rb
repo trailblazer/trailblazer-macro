@@ -131,6 +131,36 @@ class NestedInput < Minitest::Spec
     C::Create.(seq: [], params: nil).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :json, :save]] >}
   end
 
+  it "Nested(:method), with pass_fast returned from nested" do
+    class JustPassFast < Trailblazer::Operation
+      step :just_pass_fast, pass_fast: true
+      include T.def_steps(:just_pass_fast)
+    end
+
+    module D
+
+      create =
+      #:nested-with-pass-fast
+      class Create < Trailblazer::Operation
+
+        def compute_nested(ctx, **)
+          JustPassFast
+        end
+
+        step :create
+        step Nested(:compute_nested)
+        step :save
+        #~meths
+        include T.def_steps(:create, :save)
+        #~meths end
+      end
+      #:nested-with-pass-fast end
+
+      # pass fast
+      create.(seq: []).inspect(:seq).must_equal %{<Result:true [[:create, :just_pass_fast, :save]] >}
+    end
+  end
+
   let(:compute_edit) {
     ->(ctx, what:, **) { what }
   }
