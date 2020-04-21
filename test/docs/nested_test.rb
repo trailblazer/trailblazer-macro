@@ -22,6 +22,11 @@ class NestedInput < Minitest::Spec
     include T.def_steps(:validate)
   end
 
+  class JsonValidate < Validate
+    step :json
+    include T.def_steps(:json)
+  end
+
   it "Nested(Edit), without any options" do
       module A
 
@@ -79,11 +84,6 @@ class NestedInput < Minitest::Spec
         #~meths end
       end
       #:nested-dynamic end
-
-      class JsonValidate < Validate
-        step :json
-        include T.def_steps(:json)
-      end
     # `edit` and `update` can be called from Nested()
 
   # edit/success
@@ -118,11 +118,6 @@ class NestedInput < Minitest::Spec
         #~meths end
       end
       #:nested-dynamic end
-
-      class JsonValidate < Validate
-        step :json
-        include T.def_steps(:json)
-      end
 
     # `edit` and `update` can be called from Nested()
     end
@@ -161,29 +156,39 @@ class NestedInput < Minitest::Spec
     end
   end
 
-  let(:compute_edit) {
-    ->(ctx, what:, **) { what }
-  }
+  it "Nested(:method, auto_wire: *activities) with :pass_fast => End()" do
+    module E
+      SignUp = Class.new(Trailblazer::Operation) do
+        step :p, pass_fast: true
+        include T.def_steps(:p)
+      end
 
-  it "Nested(:method), :pass_fast => :fail_fast doesn't work with standard wiring" do
-    skip "we need to allow adding :outputs"
+      SignIn = Class.new(Trailblazer::Operation) do
+        step :f, fail_fast: true
+        include T.def_steps(:f)
+      end
 
-    compute_edit = self.compute_edit
+      #:nested-with-auto-wire
+      class Create < Trailblazer::Operation
+        step :a
+        step Nested(:compute_nested, auto_wire: [SignUp, SignIn]), Output(:pass_fast) => End(:new_sign_up)
+        step :b
 
-    pass_fast = Class.new(Trailblazer::Operation) do
-      step :p, pass_fast: true
-      include T.def_steps(:p)
+        #~meths
+        def compute_nested(ctx, what:, **)
+          what
+        end
+
+        include T.def_steps(:a, :b)
+        #~meths end
+      end
+      #:nested-with-auto-wire end
+
+      result = Create.(seq: [], what: SignUp)
+
+      result.inspect(:seq).must_equal %{<Result:false [[:a, :p]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:new_sign_up>}
     end
-
-    create = Class.new(Trailblazer::Operation) do
-      step :a
-      step Nested(compute_edit, auto_wire: [pass_fast]), Output(:pass_fast) => Track(:fail_fast)
-      step :b
-      include T.def_steps(:a, :b)
-    end
-
-
-    create.(seq: [], what: pass_fast).inspect(:seq).must_equal %{<Result:false [[:a, :c]] >}
   end
 end
 
