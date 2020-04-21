@@ -1,9 +1,10 @@
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+require "trailblazer/macro"
+
 require "delegate" # Ruby 2.2
 require "minitest/autorun"
 
 require "trailblazer/developer"
-require "trailblazer/macro"
-
 
 module Mock
   class Result

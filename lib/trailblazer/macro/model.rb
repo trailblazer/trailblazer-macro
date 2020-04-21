@@ -1,5 +1,8 @@
 module Trailblazer::Macro
-  def self.Model(model_class, action = nil, find_by_key = nil)
+
+  Linear = Trailblazer::Activity::DSL::Linear
+
+  def self.Model(model_class, action = nil, find_by_key = nil, id: 'model.build', not_found_end: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
@@ -8,7 +11,10 @@ module Trailblazer::Macro
       :"model.find_by_key"    => find_by_key
     )
 
-    {task: task, id: "model.build", extensions: [injection]}
+    options = { task: task, id: id, extensions: [injection] }
+    options = options.merge(Linear::Output(:failure) => Linear::End(:not_found)) if not_found_end
+
+    options
   end
 
   class Model

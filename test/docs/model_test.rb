@@ -45,6 +45,13 @@ class DocsModelTest < Minitest::Spec
   end
   #:update-with-find-by-key end
 
+  #:update-with-not-found-end
+  class UpdateFailureWithModelNotFound < Trailblazer::Operation
+    step Model( Song, :find_by, not_found_end: true )
+    # ..
+  end
+  #:update-with-not-found-end end
+
   it do
     #:update-ok
     result = Update.(params: { id: 1 })
@@ -81,6 +88,19 @@ class DocsModelTest < Minitest::Spec
     #:update-with-find-by-key-fail end
     result[:model].must_be_nil
     result.success?.must_equal false
+  end
+
+  it do
+    #:update-with-not-found-end-use
+    result = UpdateFailureWithModelNotFound.(params: {title: nil})
+    result[:model] #=> nil
+    result.success? #=> false
+    result.event #=> #<Trailblazer::Activity::End semantic=:not_found>
+    #:update-with-not-found-end-use end
+
+    result[:model].must_be_nil
+    result.success?.must_equal false
+    result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:not_found>}
   end
 
   #:show
