@@ -4,7 +4,6 @@ module Trailblazer
     # {Nested} macro.
     def self.Nested(callable, id: "Nested(#{callable})")
       if callable.is_a?(Class) && callable < Nested.operation_class
-        warn %{[Trailblazer] Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(Create)` with `Subprocess(Create)`.}
         return Nested.operation_class.Subprocess(callable)
       end
 
