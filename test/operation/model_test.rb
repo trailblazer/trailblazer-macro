@@ -19,11 +19,8 @@ class ModelTest < Minitest::Spec
   end
 
   # :new new.
-  it { Create.(params: {})[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>} }
-  it do
-
-    result = Create.(params: {})
-
+  it "initializes new model's instance" do
+    result = Create.()
     result[:model].inspect.must_equal %{#<struct ModelTest::Song id=nil, title=nil>}
   end
 

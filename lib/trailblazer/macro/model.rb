@@ -18,7 +18,7 @@ module Trailblazer::Macro
   end
 
   class Model
-    def call(options, params:,  **)
+    def call(options, params: nil,  **)
       builder                 = Model::Builder.new
       options[:model]         = model = builder.call(options, params)
       options[:"result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
