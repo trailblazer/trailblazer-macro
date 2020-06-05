@@ -1,3 +1,9 @@
+# 2.1.2
+
+* Fix to make macros available in all Linear::DSL strategies.
+* Make `params` optional in `Model`.
+* Support for adding `End.not_found` end in `Model`.
+
 # 2.1.1
 
 * Fix case when Macros generate same id due to small entropy
