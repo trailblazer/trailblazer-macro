@@ -1,9 +1,12 @@
 language: ruby
 rvm:
-  - 2.6.5
-  - 2.5.5
-  - 2.4.4
-  - 2.3.7
-  - 2.2
-
+  - ruby-head
+  - 2.7
+  - 2.6
+  - 2.5
+  - 2.4
 cache: bundler
+jobs:
+  allow_failures:
+    - rvm: ruby-head
+    - rvm: 2.7
