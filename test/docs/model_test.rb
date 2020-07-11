@@ -47,7 +47,7 @@ class DocsModelTest < Minitest::Spec
 
   #:update-with-not-found-end
   class UpdateFailureWithModelNotFound < Trailblazer::Operation
-    step Model( Song, :find_by, not_found_end: true )
+    step Model( Song, :find_by, not_found_terminus: true )
     # ..
   end
   #:update-with-not-found-end end
