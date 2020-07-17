@@ -1,3 +1,7 @@
+# 2.1.3
+
+* Rename Model()'s `not_found_end` kwarg to `not_found_terminus` for consistency.
+
 # 2.1.2
 
 * Fix to make macros available in all Linear::DSL strategies.
