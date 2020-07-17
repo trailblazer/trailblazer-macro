@@ -2,7 +2,7 @@ module Trailblazer::Macro
 
   Linear = Trailblazer::Activity::DSL::Linear
 
-  def self.Model(model_class, action = nil, find_by_key = nil, id: 'model.build', not_found_end: false)
+  def self.Model(model_class, action = nil, find_by_key = nil, id: 'model.build', not_found_terminus: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
@@ -12,7 +12,7 @@ module Trailblazer::Macro
     )
 
     options = { task: task, id: id, extensions: [injection] }
-    options = options.merge(Linear::Output(:failure) => Linear::End(:not_found)) if not_found_end
+    options = options.merge(Linear::Output(:failure) => Linear::End(:not_found)) if not_found_terminus
 
     options
   end
