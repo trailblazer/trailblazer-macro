@@ -126,4 +126,29 @@ Rescue( handler: :instance_method )
     it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
   end
+
+=begin
+Rescue(), fast_track: true {}
+=end
+  class RescueWithFastTrack < Minitest::Spec
+    Memo = Class.new
+
+    #:rescue-fasttrack
+    class Memo::Create < Trailblazer::Operation
+      rescue_block = ->(*) {
+        step :update, Output(:failure) => End(:fail_fast)
+        step :rehash
+      }
+
+      step :find_model
+      step Rescue(&rescue_block), fail_fast: true
+      step :notify
+      fail :log_error
+      #~methods
+      include T.def_steps(:find_model, :update, :notify, :log_error, :rehash)
+    end
+
+    it { Memo::Create.( { seq: [], } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+  end
 end
