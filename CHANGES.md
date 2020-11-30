@@ -1,3 +1,8 @@
+# 2.1.4
+
+* Upgrade DSL version to fix step's circuit interface eating passed arguments
+* Upgrade OP version to remove OP::Container reference in tests
+
 # 2.1.3
 
 * Rename Model()'s `not_found_end` kwarg to `not_found_terminus` for consistency.
