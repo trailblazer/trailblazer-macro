@@ -109,6 +109,27 @@ class DocsGuardNamedTest < Minitest::Spec
 end
 
 #---
+# dependency injection
+class DocsGuardInjectionTest < Minitest::Spec
+  #:di-op
+  class Create < Trailblazer::Operation
+    step Policy::Guard( ->(options, current_user:, **) { current_user == Module } )
+  end
+  #:di-op end
+
+  it { Create.(:current_user => Module).inspect("").must_equal %{<Result:true [nil] >} }
+  it {
+    result =
+  #:di-call
+  Create.(
+    :current_user           => Module,
+    :"policy.default.eval"  => Trailblazer::Operation::Policy::Guard.build(->(options, **) { false })
+  )
+  #:di-call end
+    result.inspect("").must_equal %{<Result:false [nil] >} }
+end
+
+#---
 # missing current_user throws exception
 class DocsGuardMissingKeywordTest < Minitest::Spec
   class Create < Trailblazer::Operation
