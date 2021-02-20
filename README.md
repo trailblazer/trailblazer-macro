@@ -21,6 +21,7 @@ Describe the following Macro's:
     + [Policy::Guard - Name](#policy--guard---name)
     + [Policy::Guard - Dependency Injection](#policy--guard---dependency-injection)
     + [Policy::Guard - Position](#policy--guard---position)
+  - [Each Macro](#each-macro)
 
 ## Model Macro
 Trailblazer also has a convenient Macro to handle model creation and basic finding by id. The Model macro literally does what our model! step did.
@@ -273,3 +274,29 @@ puts Create["pipetree"].inspect(style: :rows) #=>
  # 2 ===============================>model!
 ```
 This is helpful if you maintain modules for operations with generic steps.
+
+## Each Macro
+This macro let you wrap steps in each itereator. It's usefull when you want iterate through an array.
+
+```ruby
+class Multiplication < Trailblazer::Activity::Railway
+  step :init_result_array
+
+  # source -> ctx key where array is stored
+  # target -> ctx key where each element will be placed
+  step Each(source: :array, target: :element) {
+    step :multiplication
+  }
+
+  def init_result_array(ctx, params, **)
+    ctx[:result_array] = []
+    ctx[:array] = params[:array]
+    true
+  end
+
+  def multiplication(ctx, params, **)
+    ctx[:result_array] << ctx[:element] * 2
+    true
+  end
+end
+```
