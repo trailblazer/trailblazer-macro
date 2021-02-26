@@ -48,7 +48,7 @@ module Trailblazer
 
         def call((ctx, flow_options), **circuit_options)
           block_calling_wrapped = -> {
-            call_wrapped_activity([ctx, flow_options], circuit_options)
+            call_wrapped_activity([ctx, flow_options], **circuit_options)
           }
 
           # call the user's Wrap {} block in the operation.
