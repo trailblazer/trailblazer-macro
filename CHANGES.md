@@ -1,3 +1,7 @@
+# 2.1.5
+
+* Support for Ruby 3.0.
+
 # 2.1.4
 
 * Upgrade DSL version to fix step's circuit interface eating passed arguments
