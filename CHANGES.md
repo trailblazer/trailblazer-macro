@@ -1,3 +1,7 @@
+# 2.1.6
+
+* Allow connecting ends of the dynamically selected activity for `Nested()` using `:auto_wire`.
+
 # 2.1.5
 
 * Support for Ruby 3.0.
