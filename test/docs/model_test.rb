@@ -16,7 +16,7 @@ class DocsModelTest < Minitest::Spec
 
   #:op
   class Create < Trailblazer::Operation
-    step Model( Song, :new )
+    step Model(Song, :new)
     # ..
   end
   #:op end
@@ -120,5 +120,19 @@ class DocsModelTest < Minitest::Spec
 
     result.success?.must_equal true
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=100, title=nil>}
+  end
+
+  it "allows injecting {:model.class} and friends" do
+    class Hit < Song
+    end
+
+    result = Create.(params: {}, :"model.class" => Hit)
+
+    result[:model].inspect.must_equal %{#<struct DocsModelTest::Hit id=nil, title=nil>}
+
+  # inject all variables
+    result = Create.(params: {title: "Olympia"}, "model.class": Hit, "model.action": :find_by, "model.find_by_key": :title)
+
+    result[:model].inspect.must_equal %{#<struct DocsModelTest::Hit id=2, title="Olympia">}
   end
 end
