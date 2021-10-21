@@ -32,11 +32,11 @@ module Trailblazer::Macro
 
       task = Eval.new(name: name, path: path)
 
-      injection = Trailblazer::Activity::TaskWrap::Inject::Defaults::Extension(
-        path => condition
-      )
+      injections = {
+        path => ->(*) { condition }
+      }
 
-      {task: task, id: path, extensions: [injection]}
+      {task: task, id: path, inject: [injections]}
     end
   end
 end
