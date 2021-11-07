@@ -66,7 +66,7 @@ plain Rescue()
 =begin
 Rescue( handler: X )
 =end
-  class RescueWithHandlerTest < Minitest::Spec
+  class RescueWithClassHandlerTest < Minitest::Spec
     Memo = Class.new
 
     #:rescue-handler
@@ -97,10 +97,35 @@ Rescue( handler: X )
     it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
   end
 
+  class RescueWithModuleHandlerTest < Minitest::Spec
+    Memo = Class.new
+
+    module MyHandler
+      def self.call(exception, (ctx), *)
+        ctx[:exception_class] = exception.class
+      end
+    end
+
+    class Memo::Create < Trailblazer::Operation
+      step :find_model
+      step Rescue( RuntimeError, handler: MyHandler ) {
+        step :update
+        step :rehash
+      }
+      step :notify
+      fail :log_error
+      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include Rehash
+    end
+
+    it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+  end
+
 =begin
 Rescue( handler: :instance_method )
 =end
-  class RescueWithHandlerTest < Minitest::Spec
+  class RescueWithMethodHandlerTest < Minitest::Spec
     Memo = Class.new
 
     #:rescue-method

@@ -28,11 +28,8 @@ module Trailblazer
     # TODO: remove me in 2.2.
     module Rescue
       def self.deprecate_positional_handler_signature(handler)
-        return handler if handler.is_a?(Symbol) # can't do nutting about this.
-
-        arity = handler.is_a?(Class) ? handler.method(:call).arity : handler.arity
-
-        return handler if arity != 2 # means (exception, (ctx, flow_options), *, &block), "new style"
+        return handler if handler.is_a?(Symbol) # can't do nothing about this.
+        return handler if handler.method(:call).arity != 2 # means (exception, (ctx, flow_options), *, &block), "new style"
 
         ->(exception, (ctx, flow_options), **circuit_options, &block) do
           warn "[Trailblazer] Rescue handlers have a new signature: (exception, *, &block)"
