@@ -62,4 +62,15 @@ class NestedTest < Minitest::Spec
 
     exception.inspect.must_match 'No `db_error` output found'
   end
+
+  it "shows warning if `Nested()` is being used instead of `Subprocess()` for static activities" do
+    _, warnings = capture_io do
+      Class.new(Trailblazer::Operation) do
+        step Nested(SignUp)
+      end
+    end
+
+    warnings.must_equal %Q{[Trailblazer]#{__FILE__}: Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(NestedTest::SignUp)` with `Subprocess(NestedTest::SignUp)`.
+}
+  end
 end
