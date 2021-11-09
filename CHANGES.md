@@ -1,3 +1,8 @@
+# 2.1.7
+
+* Improve `Nested()` warning message.
+* Fix exception in `Rescue()` macro when it's handler is a `Module`.
+
 # 2.1.6
 
 * Allow connecting ends of the dynamically selected activity for `Nested()` using `:auto_wire`.
