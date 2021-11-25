@@ -21,6 +21,17 @@ class DocsModelTest < Minitest::Spec
   end
   #:op end
 
+
+  it "defaults {:params} to empty hash when not passed" do
+    result = Create.({})
+    assert_equal true, result.success?
+    assert_equal %{#<struct DocsModelTest::Song id=nil, title=nil>}, result[:model].inspect
+
+    result = Update.({})
+    assert_equal false, result.success?
+    assert_equal "nil", result[:model].inspect
+  end
+
   it do
     #:create
     result = Create.(params: {})

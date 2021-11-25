@@ -19,7 +19,7 @@ module Trailblazer::Macro
   end
 
   class Model
-    def call(ctx, params: nil, **)
+    def call(ctx, params: {}, **)
       builder                 = Model::Builder.new
       ctx[:model]         = model = builder.call(ctx, params)
       ctx[:"result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
