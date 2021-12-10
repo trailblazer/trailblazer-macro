@@ -21,6 +21,17 @@ class DocsModelTest < Minitest::Spec
   end
   #:op end
 
+
+  it "defaults {:params} to empty hash when not passed" do
+    result = Create.({})
+    assert_equal true, result.success?
+    assert_equal %{#<struct DocsModelTest::Song id=nil, title=nil>}, result[:model].inspect
+
+    result = Update.({})
+    assert_equal false, result.success?
+    assert_equal "nil", result[:model].inspect
+  end
+
   it do
     #:create
     result = Create.(params: {})
@@ -126,13 +137,38 @@ class DocsModelTest < Minitest::Spec
     class Hit < Song
     end
 
+    #:di-model-class
     result = Create.(params: {}, :"model.class" => Hit)
+    #:di-model-class end
 
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Hit id=nil, title=nil>}
 
   # inject all variables
-    result = Create.(params: {title: "Olympia"}, "model.class": Hit, "model.action": :find_by, "model.find_by_key": :title)
+    #:di-all
+    result = Create.(
+      params:               {title: "Olympia"}, # some random variable.
+      "model.class":        Hit,
+      "model.action":       :find_by,
+      "model.find_by_key": :title
+    )
+    #:di-all end
 
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Hit id=2, title="Olympia">}
+
+  # use empty Model() and inject {model.class} and {model.action}
+    module A
+      #:op-model-empty
+      class Create < Trailblazer::Operation
+        step Model()
+        # ..
+      end
+      #:op-model-empty end
+    end # A
+
+    result = A::Create.(params: {}, :"model.class" => Hit)
+
+    result[:model].inspect.must_equal %{#<struct DocsModelTest::Hit id=nil, title=nil>}
+
+
   end
 end

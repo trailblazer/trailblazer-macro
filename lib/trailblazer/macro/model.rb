@@ -2,7 +2,7 @@ module Trailblazer::Macro
 
   Linear = Trailblazer::Activity::DSL::Linear
 
-  def self.Model(model_class, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
+  def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
     injections = { # defaulting as per `:inject` API.
@@ -19,22 +19,22 @@ module Trailblazer::Macro
   end
 
   class Model
-    def call(options, params: nil, **)
+    def call(ctx, params: {}, **)
       builder                 = Model::Builder.new
-      options[:model]         = model = builder.call(options, params)
-      options[:"result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
+      ctx[:model]         = model = builder.call(ctx, params)
+      ctx[:"result.model"] = result = Trailblazer::Operation::Result.new(!model.nil?, {})
 
       result.success?
     end
 
     class Builder
-      def call(options, params)
-        action        = options[:"model.action"]
-        model_class   = options[:"model.class"]
-        find_by_key   = options[:"model.find_by_key"]
+      def call(ctx, params)
+        action        = ctx[:"model.action"]
+        model_class   = ctx[:"model.class"]
+        find_by_key   = ctx[:"model.find_by_key"]
         action        = :pass_through unless %i[new find_by].include?(action)
 
-        send("#{action}!", model_class, params, options[:"model.action"], find_by_key)
+        send("#{action}!", model_class, params, ctx[:"model.action"], find_by_key)
       end
 
       def new!(model_class, params, *)

@@ -1,3 +1,7 @@
+# 2.1.8
+
+* Allow omitting `:params` when calling the operation by defaulting it to `{}` in `Model()`.
+
 # 2.1.7
 
 * Improve `Nested()` warning message.
