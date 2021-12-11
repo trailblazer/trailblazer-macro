@@ -1,6 +1,7 @@
 module Trailblazer::Macro
   module Policy
-    def self.Guard(proc, name: :default, &block)
+    # noinspection RubyClassMethodNamingConvention
+    def self.Guard(proc, name: :default, &_block)
       Policy.step(Guard.build(proc), name: name)
     end
 

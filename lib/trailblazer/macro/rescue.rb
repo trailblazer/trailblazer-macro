@@ -1,7 +1,8 @@
 module Trailblazer
   module Macro
-    NoopHandler = lambda { |*| }
+    NoopHandler = ->(*) {}
 
+    # noinspection RubyClassMethodNamingConvention
     def self.Rescue(*exceptions, handler: NoopHandler, &block)
       exceptions = [StandardError] unless exceptions.any?
 
@@ -31,7 +32,7 @@ module Trailblazer
         return handler if handler.is_a?(Symbol) # can't do nothing about this.
         return handler if handler.method(:call).arity != 2 # means (exception, (ctx, flow_options), *, &block), "new style"
 
-        ->(exception, (ctx, flow_options), **circuit_options, &block) do
+        ->(exception, (ctx, _flow_options), **_circuit_options, &block) do
           warn "[Trailblazer] Rescue handlers have a new signature: (exception, *, &block)"
           handler.(exception, ctx, &block)
         end

@@ -2,6 +2,7 @@ require 'securerandom'
 
 module Trailblazer
   module Macro
+    # noinspection RubyClassMethodNamingConvention
     def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
       activity = Class.new(Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
 
@@ -16,12 +17,14 @@ module Trailblazer
     module Wrap
       # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
       class Wrapped
-        private def deprecate_positional_wrap_signature(user_wrap)
+        private
+
+        def deprecate_positional_wrap_signature(user_wrap)
           parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters
 
           return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
 
-          ->((ctx, flow_options), **circuit_options, &block) do
+          ->((ctx, _flow_options), **_circuit_options, &block) do
             warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block)"
             user_wrap.(ctx, &block)
           end

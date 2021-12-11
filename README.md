@@ -1,4 +1,7 @@
 # Trailblazer Macro
+![Build
+Status](https://github.com/trailblazer/trailblazer-macro/actions/workflows/ci.yml/badge.svg?branch=master)
+[![Gem Version](https://badge.fury.io/rb/trailblazer-macro.svg)](http://badge.fury.io/rb/trailblazer-macro)
 All common Macro's for Trailblazer::Operation, will come here
 
 ## TODO

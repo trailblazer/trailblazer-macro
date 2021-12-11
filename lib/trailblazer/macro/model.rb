@@ -1,7 +1,8 @@
 module Trailblazer::Macro
 
+  # noinspection RubyConstantNamingConvention
   Linear = Trailblazer::Activity::DSL::Linear
-
+  # noinspection RubyClassMethodNamingConvention
   def self.Model(model_class, action = nil, find_by_key = nil, id: 'model.build', not_found_terminus: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
@@ -36,12 +37,12 @@ module Trailblazer::Macro
         send("#{action}!", model_class, params, options[:"model.action"], find_by_key)
       end
 
-      def new!(model_class, params, *)
+      def new!(model_class, _params, *)
         model_class.new
       end
 
       # Doesn't throw an exception and will return false to divert to Left.
-      def find_by!(model_class, params, action, find_by_key, *)
+      def find_by!(model_class, params, _action, find_by_key, *)
         model_class.find_by(find_by_key.to_sym => params[find_by_key])
       end
 
