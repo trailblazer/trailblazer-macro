@@ -9,7 +9,6 @@ module Trailblazer::Macro
       def self.build(callable)
         option = Trailblazer::Option(callable)
 
-        # this gets wrapped in a Operation::Result object.
         ->((ctx, *), **circuit_args) do
           Trailblazer::Operation::Result.new(!!option.call(ctx, keyword_arguments: ctx.to_hash, **circuit_args), {})
         end

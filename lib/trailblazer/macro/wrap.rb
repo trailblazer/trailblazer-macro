@@ -17,19 +17,6 @@ module Trailblazer
     module Wrap
       # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
       class Wrapped
-        private
-
-        def deprecate_positional_wrap_signature(user_wrap)
-          parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters
-
-          return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
-
-          ->((ctx, _flow_options), **_circuit_options, &block) do
-            warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block)"
-            user_wrap.(ctx, &block)
-          end
-        end
-
         def initialize(operation, user_wrap, outputs)
           user_wrap = deprecate_positional_wrap_signature(user_wrap)
 
@@ -78,6 +65,19 @@ module Trailblazer
 
         def call_wrapped_activity((ctx, flow_options), **circuit_options)
           @operation.to_h[:activity].([ctx, flow_options], **circuit_options) # :exec_context is this instance.
+        end
+
+        private
+
+        def deprecate_positional_wrap_signature(user_wrap)
+          parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters
+
+          return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
+
+          ->((ctx, _flow_options), **_circuit_options, &block) do
+            warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block)"
+            user_wrap.(ctx, &block)
+          end
         end
       end
     end # Wrap
