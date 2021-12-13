@@ -2,7 +2,6 @@ module Trailblazer
   module Macro
     NoopHandler = ->(*) {}
 
-    # noinspection RubyClassMethodNamingConvention
     def self.Rescue(*exceptions, handler: NoopHandler, &block)
       exceptions = [StandardError] unless exceptions.any?
 

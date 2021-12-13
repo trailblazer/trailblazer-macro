@@ -2,7 +2,6 @@ require 'securerandom'
 
 module Trailblazer
   module Macro
-    # noinspection RubyClassMethodNamingConvention
     def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
       activity = Class.new(Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
 

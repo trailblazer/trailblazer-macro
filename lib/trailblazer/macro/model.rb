@@ -1,8 +1,6 @@
 module Trailblazer::Macro
-
-  # noinspection RubyConstantNamingConvention
   Linear = Trailblazer::Activity::DSL::Linear
-  # noinspection RubyClassMethodNamingConvention
+
   def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 

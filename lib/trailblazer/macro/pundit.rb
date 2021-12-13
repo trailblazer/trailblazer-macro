@@ -1,6 +1,5 @@
 module Trailblazer::Macro
   module Policy
-    # noinspection RubyClassMethodNamingConvention
     def self.Pundit(policy_class, action, name: :default)
       Policy.step(Pundit.build(policy_class, action), name: name)
     end

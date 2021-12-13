@@ -5,7 +5,7 @@ Status](https://github.com/trailblazer/trailblazer-macro/actions/workflows/ci.ym
 All common Macro's for Trailblazer::Operation, will come here
 
 ## TODO
-Describe the following Macro's:
+Describe the following Macros:
 - Nested
 - Rescue
 - Wrap

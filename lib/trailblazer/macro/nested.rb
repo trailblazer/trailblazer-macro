@@ -2,7 +2,6 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
-    # noinspection RubyClassMethodNamingConvention
     def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
       if callable.is_a?(Class) && callable < Nested.operation_class
         caller_location = caller_locations(2, 1)[0]
