@@ -1,6 +1,7 @@
 # 2.1.8
 
 * Allow omitting `:params` when calling the operation by defaulting it to `{}` in `Model()`.
+* Use `dsl-linear` 0.5.0 and above, which allows removing `Inject()` uses.
 
 # 2.1.7
 
