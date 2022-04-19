@@ -1,5 +1,4 @@
 require "forwardable"
-require "trailblazer/activity"
 require "trailblazer/activity/dsl/linear"
 require "trailblazer/operation" # TODO: remove this dependency
 
@@ -17,12 +16,13 @@ module Trailblazer
 
   # All macros sit in the {Trailblazer::Macro} namespace, where we forward calls from
   # operations and activities to.
-  module Activity::DSL::Linear::Helper
-    Policy = Trailblazer::Macro::Policy
 
-    module ClassMethods
-      extend Forwardable
-      def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue
-    end # ClassMethods
+  module Activity::DSL::Linear::Helper
+    Constants::Policy = Trailblazer::Macro::Policy
+
+    # Extending the {Linear::Helper} namespace is the canonical way to import
+    # macros into Railway, FastTrack, Operation, etc.
+    extend Forwardable
+    def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue
   end # Helper
 end

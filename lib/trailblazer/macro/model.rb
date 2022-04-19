@@ -1,7 +1,5 @@
 module Trailblazer::Macro
 
-  Linear = Trailblazer::Activity::DSL::Linear
-
   def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
     task = Trailblazer::Activity::TaskBuilder::Binary(Model.new)
 
@@ -13,7 +11,7 @@ module Trailblazer::Macro
 
     options = {task: task, id: id, inject: [:params, injections]} # pass-through {:params} if it's in ctx.
 
-    options = options.merge(Linear::Output(:failure) => Linear::End(:not_found)) if not_found_terminus
+    options = options.merge(Trailblazer::Activity::Railway.Output(:failure) => Trailblazer::Activity::Railway.End(:not_found)) if not_found_terminus
 
     options
   end
