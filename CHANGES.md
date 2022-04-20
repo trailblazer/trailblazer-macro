@@ -1,3 +1,8 @@
+# 2.1.10
+
+* In `Nested()`, we no longer use `Railway::End::Success` and `Railway::End::Failure` as static outputs but
+  simply use `Railway`'s default termini objects.
+
 # 2.1.9
 
 * Allow omitting `:params` when calling the operation by defaulting it to `{}` in `Model()`.

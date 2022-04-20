@@ -49,6 +49,28 @@ class NestedTest < Minitest::Spec
     result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
   end
 
+  #@ unit test
+  # TODO: make me a non-Operation test.
+  it "allows using multiple Nested() per operation" do
+    create = Class.new(Trailblazer::Operation) do
+      def compute_nested(ctx, what:, **)
+        what
+      end
+
+      step Nested(:compute_nested)
+      step Nested(:compute_nested), id: :compute_nested_again
+    end
+
+    #@ we want both Nested executed
+    result = create.(seq: [], what: SignIn)
+    result.inspect(:seq).must_equal %{<Result:true [[:c, :c]] >}
+    result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
+
+    result = create.wtf?(seq: [], what: SignUp)
+    result.inspect(:seq).must_equal %{<Result:false [[:b]] >}
+    result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
+  end
+
   it "raises RuntimeError if dynamically nested activities with custom output are not auto wired" do
     exception = assert_raises RuntimeError do
       Class.new(Trailblazer::Operation) do
