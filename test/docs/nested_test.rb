@@ -151,7 +151,8 @@ class NestedInput < Minitest::Spec
       end
       #:nested-with-pass-fast end
 
-      # pass fast
+      #= {#save} is still called because the {End.pass_fast} terminus is automatically wired to
+      #= the success "output" of Nested().
       create.(seq: []).inspect(:seq).must_equal %{<Result:true [[:create, :just_pass_fast, :save]] >}
     end
   end
