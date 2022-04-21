@@ -160,15 +160,16 @@ class NestedInput < Minitest::Spec
   it "Nested(:method, auto_wire: *activities) with :pass_fast => End()" do
     module E
       class JsonValidate < Trailblazer::Operation
-        step :validate, Output(:success) => End(:json_validate)
-        include T.def_steps(:validate)
+        step :validate, Output(:failure) => End(:invalid_json)
+        step :save
+        include T.def_steps(:validate, :save)
       end
 
       #:nested-with-auto-wire
       class Create < Trailblazer::Operation
         step :create
         step Nested(:compute_nested, auto_wire: [Validate, JsonValidate]),
-          Output(:json_validate) => End(:jsoned)
+          Output(:invalid_json) => End(:jsoned)
 
         #~meths
         def compute_nested(ctx, what:, **)
@@ -180,10 +181,36 @@ class NestedInput < Minitest::Spec
       end
       #:nested-with-auto-wire end
 
-      result = Create.(seq: [], what: JsonValidate)
+
+    #@ nested {JsonValidate} ends on {End.success}
+      result = Create.(seq: [], what: JsonValidate, validate: true)
+
+      result.inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
+
+    #@ nested {JsonValidate} ends on {End.invalid_json} because validate fails.
+      result = Create.(seq: [], what: JsonValidate, validate: false)
 
       result.inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:jsoned>}
+
+    #@ nested {JsonValidate} ends on {End.failure} because save fails.
+      result = Create.(seq: [], what: JsonValidate, save: false)
+
+      result.inspect(:seq).must_equal %{<Result:false [[:create, :validate, :save]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
+
+    #@ nested {Validate} ends on {End.failure} because validate fails.
+      result = Create.(seq: [], what: Validate, validate: false)
+
+      result.inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
+
+    #@ nested {Validate} ends on {End.success}.
+      result = Create.(seq: [], what: Validate)
+
+      result.inspect(:seq).must_equal %{<Result:true [[:create, :validate]] >}
+      result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
     end
   end
 end

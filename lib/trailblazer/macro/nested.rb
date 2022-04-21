@@ -50,7 +50,7 @@ module Trailblazer
       def self.Dynamic(nested_activity_decider, auto_wire:)
         if auto_wire.empty?
           is_legacy = true # no auto_wire means we need to compute the legacy return signal.
-          auto_wire = [Class.new(Activity::Railway)] # TODO: test multiple Nested() legacy-style
+          auto_wire = [Class.new(Activity::Railway)]
         end
 
         outputs = outputs_for(auto_wire)
