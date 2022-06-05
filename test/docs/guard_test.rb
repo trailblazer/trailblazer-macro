@@ -1,5 +1,5 @@
 require "test_helper"
-
+require "trailblazer/operation"
 #--
 # with proc
 class DocsGuardProcTest < Minitest::Spec

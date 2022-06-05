@@ -47,8 +47,8 @@ module Trailblazer
       # step Nested(:compute_nested, auto_wire: [Create, Update])
       class Dynamic
         STATIC_OUTPUTS = {
-          :success => Activity::Output(Activity::Railway::End::Success.new(semantic: :success), :success),
-          :failure => Activity::Output(Activity::Railway::End::Failure.new(semantic: :failure), :failure),
+          :success => Activity::Output(Trailblazer::Activity::End(:success), :success),
+          :failure => Activity::Output(Trailblazer::Activity::End(:failure), :failure),
         }
 
         def initialize(nested_activity_decider, auto_wire: [])

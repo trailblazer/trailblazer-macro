@@ -12,9 +12,9 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://trailblazer.to/2.1/docs/activity.html#activity-macro-api"
   spec.license       = "LGPL-3.0"
 
-  spec.files         = `git ls-files`.split($INPUT_RECORD_SEPARATOR)
-  spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
-  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
+  spec.files         = Dir.glob("lib/**/*.rb")
+  spec.files         << "trailblazer-macro.gemspec"
+  spec.test_files    = Dir.glob("test/**/*.rb")
   spec.require_paths = ["lib"]
 
   spec.add_development_dependency "bundler"
@@ -24,9 +24,9 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "multi_json"
   spec.add_development_dependency "roar"
   spec.add_development_dependency "trailblazer-developer"
+  spec.add_development_dependency "trailblazer-operation", ">= 0.7.0"
 
   spec.add_dependency "trailblazer-activity-dsl-linear", ">= 0.5.0", "< 0.6.0"
-  spec.add_dependency "trailblazer-operation", ">= 0.7.0" # TODO: this dependency will be removed.
 
-  spec.required_ruby_version = ">=2.6.0"
+  spec.required_ruby_version = ">=2.5.0"
 end
