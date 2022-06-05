@@ -30,8 +30,8 @@ class IntegrationTest < Minitest::Spec
   end
 
   class SongSpecialCreate < Trailblazer::Operation
-    step Nested(ArtistCreate)
-    step Nested(SongCreate)
+    step Subprocess(ArtistCreate)
+    step Subprocess(SongCreate)
   end
 
   it "create Artist and Song" do
