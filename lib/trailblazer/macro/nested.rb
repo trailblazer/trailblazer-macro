@@ -15,14 +15,14 @@ module Trailblazer
       task, outputs, compute_legacy_return_signal = Nested.Dynamic(callable, auto_wire: auto_wire)
 
       merge = [
-        [Activity::TaskWrap::Pipeline.method(:insert_before), "task_wrap.call_task", ["Nested.compute_nested_activity", task]],
+        [task, id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
       ]
 
       if compute_legacy_return_signal
-        merge << [Activity::TaskWrap::Pipeline.method(:insert_after),  "task_wrap.call_task", ["Nested.compute_return_signal", compute_legacy_return_signal]]
+        merge << [compute_legacy_return_signal, id: "Nested.compute_return_signal", append: "task_wrap.call_task"]
       end
 
-      task_wrap_extension = Activity::TaskWrap::Extension(merge: merge)
+      task_wrap_extension = Activity::TaskWrap::Extension::WrapStatic.new(extension: Activity::TaskWrap::Extension(*merge))
 
       {
         task:       task,
