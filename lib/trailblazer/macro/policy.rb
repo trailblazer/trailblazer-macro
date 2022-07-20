@@ -33,11 +33,13 @@ module Trailblazer::Macro
       task = Eval.new(name: name, path: path)
 
       injections = {
-        # :"policy.default.eval"
-        path => ->(*) { condition }
+        Trailblazer::Activity::Railway.Inject() => {
+          # :"policy.default.eval"
+          path => ->(*) { condition }
+        }
       }
 
-      {task: task, id: path, inject: [injections]}
+      {task: task, id: path, **injections}
     end
   end
 end

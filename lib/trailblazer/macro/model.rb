@@ -4,13 +4,18 @@ module Trailblazer
     def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
       task = Activity::TaskBuilder::Binary(Model.new)
 
-      injections = { # defaulting as per `:inject` API.
-        :"model.class"          => ->(*) { model_class },
-        :"model.action"         => ->(*) { action },
-        :"model.find_by_key"    => ->(*) { find_by_key },
+      injections = {
+        Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
+
+        # defaulting as per Inject() API.
+        Activity::Railway.Inject() => {
+          :"model.class"          => ->(*) { model_class },
+          :"model.action"         => ->(*) { action },
+          :"model.find_by_key"    => ->(*) { find_by_key },
+        }
       }
 
-      options = {task: task, id: id, inject: [:params, injections]} # pass-through {:params} if it's in ctx.
+      options = {task: task, id: id, **injections}
 
       options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
 
