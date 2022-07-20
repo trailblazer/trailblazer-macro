@@ -39,7 +39,7 @@ module Trailblazer::Macro
         }
       }
 
-      {task: task, id: path, **injections}
+      {task: task, id: path}.merge(injections)
     end
   end
 end

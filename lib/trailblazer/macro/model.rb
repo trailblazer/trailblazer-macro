@@ -15,7 +15,7 @@ module Trailblazer
         }
       }
 
-      options = {task: task, id: id, **injections}
+      options = {task: task, id: id}.merge(injections)
 
       options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
 
