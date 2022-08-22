@@ -1,7 +1,7 @@
 module Trailblazer
   module Version
     module Macro
-      VERSION = "2.1.10.beta1"
+      VERSION = "2.1.11"
     end
   end
 end
