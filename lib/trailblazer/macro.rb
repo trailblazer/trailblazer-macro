@@ -9,6 +9,7 @@ require "trailblazer/macro/pundit"
 require "trailblazer/macro/nested"
 require "trailblazer/macro/rescue"
 require "trailblazer/macro/wrap"
+require "trailblazer/macro/each"
 
 module Trailblazer
   module Macro
@@ -23,6 +24,6 @@ module Trailblazer
     # Extending the {Linear::Helper} namespace is the canonical way to import
     # macros into Railway, FastTrack, Operation, etc.
     extend Forwardable
-    def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue
+    def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue, :Each
   end # Helper
 end
