@@ -17,7 +17,7 @@ module Trailblazer
       # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
       class Wrapped
         private def deprecate_positional_wrap_signature(user_wrap)
-          parameters = user_wrap.is_a?(Module) ? user_wrap.method(:call).parameters : user_wrap.parameters
+          parameters = user_wrap.is_a?(Proc) || user_wrap.is_a?(Method) ? user_wrap.parameters : user_wrap.method(:call).parameters
 
           return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
 
