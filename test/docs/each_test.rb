@@ -1,6 +1,37 @@
 require "test_helper"
 
 class DocsEachTest < Minitest::Spec
+  it "what" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
+        step :compute_item
+
+        def compute_item(ctx, item:, index:, **)
+          ctx[:value] = "#{item}-#{index.inspect}"
+        end
+      }
+
+    end
+
+    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+  end
+
+  it "allows taskWrap in Each" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
+        step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
+      }
+
+      def compute_item(ctx, item:, index:, user:, **)
+        ctx[:value] = "#{item}-#{index.inspect}-#{user}"
+      end
+    end
+
+    assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
+  end
+
+
+
   Album = Struct.new(:id, :title, :songs) do
     def self.find(id)
       RECORDS.fetch(id)
@@ -27,9 +58,9 @@ class DocsEachTest < Minitest::Spec
 
   #:op
   class Album::Clone < Trailblazer::Operation
-    step Model( Album, :find )
+    step Model(Album, :find)
     step :clone_album
-    step Each( :songs, key: :original_song ) {
+    step Each(:songs, key: :original_song) {
       step :clone_song
       # ...
     }, id: :clone_songs

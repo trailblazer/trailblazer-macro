@@ -44,3 +44,5 @@ module Rehash
     true
   end
 end
+
+Minitest::Spec.include Trailblazer::Activity::Testing::Assertions
