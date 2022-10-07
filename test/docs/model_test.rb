@@ -171,4 +171,26 @@ class DocsModelTest < Minitest::Spec
 
 
   end
+
+  it "allows to use composable I/O with macros" do
+    module AA
+      #:in
+      class Create < Trailblazer::Operation
+        step Model(Song, :find_by),
+          In() => ->(ctx, my_id:, **) { ctx.merge(params: {id: my_id}) } # Model() needs {params[:id]}.
+        # ...
+      end
+      #:in end
+
+      result = AA::Create.(my_id: 1)
+=begin
+#:in-call
+result = Create.(my_id: 1)
+#:in-call end
+=end
+
+    result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=1, title=nil>}
+
+    end
+  end
 end
