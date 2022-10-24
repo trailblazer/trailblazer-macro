@@ -1,8 +1,12 @@
-# 2.1.10
+# 2.1.11
 
 * In `Nested()`, we no longer use `Railway::End::Success` and `Railway::End::Failure` as static outputs but
   simply use `Railway`'s default termini objects.
 * Use `dsl`'s new `Inject()` API instead of a overriding `:inject` in `Model()` and `Policy()`.
+
+# 2.1.10
+
+* Yanked, pushed accidentially.
 
 # 2.1.9
 

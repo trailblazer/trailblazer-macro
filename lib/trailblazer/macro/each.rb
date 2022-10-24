@@ -1,92 +1,94 @@
-require 'securerandom'
-
 module Trailblazer
   module Macro
-    class Each
-      def initialize(dataset_getter:, inner_key:, block_activity:)
-        @dataset_getter = dataset_getter # TODO: Option here
-        @inner_key      = inner_key
-        @block_activity = block_activity # TODO: check Wrap
-        outputs         = @block_activity.to_h[:outputs]
-        @to_h           = {outputs: outputs, nodes: Object}
-        wrap_static    = Activity::TaskWrap.initial_wrap_static
-
-        # DISCUSS: do we want to support In/Out for Each items?
-        static_ext = Activity::DSL::Linear.VariableMapping(
-          out_filters: [
-            [Activity::Railway.Out(), [:value]] # we need to make sure that {:value} is returned.
-          ]
-        )[0]
-
-        @wrap_static = static_ext.instance_variable_get(:@extension).(wrap_static)
+    class Each < Trailblazer::Activity::FastTrack
+      def self.default_dataset(ctx, dataset:, **)
+        dataset
       end
 
-      attr_reader :to_h
+      # EnumerableNotGiven = Class.new(RuntimeError)
 
-      def call((ctx, flow_options), **circuit_options)
-        elements = @dataset_getter.(ctx, keyword_arguments: ctx, **circuit_options) # Trailblazer::Option call
 
-        raise EnumerableNotGiven unless elements.kind_of?(Enumerable) # FIXME: do we want this check?
+      # def self.iterate(ctx, dataset:, inner_key:, block_activity:, **)
+      def self.iterate((ctx, flow_options), **circuit_options)
+        puts "@@@@@? #{ctx.keys.inspect}"
+        inner_key = ctx.fetch(:inner_key) # TODO: hm... keyword args would be better.
+        dataset = ctx.fetch(:dataset)
+        block_activity = ctx.fetch(:block_activity)
+
 
         collected_values = []
 
-        elements.each.with_index do |element, index|
+        dataset.each.with_index do |element, index|
           # This new {inner_ctx} will be disposed of after invoking the item activity.
           inner_ctx = ctx.merge(
-            @inner_key => element, # defaults to {:item}
+            inner_key => element, # defaults to {:item}
             :index     => index,
             # "#{key}_index" => index,
           )
 
-          # signal, (returned_ctx, flow_options) = Activity::TaskWrap.invoke(
-          #   @block_activity,
-          #   [inner_ctx, flow_options],
-
-
-          #   **circuit_options, # {circuit_options} contains {TaskWrap::Runner}.
-          #   wrap_static: @wrap_static # injecting the wrap_static here will result in @block_activity being run through the taskWrap we build in initialize.
-          # )
+          # using this runner will make it look as if block_activity is being run consequetively within Each as if they were steps
 
           # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
+          # and literally simply invokes {block_activity.call}, which will set its own {wrap_static}.
           signal, (returned_ctx, flow_options) = circuit_options[:runner].(
-            @block_activity,
+            block_activity,
             [inner_ctx, flow_options],
-            **circuit_options, wrap_static: @wrap_static,
+            **circuit_options,
+            # wrap_static: @wrap_static,
           )
 
 
           collected_values << returned_ctx[:value] # {:value} is guaranteed to be returned.
 
-          # Break the loop if {block} emits failure signal
-          return [signal, [ctx, flow_options]] if [:failure, :fail_fast].include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
+          #   # Break the loop if {block} emits failure signal
+          #   return [signal, [ctx, flow_options]] if [:failure, :fail_fast].include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
+          # end
+
+          ctx[:collected_from_each] = collected_values
+
+          # return [@to_h[:outputs].find { |output| output[:semantic] == :success }[:signal], [ctx, flow_options]] # TODO: use Wrap logic somewhow here.
         end
 
-        ctx[:collected_from_each] = collected_values
-
-        return [@to_h[:outputs].find { |output| output[:semantic] == :success }[:signal], [ctx, flow_options]] # TODO: use Wrap logic somewhow here.
+        # {:collected_from_each}
+        return Activity::Right, [ctx, flow_options]
       end
-
-      def self.default_dataset(ctx, dataset:, **)
-        dataset
-      end
-
-      EnumerableNotGiven = Class.new(RuntimeError)
     end
 
     def self.Each(block_activity=nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+
+      dataset_getter = enumerable
+
       # TODO: logic here sucks.
       block_activity ||= Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
 
-      # Wrap(
-        _each = Each.new(
-          dataset_getter: Trailblazer::Option(enumerable),
-          inner_key: inner_key,
-          block_activity: block_activity
-        )
+      # returns {:collected_from_each}
+      each_activity = Class.new(Macro::Each) # DISCUSS: do we need this class? and what base class should we be using?
+      each_activity.step dataset_getter # returns {:value}
+      each_activity.step task: Each.method(:iterate),
+        Activity::Railway.In() => ->(ctx, dataset:, **) {
+          ctx = ctx.merge(
 
-        Activity::Railway.Subprocess(_each).merge(id: id)
+            inner_key:      inner_key,
+            block_activity: block_activity,
+            dataset:        dataset,
 
-      # )
+          )
+        }#,
+        #Activity::Railway.In() => [:dataset] # from {dataset_getter}
+
+        # TODO: Inject(always: true) => {inner_key: ->(*) { inner_key }}
+
+      # TODO: this is only for Introspect: tracing will try to look up {block_activity} in {each_activity}.
+      each_activity.step task: block_activity,
+        magnetic_to: :dontevercallme,
+        id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
+
+
+
+
+
+
+      Activity::Railway.Subprocess(each_activity).merge(id: id)
     end
   end
 end

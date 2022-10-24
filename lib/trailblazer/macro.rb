@@ -2,6 +2,7 @@ require "forwardable"
 require "trailblazer/activity/dsl/linear"
 require "trailblazer/operation" # TODO: remove this dependency
 
+require "securerandom"
 require "trailblazer/macro/model"
 require "trailblazer/macro/policy"
 require "trailblazer/macro/guard"
