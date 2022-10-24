@@ -3,12 +3,12 @@ require 'securerandom'
 module Trailblazer
   module Macro
     class Each
-      def initialize(dataset_getter:, inner_key:, block:)
+      def initialize(dataset_getter:, inner_key:, block_activity:)
         @dataset_getter = dataset_getter # TODO: Option here
         @inner_key      = inner_key
-        @block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
+        @block_activity = block_activity # TODO: check Wrap
         outputs         = @block_activity.to_h[:outputs]
-        @to_h           = {outputs: outputs}
+        @to_h           = {outputs: outputs, nodes: Object}
         wrap_static    = Activity::TaskWrap.initial_wrap_static
 
         # DISCUSS: do we want to support In/Out for Each items?
@@ -38,15 +38,22 @@ module Trailblazer
             # "#{key}_index" => index,
           )
 
-          # signal, (returned_ctx, flow_options) = @block_activity.(
-          signal, (returned_ctx, flow_options) = Activity::TaskWrap.invoke(
+          # signal, (returned_ctx, flow_options) = Activity::TaskWrap.invoke(
+          #   @block_activity,
+          #   [inner_ctx, flow_options],
+
+
+          #   **circuit_options, # {circuit_options} contains {TaskWrap::Runner}.
+          #   wrap_static: @wrap_static # injecting the wrap_static here will result in @block_activity being run through the taskWrap we build in initialize.
+          # )
+
+          # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
+          signal, (returned_ctx, flow_options) = circuit_options[:runner].(
             @block_activity,
             [inner_ctx, flow_options],
-
-
-            **circuit_options, # {circuit_options} contains {TaskWrap::Runner}.
-          wrap_static: @wrap_static
+            **circuit_options, wrap_static: @wrap_static,
           )
+
 
           collected_values << returned_ctx[:value] # {:value} is guaranteed to be returned.
 
@@ -66,12 +73,15 @@ module Trailblazer
       EnumerableNotGiven = Class.new(RuntimeError)
     end
 
-    def self.Each(enumerable=Each.method(:default_dataset), key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+    def self.Each(block_activity=nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+      # TODO: logic here sucks.
+      block_activity ||= Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
+
       # Wrap(
         _each = Each.new(
           dataset_getter: Trailblazer::Option(enumerable),
-          inner_key: key,
-          block: block
+          inner_key: inner_key,
+          block_activity: block_activity
         )
 
         Activity::Railway.Subprocess(_each).merge(id: id)
