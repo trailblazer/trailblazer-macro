@@ -23,7 +23,7 @@ module Trailblazer
               # "#{key}_index" => index,
             )
 
-            # using this runner will make it look as if block_activity is being run consequetively within Each as if they were steps
+            # using this runner will make it look as if block_activity is being run consequetively within {Each.iterate} as if they were steps
             # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
             # and literally simply invokes {block_activity.call}, which will set its own {wrap_static}.
             signal, (returned_ctx, flow_options) = runner.(
@@ -56,7 +56,7 @@ module Trailblazer
       end
     end
 
-    def self.Each(block_activity: nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+    def self.Each(block_activity=nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       dataset_getter = enumerable
 

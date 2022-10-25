@@ -3,16 +3,65 @@ require "test_helper"
 # TODO: index in trace
 
 class DocsEachTest < Minitest::Spec
-  it "Each::Circuit" do
-    block = -> (*){
+  def self.block
+    -> (*){
       step :compute_item
 
       def compute_item(ctx, item:, index:, **)
         ctx[:value] = "#{item}-#{index.inspect}"
       end
     }
+  end
 
-    activity = Trailblazer::Macro.Each(&block)[:task]
+  it "with Trace" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      include T.def_steps(:a, :b)
+
+      step :a
+      step Each(&DocsEachTest.block), id: "Each/1"
+      step :b
+    end
+
+    ctx = {seq: [], dataset: [3,2,1]}
+
+    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+
+    assert_equal Trailblazer::Developer::Trace::Present.(stack, options_for_renderer: {label: {activity => "<a-Each-b>"}}), %{<a-Each-b>
+|-- Start.default
+|-- a
+|-- Each/1
+|   |-- Start.default
+|   |-- dataset_getter
+|   |-- Each.iterate.block
+|   |   |-- invoke_block_activity
+|   |   |   |-- Start.default
+|   |   |   |-- compute_item
+|   |   |   `-- End.success
+|   |   |-- invoke_block_activity
+|   |   |   |-- Start.default
+|   |   |   |-- compute_item
+|   |   |   `-- End.success
+|   |   `-- invoke_block_activity
+|   |       |-- Start.default
+|   |       |-- compute_item
+|   |       `-- End.success
+|   `-- End.success
+|-- b
+`-- End.success}
+
+  #@ compile time
+  #@ make sure we can find tasks/compile-time artifacts in Each
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
+      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item]).task.inspect, %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
+
+  #@ TODO: how to identify index in trace?
+  #@ TODO: grab runtime ctx for iteration 134
+  end
+
+  it "Each::Circuit" do
+
+    activity = Trailblazer::Macro.Each(&DocsEachTest.block)[:task]
 
     ctx = {
       dataset: [1,2,3]
@@ -90,7 +139,7 @@ class DocsEachTest < Minitest::Spec
     activity = Class.new(Trailblazer::Activity::Railway) do
       step Each(nested_activity)  # expects {:dataset}
     end
-    Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
+    # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
 
     assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
   end
