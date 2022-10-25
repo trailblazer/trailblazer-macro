@@ -1,6 +1,50 @@
 require "test_helper"
 
+# TODO: index in trace
+
 class DocsEachTest < Minitest::Spec
+  it "Each::Circuit" do
+    block = -> (*){
+      step :compute_item
+
+      def compute_item(ctx, item:, index:, **)
+        ctx[:value] = "#{item}-#{index.inspect}"
+      end
+    }
+
+    block_activity = Class.new(Trailblazer::Activity::Railway, &block)
+
+    # NodeAttributes = Struct.new(:id, :outputs, :task, :data) # TODO: rename to Task::Attributes.
+
+    circuit = Trailblazer::Macro::Each::Circuit.new(block_activity: block_activity, inner_key: :item)
+
+    schema = Trailblazer::Activity::Schema.new(circuit,
+      :outputs,
+
+      # nodes
+      [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", ["# FIXME"], block_activity)],
+
+      # config
+      {wrap_static: {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static}}
+    )
+
+
+    activity = Trailblazer::Macro::Each::Iterate.new(schema)
+
+    ctx = {
+      dataset: [1,2,3]
+    }
+
+
+    # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
+
+    # assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
+
+    signal, (ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx])
+
+  end
+
+
   it "accepts iterated {block}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
       step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
@@ -44,9 +88,10 @@ class DocsEachTest < Minitest::Spec
     activity = Class.new(Trailblazer::Activity::Railway) do
       step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
-      def compute_item(ctx, item:, index:, user:, **)
-        ctx[:value] = "#{item}-#{index.inspect}-#{user}"
-      end
+
+        def compute_item(ctx, item:, index:, user:, **)
+          ctx[:value] = "#{item}-#{index.inspect}-#{user}"
+        end
       }
 
     end
