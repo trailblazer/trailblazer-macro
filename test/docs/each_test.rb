@@ -12,35 +12,15 @@ class DocsEachTest < Minitest::Spec
       end
     }
 
-    block_activity = Class.new(Trailblazer::Activity::Railway, &block)
-
-    # NodeAttributes = Struct.new(:id, :outputs, :task, :data) # TODO: rename to Task::Attributes.
-
-    circuit = Trailblazer::Macro::Each::Circuit.new(block_activity: block_activity, inner_key: :item)
-
-    schema = Trailblazer::Activity::Schema.new(circuit,
-      :outputs,
-
-      # nodes
-      [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", ["# FIXME"], block_activity)],
-
-      # config
-      {wrap_static: {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static}}
-    )
-
-
-    activity = Trailblazer::Macro::Each::Iterate.new(schema)
+    activity = Trailblazer::Macro.Each(&block)[:task]
 
     ctx = {
       dataset: [1,2,3]
     }
 
-
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-
-    # assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
-
-    signal, (ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx])
+    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx])
+    assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
 
   end
 
@@ -80,8 +60,7 @@ class DocsEachTest < Minitest::Spec
         },
       {}]
     )
-
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+    assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
   end
 
   it "allows taskWrap in Each" do
