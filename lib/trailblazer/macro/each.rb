@@ -13,9 +13,7 @@ module Trailblazer
         def call((ctx, flow_options), runner: Run, **circuit_options) # DISCUSS: do we need {start_task}?
           dataset = ctx.fetch(:dataset)
 
-          collected_values = []
-
-          dataset.each.with_index do |element, index|
+          collected_values = dataset.collect.with_index do |element, index|
             # This new {inner_ctx} will be disposed of after invoking the item activity.
             inner_ctx = ctx.merge(
               @inner_key => element, # defaults to {:item}
@@ -34,11 +32,11 @@ module Trailblazer
               # wrap_static: @wrap_static,
             )
 
-            collected_values << returned_ctx[:value] # {:value} is guaranteed to be returned.
 
             #   # Break the loop if {block} emits failure signal
             #   return [signal, [ctx, flow_options]] if [:failure, :fail_fast].include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
             # end
+            returned_ctx[:value] # {:value} is guaranteed to be returned.
           end
 
           ctx[:collected_from_each] = collected_values
