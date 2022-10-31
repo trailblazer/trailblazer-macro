@@ -67,22 +67,16 @@ class DocsEachTest < Minitest::Spec
 `-- End.success}
 
   #@ compile time
-  #@ make sure we can find tasks/compile-time artifacts in Each
+  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
       ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
-  #@ TODO: grab runtime ctx for iteration 134
-
-
-
-  #             ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item]
-  # Trace path: ["Each/1", "Each.iterate.block", "invoke_block_activity/0", :compute_item] ("runtime path")
+  # TODO: grab runtime ctx for iteration 134
   end
 
   it "Each::Circuit" do
-
     activity = Trailblazer::Macro.Each(&DocsEachTest.block)[:task]
 
     ctx = {
@@ -92,7 +86,6 @@ class DocsEachTest < Minitest::Spec
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
     signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx])
     assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
-
   end
 
 
