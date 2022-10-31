@@ -1,4 +1,3 @@
-# per default, everything we pass into a circuit is immutable. it's the ops/act's job to allow writing (via a Context)
 module Trailblazer
   module Macro
     # {Nested} macro.
@@ -13,16 +12,12 @@ module Trailblazer
         return Activity::Railway.Subprocess(callable)
       end
 
-
-
-
-
-
+# TODO: rename auto_wire => static
+      return Nested.Static(callable, id: id, auto_wire: auto_wire) if auto_wire.any?
 
       # no {auto_wire}
-      return Nested::Dynamic(callable, id: id)
+      return Nested.Dynamic(callable, id: id)
     end
-# TODO: auto_wire => static
 
     # @private
     class Nested < Trailblazer::Activity::Railway
@@ -33,13 +28,11 @@ module Trailblazer
         to_h[:activity].(args, **circuit_options)
       end
 
-      def self.operation_class
+      def self.operation_class # TODO: remove once we don't need the deprecation anymore.
         Operation
       end
 
-      # Dynamic is without auto_wire where we don't even know what *could* be the actual
-      # nested activity until it's runtime.
-      def self.Dynamic(decider, id:)
+      def self.nesting_activity_for(decider, id:, &block)
         decider_task = Activity::Circuit::TaskAdapter.Binary(
           decider,
           adapter_class: Activity::Circuit::TaskAdapter::Step::AssignVariable,
@@ -49,7 +42,16 @@ module Trailblazer
         # and assigns the return value to {ctx[:nested_activity]}.
 
         nesting_activity = Class.new(Macro::Nested) do
-          step task: decider_task
+          step task: decider_task # always run the decider!
+
+          instance_exec(&block)
+        end
+      end
+
+      # Dynamic is without auto_wire where we don't even know what *could* be the actual
+      # nested activity until it's runtime.
+      def self.Dynamic(decider, id:)
+        nesting_activity = nesting_activity_for(decider, id: id) do
           step task: Dynamic.method(:call_dynamic_nested), id: :call_dynamic_nested
         end
 
@@ -69,45 +71,54 @@ module Trailblazer
 
           return_signal, (ctx, flow_options) = runner.(nested_activity, [ctx, flow_options], runner: runner, **circuit_options, activity: hosting_activity)
 
+          return compute_legacy_return_signal(return_signal), [ctx, flow_options]
+        end
+
+        def self.compute_legacy_return_signal(return_signal)
           actual_semantic  = return_signal.to_h[:semantic]
           applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
-
-          return applied_signal, [ctx, flow_options]
         end
       end
 
+      def self.Static(decider, id:, auto_wire:)
+        # dispatch is wired to each possible Activity.
+        dispatch_outputs = auto_wire.collect do |activity|
+          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
+        end.to_h
+
+        nesting_activity = nesting_activity_for(decider, id: id) do
+          step({task: Static.method(:dispatch), id: :dispatch}.merge(dispatch_outputs))
 
 
-      # For dynamic `Nested`s that do not expose an {Activity} interface.
-      #
-      # Dynamic doesn't automatically connect outputs of runtime {Activity}
-      # at compile time (as we don't know which activity will be nested, obviously).
-      # So by default, it only connects good old success/failure ends. But it is also
-      # possible to connect all the ends of all possible dynamic activities
-      # by passing their list to {:auto_wire} option.
-      #
-      # step Nested(:compute_nested, auto_wire: [Create, Update])
-      def self.___Dynamic(nested_activity_decider, auto_wire:)
-        if auto_wire.empty?
-          is_legacy = true # no auto_wire means we need to compute the legacy return signal.
-          auto_wire = [Class.new(Activity::Railway)]
+          all_termini = {}
+
+          auto_wire.each do |activity|
+            activity_step = Subprocess(activity)
+
+            outputs = activity_step[:outputs]
+
+            # TODO: detect if we have two identical "special" termini.
+            output_wirings = outputs.collect do |semantic, output|
+              [Output(semantic), End(semantic)]
+            end.to_h
+
+            step activity_step,
+              {magnetic_to: activity}.merge(output_wirings)
+              # failure and success are wired to respective termini of {nesting_activity}.
+          end
         end
 
-        outputs = outputs_for(auto_wire)
-        task    = Dynamic.new(nested_activity_decider)
-        compute_legacy_return_signal = Dynamic::ComputeLegacyReturnSignal.new(outputs) if is_legacy
-
-        return task, outputs, compute_legacy_return_signal
+        Activity::Railway.Subprocess(nesting_activity).merge(id: id)
       end
 
-      # Go through the list of all possible nested activities and compile the total sum of possible outputs.
-      # FIXME: WHAT IF WE HAVE TWO IDENTICALLY NAMED OUTPUTS?
-      # @private
-      def self.outputs_for(activities)
-        activities.map do |activity|
-          Activity::Railway.Subprocess(activity)[:outputs]
-        end.inject(:merge)
+      module Static
+        def self.dispatch((ctx, flow_options), **circuit_options)
+          nested_activity = ctx[:nested_activity] # we use the decision class as a signal.
+
+          return nested_activity, [ctx, flow_options]
+        end
       end
-    end
+
+    end # Nested
   end
 end
