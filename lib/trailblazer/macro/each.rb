@@ -83,10 +83,13 @@ module Trailblazer
         # nodes
         [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", ["# FIXME"], block_activity)],
         # config
-        {wrap_static: {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static}}
+        {
+          wrap_static:  {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static},
+          each:         true, # mark this activity for {compute_runtime_id}.
+        }
       )
 
-
+      # The {Each.iterate.block} activity hosting a special {Circuit}
       iterate_activity = Trailblazer::Activity.new(schema)
 
 

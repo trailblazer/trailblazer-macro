@@ -26,22 +26,39 @@ class DocsEachTest < Minitest::Spec
 
     stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
 
-    assert_equal Trailblazer::Developer::Trace::Present.(stack, options_for_renderer: {label: {activity => "<a-Each-b>"}}), %{<a-Each-b>
+    my_compute_runtime_id = ->(captured_node:, activity:, compile_id:, **) do
+      # activity is the host activity
+      puts "@@@@@ #{captured_node.captured_input.task.inspect}"
+
+      return compile_id unless activity[:each] == true
+
+      # puts "@@@@@   #{activity.inspect}"
+      index = captured_node.captured_input.data[:ctx].fetch(:index)
+
+      "#{compile_id}.#{index}"
+    end
+
+
+    assert_equal Trailblazer::Developer::Trace::Present.(stack,
+
+      compute_runtime_id: my_compute_runtime_id,
+
+      node_options: {stack.to_a[0] => {label: "<a-Each-b>"}}), %{<a-Each-b>
 |-- Start.default
 |-- a
 |-- Each/1
 |   |-- Start.default
 |   |-- dataset_getter
 |   |-- Each.iterate.block
-|   |   |-- invoke_block_activity
+|   |   |-- invoke_block_activity.0
 |   |   |   |-- Start.default
 |   |   |   |-- compute_item
 |   |   |   `-- End.success
-|   |   |-- invoke_block_activity
+|   |   |-- invoke_block_activity.1
 |   |   |   |-- Start.default
 |   |   |   |-- compute_item
 |   |   |   `-- End.success
-|   |   `-- invoke_block_activity
+|   |   `-- invoke_block_activity.2
 |   |       |-- Start.default
 |   |       |-- compute_item
 |   |       `-- End.success
@@ -52,11 +69,16 @@ class DocsEachTest < Minitest::Spec
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item]).task.inspect, %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
-  #@ TODO: how to identify index in trace?
   #@ TODO: grab runtime ctx for iteration 134
+
+
+
+  #             ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item]
+  # Trace path: ["Each/1", "Each.iterate.block", "invoke_block_activity/0", :compute_item] ("runtime path")
   end
 
   it "Each::Circuit" do
