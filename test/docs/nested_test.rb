@@ -2,7 +2,7 @@ require "test_helper"
 
 class NestedInput < Minitest::Spec
   let(:edit) do
-    edit = Class.new(Trailblazer::Operation) do
+    Class.new(Trailblazer::Operation) do
       step :c
 
       include T.def_steps(:c)
@@ -10,7 +10,7 @@ class NestedInput < Minitest::Spec
   end
 
   let(:update) do
-    edit = Class.new(Trailblazer::Operation) do
+    Class.new(Trailblazer::Operation) do
       step :d
       include T.def_steps(:d)
     end
@@ -67,38 +67,38 @@ class NestedInput < Minitest::Spec
     create.(seq: [], c: false).inspect(:seq).must_equal %{<Result:true [[:a, :c, :b]] >}
   end
 
-  it "Nested(:method)" do
-    module B
-      create =
-      #:nested-dynamic
-      class Create < Trailblazer::Operation
-        step :create
-        step Nested(:compute_nested)
-        step :save
+  module B
+    #:nested-dynamic
+    class Create < Trailblazer::Operation
+      step :create
+      step Nested(:compute_nested)
+      step :save
 
-        def compute_nested(ctx, params:, **)
-          params.is_a?(Hash) ? Validate : JsonValidate
-        end
-        #~meths
-        include T.def_steps(:create, :save)
-        #~meths end
+      def compute_nested(ctx, params:, **)
+        params.is_a?(Hash) ? Validate : JsonValidate
       end
+      #~meths
+      include T.def_steps(:create, :save)
+      #~meths end
+    end
+  end
+
+  it "Nested(:method)" do
       #:nested-dynamic end
     # `edit` and `update` can be called from Nested()
 
   # edit/success
-    create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
+    B::Create.(seq: [], params: {}).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :save]] >}
 
   # update/success
-    create.(seq: [], params: nil).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :json, :save]] >}
+    B::Create.(seq: [], params: nil).inspect(:seq).must_equal %{<Result:true [[:create, :validate, :json, :save]] >}
 
 
 # wiring of fail:
   # edit/failure
-    create.(seq: [], params: {}, validate: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
+    B::Create.(seq: [], params: {}, validate: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate]] >}
   # update/failure
-    create.(seq: [], params: nil, json: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate, :json]] >}
-    end
+    B::Create.(seq: [], params: nil, json: false).inspect(:seq).must_equal %{<Result:false [[:create, :validate, :json]] >}
   end
 
   it "Nested(:method), input: :my_input" do
