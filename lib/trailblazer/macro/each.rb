@@ -43,10 +43,6 @@ module Trailblazer
 
           return @success_terminus, [ctx, flow_options]
         end
-
-        def to_h
-          {map: {@block_activity =>{}}} # FIXME.
-        end
       end # Circuit
 
       def self.default_dataset(ctx, dataset:, **)
@@ -54,9 +50,11 @@ module Trailblazer
       end
     end
 
+    # @api private The internals here are considered private and might change in the near future.
     def self.Each(block_activity=nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       dataset_getter = enumerable
+
 
       # TODO: logic here sucks.
       block_activity ||= Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
@@ -81,7 +79,7 @@ module Trailblazer
       schema = Trailblazer::Activity::Schema.new(circuit,
         outputs, # outputs
         # nodes
-        [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", ["# FIXME"], block_activity)],
+        [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
         # config
         {
           wrap_static:  {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static},
@@ -89,7 +87,10 @@ module Trailblazer
         }
       )
 
-      # The {Each.iterate.block} activity hosting a special {Circuit}
+      # The {Each.iterate.block} activity hosting a special {Circuit} that runs
+      # {block_activity} looped. In the Stack, this will look as if {block_activity} is
+      # a child of {iterate_activity}, that's why we add {block_activity} as a Node in
+      # {iterate_activity}'s schema.
       iterate_activity = Trailblazer::Activity.new(schema)
 
 
