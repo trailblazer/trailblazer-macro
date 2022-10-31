@@ -2,6 +2,7 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
+    # @api private The internals here are considered private and might change in the near future.
     def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
       if callable.is_a?(Class) && callable < Nested.operation_class
         caller_location = caller_locations(2, 1)[0]
@@ -12,31 +13,70 @@ module Trailblazer
         return Activity::Railway.Subprocess(callable)
       end
 
-      task, outputs, compute_legacy_return_signal = Nested.Dynamic(callable, auto_wire: auto_wire)
 
-      merge = [
-        [task, id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
-      ]
 
-      if compute_legacy_return_signal
-        merge << [compute_legacy_return_signal, id: "Nested.compute_return_signal", append: "task_wrap.call_task"]
-      end
 
-      task_wrap_extension = Activity::TaskWrap::Extension::WrapStatic.new(extension: Activity::TaskWrap::Extension(*merge))
 
-      {
-        task:       task,
-        id:         id,
-        extensions: [task_wrap_extension],
-        outputs:    outputs,
-      }
+
+
+      # no {auto_wire}
+      return Nested::Dynamic(callable, id: id)
     end
+# TODO: auto_wire => static
 
     # @private
-    module Nested
+    class Nested < Trailblazer::Activity::Railway
+      # TODO: make this {Activity::KeepOuterExecContext} Interim or something
+      # TODO: remove Strategy.call and let runner do this.
+      def self.call(args, **circuit_options)
+        # by calling the internal {Activity} directly we skip setting a new {:exec_context}
+        to_h[:activity].(args, **circuit_options)
+      end
+
       def self.operation_class
         Operation
       end
+
+      # Dynamic is without auto_wire where we don't even know what *could* be the actual
+      # nested activity until it's runtime.
+      def self.Dynamic(decider, id:)
+        decider_task = Activity::Circuit::TaskAdapter.Binary(
+          decider,
+          adapter_class: Activity::Circuit::TaskAdapter::Step::AssignVariable,
+          variable_name: :nested_activity
+        )
+        # decider_task is a circuit-interface compatible task that internally calls {user_proc}
+        # and assigns the return value to {ctx[:nested_activity]}.
+
+        nesting_activity = Class.new(Macro::Nested) do
+          step task: decider_task
+          step task: Dynamic.method(:call_dynamic_nested), id: :call_dynamic_nested
+        end
+
+        Activity::Railway.Subprocess(nesting_activity).merge(id: id)
+      end
+
+      class Dynamic
+        SUCCESS_SEMANTICS = [:success, :pass_fast] # TODO: make this injectable/or get it from operation.
+
+        def self.call_dynamic_nested((ctx, flow_options), runner:, **circuit_options)
+          nested_activity = ctx[:nested_activity]
+
+          hosting_activity = {
+            nodes:        [Trailblazer::Activity::NodeAttributes.new(nested_activity.to_s, nil, nested_activity)],
+            wrap_static:  {nested_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static},
+          }
+
+          return_signal, (ctx, flow_options) = runner.(nested_activity, [ctx, flow_options], runner: runner, **circuit_options, activity: hosting_activity)
+
+          actual_semantic  = return_signal.to_h[:semantic]
+          applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
+
+          return applied_signal, [ctx, flow_options]
+        end
+      end
+
+
 
       # For dynamic `Nested`s that do not expose an {Activity} interface.
       #
@@ -47,7 +87,7 @@ module Trailblazer
       # by passing their list to {:auto_wire} option.
       #
       # step Nested(:compute_nested, auto_wire: [Create, Update])
-      def self.Dynamic(nested_activity_decider, auto_wire:)
+      def self.___Dynamic(nested_activity_decider, auto_wire:)
         if auto_wire.empty?
           is_legacy = true # no auto_wire means we need to compute the legacy return signal.
           auto_wire = [Class.new(Activity::Railway)]
@@ -67,44 +107,6 @@ module Trailblazer
         activities.map do |activity|
           Activity::Railway.Subprocess(activity)[:outputs]
         end.inject(:merge)
-      end
-
-      class Dynamic
-        def initialize(nested_activity_decider)
-          @nested_activity_decider = Trailblazer::Option(nested_activity_decider)
-        end
-
-        # TaskWrap step.
-        def call(wrap_ctx, original_args)
-          (ctx, _), original_circuit_options = original_args
-
-          # TODO: evaluate the option to get the actual "object" to call.
-          activity = @nested_activity_decider.(ctx, keyword_arguments: ctx.to_hash, **original_circuit_options)
-
-          # Overwrite :task so task_wrap.call_task will call this activity.
-          # This is a taskWrap trick so we don't have to repeat logic from #call_task here.
-          wrap_ctx[:task] = activity
-
-          return wrap_ctx, original_args
-        end
-
-        # TODO: remove me when we make {:auto_wire} mandatory.
-        class ComputeLegacyReturnSignal
-          SUCCESS_SEMANTICS = [:success, :pass_fast] # TODO: make this injectable/or get it from operation.
-
-          def initialize(outputs)
-            @outputs = outputs # not needed for auto_wire!
-          end
-
-          def call(wrap_ctx, original_args)
-            actual_semantic  = wrap_ctx[:return_signal].to_h[:semantic]
-            applied_semantic = SUCCESS_SEMANTICS.include?(actual_semantic) ? :success : :failure
-
-            wrap_ctx[:return_signal] = @outputs.fetch(applied_semantic).signal
-
-            return wrap_ctx, original_args
-          end
-        end # ComputeLegacyReturnSignal
       end
     end
   end

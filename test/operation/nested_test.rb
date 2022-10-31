@@ -3,6 +3,19 @@ require 'test_helper'
 class NestedTest < Minitest::Spec
   DatabaseError = Class.new(Trailblazer::Activity::Signal)
 
+  def trace(activity, ctx)
+    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
+  end
+
+  module ComputeNested
+    module_function
+
+    def compute_nested(ctx, what:, **)
+      what
+    end
+  end
+
   class SignUp < Trailblazer::Operation
     def self.b(ctx, **)
       ctx[:seq] << :b
@@ -95,4 +108,66 @@ class NestedTest < Minitest::Spec
     warnings.must_equal %Q{[Trailblazer]#{__FILE__}: Using the `Nested()` macro with operations and activities is deprecated. Replace `Nested(NestedTest::SignUp)` with `Subprocess(NestedTest::SignUp)`.
 }
   end
+
+  it "{#wtf?} with Nested::Dynamic and {:decider} instance method" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      include T.def_steps(:a)
+      include ComputeNested
+
+      step :a
+      step Nested(:compute_nested)
+    end
+
+  #@ SignIn, success
+    output, signal, ctx = trace(activity, {seq: [], what: SignIn})
+    assert_equal signal.inspect, %{#<Trailblazer::Activity::End semantic=:success>}
+    assert_equal ctx.inspect, %{{:seq=>[:a, :c], :what=>NestedTest::SignIn, :nested_activity=>NestedTest::SignIn}}
+    assert_equal output, %{TOP
+|-- Start.default
+|-- a
+|-- Nested(compute_nested)
+|   |-- Start.default
+|   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_nested>
+|   |-- call_dynamic_nested
+|   |   `-- NestedTest::SignIn
+|   |       |-- Start.default
+|   |       |-- c
+|   |       `-- End.success
+|   `-- End.success
+`-- End.success}
+
+  #@ SignIn, failure
+    output, signal, ctx = trace(activity, {seq: [], what: SignIn, c: false})
+    assert_equal signal.inspect, %{#<Trailblazer::Activity::End semantic=:failure>}
+    assert_equal ctx.inspect, %{{:seq=>[:a, :c], :what=>NestedTest::SignIn, :c=>false, :nested_activity=>NestedTest::SignIn}}
+    assert_equal output, %{TOP
+|-- Start.default
+|-- a
+|-- Nested(compute_nested)
+|   |-- Start.default
+|   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_nested>
+|   |-- call_dynamic_nested
+|   |   `-- NestedTest::SignIn
+|   |       |-- Start.default
+|   |       |-- c
+|   |       `-- End.failure
+|   `-- End.failure
+`-- End.failure}
+  end
+
+  it "Nested() unit test" do
+    my_decider  = ComputeNested.method(:compute_nested)
+    activity    = Trailblazer::Macro.Nested(my_decider)[:task]
+
+    ctx = {
+      what: SignUp,
+      seq: [],
+    }
+
+    # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
+    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: self)
+    assert_equal _ctx.inspect, %{{:what=>NestedTest::SignUp, :seq=>[:b], :nested_activity=>NestedTest::SignUp}}
+  end
 end
+
+# TODO:  find_path in Nested
