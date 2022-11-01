@@ -32,6 +32,10 @@ module Trailblazer
         Operation
       end
 
+      # Creates the central Nested() activity that looks as follows.
+      #   step decider_task
+      #   ..your code...
+      # It is used for both Dynamic and Static.
       def self.nesting_activity_for(decider, id:, &block)
         decider_task = Activity::Circuit::TaskAdapter.Binary(
           decider,
@@ -80,17 +84,31 @@ module Trailblazer
         end
       end
 
+      # Code to handle [:auto_wire]. This is called "static" as you configure the possible activities at
+      # compile-time. This is the recommended way.
       def self.Static(decider, id:, auto_wire:)
         # dispatch is wired to each possible Activity.
+
         dispatch_outputs = auto_wire.collect do |activity|
-          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
+          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.End("decision:#{activity}")]
         end.to_h
 
-        nesting_activity = nesting_activity_for(decider, id: id) do
-          step({task: Static.method(:dispatch), id: :dispatch}.merge(dispatch_outputs))
+        deciding_activity = nesting_activity_for(decider, id: id) do
+          step({task: Static.method(:dispatch), id: :dispatch_to_terminus}.merge(dispatch_outputs))
+        end
 
+        deciding_outputs = auto_wire.collect do |activity|
+          [Activity::Railway.Output("decision:#{activity}"), Activity::Railway.Track(activity)]
+        end.to_h
 
-          all_termini = {}
+        nesting_activity = Class.new(Nested) do
+          # The separated deciding_activity is so we can discard {:nested_activity} and
+          # keep any decider computation within {deciding_activity}.
+          step Subprocess(deciding_activity).merge({
+            id: :decide,
+            In() => ->(ctx, **) { ctx }, # FIXME: generic solution for this.
+            Out() => [], # discard of {ctx[:nested_activity]}.
+          }).merge(deciding_outputs)
 
           auto_wire.each do |activity|
             activity_step = Subprocess(activity)
