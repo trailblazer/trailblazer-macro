@@ -48,7 +48,7 @@ class DocsNestedStaticTest < Minitest::Spec
     end
   end # A
 
-  it "auto_wire: []" do
+  it "wires all nested termini to the outer tracks" do
     #@ success for Id3Tag
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
     #@ failure for Id3Tag
@@ -58,10 +58,12 @@ class DocsNestedStaticTest < Minitest::Spec
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
     #@ failure for VorbisComment
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
+  end
 
-
-    output, _ = trace A::Song::Activity::Create, params: {type: "vorbis"}, seq: []
-    assert_equal output, %{TOP
+  it "is compatible with Debugging API" do
+    trace = %{
+#:create-trace
+Song::Activity::Create
 |-- Start.default
 |-- model
 |-- Nested(decide_file_type)
@@ -78,7 +80,12 @@ class DocsNestedStaticTest < Minitest::Spec
 |   |   `-- End.success
 |   `-- End.success
 |-- save
-`-- End.success}
+`-- End.success
+#:create-trace end
+}
+
+    output, _ = trace A::Song::Activity::Create, params: {type: "vorbis"}, seq: []
+    assert_equal output, trace.split("\n")[2..-2].join("\n").sub("Song::Activity::Create", "TOP")
 
     output, _ = trace A::Song::Activity::Create, params: {type: "mp3"}, seq: []
     assert_equal output, %{TOP
@@ -101,11 +108,23 @@ class DocsNestedStaticTest < Minitest::Spec
 `-- End.success}
 
 
-    #@ compile time
+  #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    # assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-    #   ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
-    #   %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    assert_equal Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
+      ["Nested(decide_file_type)", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=encode_id3>}
+
+    Song = A::Song
+    output =
+    #:create-introspect
+    Trailblazer::Developer.render(Song::Activity::Create,
+      path: [
+        "Nested(decide_file_type)", # ID of Nested()
+        Song::Activity::Id3Tag      # ID of the nested {Id3Tag} activity.
+      ]
+    )
+    #:create-introspect end
+    assert_match /user_proc=encode_id3>/, output
   end
 
 #@ Additional terminus {End.invalid_metadata} in Nested activity
