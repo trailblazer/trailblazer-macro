@@ -8,9 +8,9 @@ class DocsNestedStaticTest < Minitest::Spec
     return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
   end
 
+#@ {:auto_wire} without any other options
   module A
     class Song
-
     end
 
     module Song::Activity
@@ -29,12 +29,14 @@ class DocsNestedStaticTest < Minitest::Spec
         include T.def_steps(:prepare_metadata, :encode_cover)
         #~meths end
       end
+    end
 
+    #:create
+    module Song::Activity
       class Create < Trailblazer::Activity::Railway
         step :model
         step Nested(:decide_file_type,
           auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
-
         step :save
         #~meths
         include T.def_steps(:model, :save)
@@ -44,8 +46,9 @@ class DocsNestedStaticTest < Minitest::Spec
           params[:type] == "mp3" ? Id3Tag : VorbisComment
         end
       end
-
     end
+    #:create end
+
   end # A
 
   it "wires all nested termini to the outer tracks" do
@@ -152,6 +155,7 @@ Song::Activity::Create
           #~body
           ctx[:seq] << :parse
           true
+          # TODO: also test returning false.
           #~body end
         end
       end
@@ -182,9 +186,8 @@ Song::Activity::Create
     class Song
     end
 
+    #:unsupported-terminus
     module Song::Activity
-      Id3Tag = B::Song::Activity::Id3Tag
-
       class VorbisComment < Trailblazer::Activity::Railway
         step :prepare_metadata
         step :encode_cover, Output(:failure) => End(:unsupported_file_format)
@@ -192,6 +195,11 @@ Song::Activity::Create
         include T.def_steps(:prepare_metadata, :encode_cover)
         #~meths end
       end
+    end
+    #:unsupported-terminus end
+
+    module Song::Activity
+      Id3Tag = B::Song::Activity::Id3Tag
 
       class Create < Trailblazer::Activity::Railway
         step :model
@@ -224,6 +232,43 @@ Song::Activity::Create
 
     #@ UnsupportedFileFormat
     assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, terminus: :internal_error, encode_cover: false
+  end
+
+  module D
+    class Song; end
+
+    module Song::Activity
+      Id3Tag = A::Song::Activity::Id3Tag
+      VorbisComment = C::Song::Activity::VorbisComment
+    end
+
+    #:create-output
+    module Song::Activity
+      class Create < Trailblazer::Activity::Railway
+        step :model
+        step Nested(
+            :decide_file_type,
+            auto_wire: [Id3Tag, VorbisComment]
+          ),
+          # Output and friends are used *after* Nested().
+          # Connect VorbisComment's {unsupported_file_format} to our {failure} track:
+          Output(:unsupported_file_format) => Track(:failure)
+
+        step :save
+        #~meths
+        include T.def_steps(:model, :save)
+
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+        #~meths end
+      end
+    end
+    #:create-output end
+  end
+
+  it "Id3Tag's invalid_metadata goes to {End.failure}" do
+    assert_invoke D::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
   end
 
   #@ unit test
