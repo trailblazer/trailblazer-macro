@@ -86,6 +86,11 @@ module Trailblazer
 
       # Code to handle [:auto_wire]. This is called "static" as you configure the possible activities at
       # compile-time. This is the recommended way.
+      #
+      # TODO: allow configuring Output of Nested per internal nested activity, e.g.
+      #         step Nested(.., Id3Tag => {Output(:invalid_metadata) => ...}
+      #       this will help when semantics overlap.
+      #
       def self.Static(decider, id:, auto_wire:)
         # dispatch is wired to each possible Activity.
 
@@ -106,7 +111,7 @@ module Trailblazer
           # keep any decider computation within {deciding_activity}.
           step Subprocess(deciding_activity).merge({
             id: :decide,
-            In() => ->(ctx, **) { ctx }, # FIXME: generic solution for this.
+            In()  => ->(ctx, **) { ctx }, # FIXME: generic solution for this.
             Out() => [], # discard of {ctx[:nested_activity]}.
           }).merge(deciding_outputs)
 
@@ -120,6 +125,8 @@ module Trailblazer
               [Output(semantic), End(semantic)]
             end.to_h
 
+            # Each nested activity is a Subprocess.
+            # They have Output(semantic) => End(semantic) for each of their termini.
             step activity_step,
               {magnetic_to: activity}.merge(output_wirings)
               # failure and success are wired to respective termini of {nesting_activity}.

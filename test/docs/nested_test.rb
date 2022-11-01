@@ -305,8 +305,6 @@ class DocsNestedStaticTest < Minitest::Spec
   it "Nested(:method) with tracing" do
     stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(B::Create, [{seq: [], params: {}}])
 
-puts stack.to_a[5]
-
         assert_equal Trailblazer::Developer::Trace::Present.(stack,
 
       # compute_runtime_id: my_compute_runtime_id,
