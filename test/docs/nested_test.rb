@@ -51,8 +51,13 @@ class DocsNestedStaticTest < Minitest::Spec
   it "auto_wire: []" do
     #@ success for Id3Tag
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    #@ failure for Id3Tag
+    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
+
     #@ success for VorbisComment
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    #@ failure for VorbisComment
+    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
 
 
     output, _ = trace A::Song::Activity::Create, params: {type: "vorbis"}, seq: []
@@ -94,6 +99,105 @@ class DocsNestedStaticTest < Minitest::Spec
 |   `-- End.success
 |-- save
 `-- End.success}
+  end
+
+#@ Additional terminus {End.invalid_metadata} in Nested activity
+  module B
+    class Song
+    end
+
+    module Song::Activity
+      class Id3Tag < Trailblazer::Activity::Railway
+        InvalidMetadata = Class.new(Trailblazer::Activity::Signal)
+
+        step :parse, Output(InvalidMetadata, :invalid_metadata) => End(:invalid_metadata) # We have a new terminus {End.invalid_metadata}
+        step :encode_id3
+        #~meths
+        include T.def_steps(:parse, :encode_id3)
+
+        def validate_metadata(params)
+          params[:is_valid]
+        end
+        #~meths end
+        def parse(ctx, params:, **)
+          unless validate_metadata(params)
+            return InvalidMetadata
+          end
+          #~body
+          ctx[:seq] << :parse
+          true
+          #~body end
+        end
+      end
+
+      VorbisComment = A::Song::Activity::VorbisComment
+
+      class Create < Trailblazer::Activity::Railway
+        step :model
+        step Nested(:decide_file_type,
+          auto_wire: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
+          Output(:invalid_metadata) => Track(:failure)
+
+        step :save
+        #~meths
+        include T.def_steps(:model, :save)
+        #~meths end
+
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+      end
+
+    end
+  end # B
+
+# Add another End.ExeedsLimit to {VorbisComment}
+  module C
+    class Song
+    end
+
+    module Song::Activity
+      Id3Tag = B::Song::Activity::Id3Tag
+
+      class VorbisComment < Trailblazer::Activity::Railway
+        step :prepare_metadata
+        step :encode_cover, Output(:failure) => End(:unsupported_file_format)
+        #~meths
+        include T.def_steps(:prepare_metadata, :encode_cover)
+        #~meths end
+      end
+
+      class Create < Trailblazer::Activity::Railway
+        step :model
+        step Nested(:decide_file_type,
+          auto_wire: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
+          Output(:invalid_metadata) => Track(:failure),
+          Output(:unsupported_file_format) => End(:internal_error)
+
+        step :save
+        include T.def_steps(:model, :save)
+
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+      end
+
+    end
+  end
+
+  it "handle {InvalidMetadata}" do
+    #@ Id3Tag with valid metadata
+    assert_invoke B::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3", is_valid: true}, terminus: :success
+
+    #@ InvalidMetadata returned from Id3Tag#parse
+    assert_invoke B::Song::Activity::Create, seq: %{[:model]}, params: {type: "mp3", is_valid: false}, terminus: :failure
+  end
+
+  it "handle {failure} from VorbisComment" do
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
+
+    #@ UnsupportedFileFormat
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, terminus: :internal_error, encode_cover: false
   end
 
 
