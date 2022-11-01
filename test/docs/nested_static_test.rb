@@ -1,8 +1,6 @@
 require "test_helper"
 
 class DocsNestedStaticTest < Minitest::Spec
-  DatabaseError = Class.new(Trailblazer::Activity::Signal)
-
   def trace(activity, ctx)
     stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
     return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
@@ -13,6 +11,7 @@ class DocsNestedStaticTest < Minitest::Spec
     class Song
     end
 
+    #:id3
     module Song::Activity
       class Id3Tag < Trailblazer::Activity::Railway
         step :parse
@@ -21,7 +20,10 @@ class DocsNestedStaticTest < Minitest::Spec
         include T.def_steps(:parse, :encode_id3)
         #~meths end
       end
+    end
+    #:id3 end
 
+    module Song::Activity
       class VorbisComment < Trailblazer::Activity::Railway
         step :prepare_metadata
         step :encode_cover
@@ -305,3 +307,38 @@ end
 
 # TODO: test with :input/:output, tracing
 # =end
+
+class DocsNestedDynamicTest < Minitest::Spec
+  #@ dynamic without any other options
+  module A
+    class Song
+    end
+
+    module Song::Activity
+      Id3Tag = DocsNestedStaticTest::A::Song::Activity::Id3Tag
+      VorbisComment = DocsNestedStaticTest::A::Song::Activity::VorbisComment
+    end
+
+    #:dynamic
+    module Song::Activity
+      class Create < Trailblazer::Activity::Railway
+        step :model
+        step Nested(:decide_file_type) # Run either {Id3Tag} or {VorbisComment}
+        step :save
+        #~meths
+        include T.def_steps(:model, :save)
+        #~meths end
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+      end
+    end
+    #:dynamic end
+  end # A
+
+  it "wires all nested termini to the outer tracks" do
+    #@ success for Id3Tag means success track on the  outside
+    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+  end
+end
+
