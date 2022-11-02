@@ -498,4 +498,17 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
 }
     end
   end
+
+  it "allows using multiple Nested() per operation" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step :a
+      step Nested(DocsNestedStaticTest::A::Song::Activity::Create)
+      step Nested(DocsNestedStaticTest::A::Song::Activity::Create), id: "Nested(2)"
+      step :b
+
+      include T.def_steps(:a, :b)
+    end
+
+    assert_invoke activity, seq: %{[:a, :model, :parse, :encode_id3, :save, :model, :parse, :encode_id3, :save, :b]}, params: {type: "mp3"}
+  end
 end
