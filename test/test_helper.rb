@@ -46,3 +46,10 @@ module Rehash
 end
 
 Minitest::Spec.include Trailblazer::Activity::Testing::Assertions
+
+Minitest::Spec.class_eval do
+  def trace(activity, ctx)
+    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
+  end
+end

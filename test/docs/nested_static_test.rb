@@ -1,10 +1,7 @@
 require "test_helper"
 
 class DocsNestedStaticTest < Minitest::Spec
-  def trace(activity, ctx)
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
-    return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
-  end
+
 
 #@ {:auto_wire} without any other options
   module A
@@ -277,6 +274,8 @@ Song::Activity::Create
     assert_invoke D::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
   end
 
+  # TODO: return signal from Nested().
+
   #@ unit test
   module ComputeNested
     module_function
@@ -440,6 +439,30 @@ class DocsNestedDynamicTest < Minitest::Spec
   it "wires all nested termini to the outer tracks" do
     #@ success for Id3Tag means success track on the  outside
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+  end
+
+  it "works with Tracing APi" do
+    output, _ = trace A::Song::Activity::Create, params: {type: "mp3"}, seq: []
+
+    assert_equal output, %{TOP
+|-- Start.default
+|-- model
+|-- Nested(decide_file_type)
+|   |-- Start.default
+|   |-- decide
+|   |   |-- Start.default
+|   |   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=decide_file_type>
+|   |   |-- decision_result_to_flow_options
+|   |   `-- End.success
+|   |-- call_dynamic_nested_activity
+|   |   `-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
+|   |       |-- Start.default
+|   |       |-- parse
+|   |       |-- encode_id3
+|   |       `-- End.success
+|   `-- End.success
+|-- save
+`-- End.success}
   end
 end
 
