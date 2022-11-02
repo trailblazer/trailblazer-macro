@@ -435,12 +435,14 @@ class DocsNestedDynamicTest < Minitest::Spec
     #:dynamic end
   end # A
 
-  it "wires all nested termini to the outer tracks" do
+  it "nested {success} and {failure} are wired to respective tracks on the outside" do
     #@ success for Id3Tag means success track on the  outside
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3]}, terminus: :failure, params: {type: "mp3"}, encode_id3: false
 
     #@ success for {VorbisComment}
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, terminus: :failure, params: {type: "vorbis"}, prepare_metadata: false
   end
 
   it "is compatible with Debugging API" do
@@ -502,9 +504,13 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
   it "allows using multiple Nested() per operation" do
     activity = Class.new(Trailblazer::Activity::Railway) do
       step :a
-      step Nested(DocsNestedStaticTest::A::Song::Activity::Create)
-      step Nested(DocsNestedStaticTest::A::Song::Activity::Create), id: "Nested(2)"
+      step Nested(:decide)
+      step Nested(:decide), id: "Nested(2)"
       step :b
+
+      def decide(ctx, **)
+        DocsNestedStaticTest::A::Song::Activity::Create
+      end
 
       include T.def_steps(:a, :b)
     end
