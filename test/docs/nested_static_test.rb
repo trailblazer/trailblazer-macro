@@ -466,7 +466,15 @@ class DocsNestedDynamicTest < Minitest::Spec
 |-- save
 `-- End.success}
 
-    raise "find_path"
+    #@ we can look into non-dynamic parts
+    assert_equal Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
+      ["Nested(decide_file_type)", :call_dynamic_nested_activity])[0].task.class.inspect, %{Method}
+
+    #@ we can't look into the dynamic parts
+    assert_raises do
+      Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
+        ["Nested(decide_file_type)", :call_dynamic_nested_activity, DocsNestedStaticTest::A::Song::Activity::Id3Tag])[0]
+    end
   end
 end
 

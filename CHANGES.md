@@ -3,6 +3,9 @@
 ## Nested()
 
 * Better warning when using `Nested(Operation)` without a dynamic decider.
+* Internal structure of `Nested()` has changed, the trace looks different.
+
+## Each()
 
 # 2.1.11
 
