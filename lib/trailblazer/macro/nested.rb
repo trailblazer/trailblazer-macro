@@ -3,11 +3,13 @@ module Trailblazer
     # {Nested} macro.
     # @api private The internals here are considered private and might change in the near future.
     def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
+      # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
       if callable.is_a?(Class) && callable < Nested.operation_class
         caller_location = caller_locations(2, 1)[0]
-        warn "[Trailblazer]#{caller_location.absolute_path}: " \
-             "Using the `Nested()` macro with operations and activities is deprecated. " \
-             "Replace `Nested(#{callable})` with `Subprocess(#{callable})`."
+        warn "[Trailblazer] #{caller_location.absolute_path}:#{caller_location.lineno} " \
+             "Using the `Nested()` macro without a dynamic decider is deprecated.\n" \
+             "To simply nest an activity or operation, replace `Nested(#{callable})` with `Subprocess(#{callable})`.\n" \
+             "Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess"
 
         return Activity::Railway.Subprocess(callable)
       end
@@ -29,7 +31,7 @@ module Trailblazer
       end
 
       def self.operation_class # TODO: remove once we don't need the deprecation anymore.
-        Operation
+        Trailblazer::Activity::DSL::Linear::Strategy
       end
 
       # Creates the "decider" activity that looks as follows.

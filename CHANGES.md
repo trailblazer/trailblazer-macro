@@ -1,3 +1,9 @@
+@ 2.1.12
+
+## Nested()
+
+* Better warning when using `Nested(Operation)` without a dynamic decider.
+
 # 2.1.11
 
 * In `Nested()`, we no longer use `Railway::End::Success` and `Railway::End::Failure` as static outputs but
