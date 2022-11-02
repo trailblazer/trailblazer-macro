@@ -292,6 +292,11 @@ Song::Activity::Create
     end
   end
 
+  def decider_with_visible_variable(ctx, what:, **)
+    ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
+    what
+  end
+
   it "nested activity can see everything Nested() can see" do
     sub_activity = activity_with_visible_variable()
 
@@ -339,10 +344,7 @@ Song::Activity::Create
 # TODO: generic
   it "without In/Out, decider and nested_activity see the same" do
     sub_activity    = activity_with_visible_variable()
-    compute_nested  = ->(ctx, what:, **) do
-      ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
-      what
-    end
+    compute_nested  = method(:decider_with_visible_variable)
 
   #@ for Static
     activity = Class.new(Trailblazer::Activity::Railway)
@@ -366,9 +368,45 @@ Song::Activity::Create
     #@ nested_activity and top activity cannot see things from decider.
     assert_invoke activity, **options, visible_in_decider: []
   end
+
+# TODO: generic
+  it "with In/Out, decider and nested_activity see the same" do
+    sub_activity    = activity_with_visible_variable()
+    compute_nested  = method(:decider_with_visible_variable)
+    in_out_options  = {
+      Trailblazer::Activity::Railway.In() => {:activity_to_nest => :what},
+      Trailblazer::Activity::Railway.In() => [:visible_in_decider]
+    }
+
+  #@ for Static
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
+      auto_wire: [sub_activity]).merge(in_out_options)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    options = {
+      please_discard_me: true,
+      activity_to_nest: sub_activity, # renamed to {:what}
+      expected_ctx_variables: {
+        visible:            [:what, :visible_in_decider],
+        visible_in_decider: [[:what, :visible_in_decider]]
+      }
+    }
+
+    assert_invoke activity, **options, visible_in_decider: []
+
+  #@ for dynamic
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested).
+      merge(in_out_options)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    assert_invoke activity, **options, visible_in_decider: []
+  end
 end
 
 # TODO: test with :input/:output, tracing
+# TODO: insntacemetho, callable etc
 # =end
 
 class DocsNestedDynamicTest < Minitest::Spec
