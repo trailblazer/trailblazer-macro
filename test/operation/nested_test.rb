@@ -3,18 +3,6 @@ require 'test_helper'
 class NestedTest < Minitest::Spec
   DatabaseError = Class.new(Trailblazer::Activity::Signal)
 
-  def trace(activity, ctx)
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
-    return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
-  end
-
-  module ComputeNested
-    module_function
-
-    def compute_nested(ctx, what:, **)
-      what
-    end
-  end
 
   class SignUp < Trailblazer::Operation
     def self.b(ctx, **)

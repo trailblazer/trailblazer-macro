@@ -3,9 +3,11 @@ require "test_helper"
 
 # TODO: insntacemetho, callable etc
 
+# Use {ComputeNested.method(:compute_nested)}
+# Use #trace
+# Use #assert_invoke
+
 class DocsNestedStaticTest < Minitest::Spec
-
-
 #@ {:auto_wire} without any other options
   module A
     class Song
@@ -443,6 +445,29 @@ class DocsNestedDynamicTest < Minitest::Spec
     #@ success for {VorbisComment}
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
     assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, terminus: :failure, params: {type: "vorbis"}, prepare_metadata: false
+  end
+
+  #@ raises RuntimeError if we try to wire special terminus.
+  it "raises when wiring special termini" do
+    exception = assert_raises RuntimeError do
+      module B
+        class Song; end
+
+          #:dynamic-output
+          module Song::Activity
+            class Create < Trailblazer::Activity::Railway
+              step :model
+              step Nested(:decide_file_type),
+                Output(:unsupported_file_format) => Track(:failure) # error!
+
+              step :save
+            end
+          end
+          #:dynamic-output end
+        end
+    end # B
+
+    assert_equal exception.message[0..34], %{No `unsupported_file_format` output}
   end
 
   it "is compatible with Debugging API" do
