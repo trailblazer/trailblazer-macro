@@ -280,138 +280,6 @@ Song::Activity::Create
   end
 
   # TODO: return signal from Nested().
-
-  #@ unit test
-  module ComputeNested
-    module_function
-
-    def compute_nested(ctx, what:, **)
-      what
-    end
-  end
-
-  # TODO: move this to some testing gem? We need it a lot of times.
-  def self.step_capturing_visible_variables(ctx, **)
-    ctx[:visible] = ctx.keys
-  end
-
-  def activity_with_visible_variable
-    Class.new(Trailblazer::Activity::Railway) do
-      step DocsNestedStaticTest.method(:step_capturing_visible_variables)
-    end
-  end
-
-  def decider_with_visible_variable(ctx, what:, **)
-    ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
-    what
-  end
-
-  it "nested activity can see everything Nested() can see" do
-    sub_activity = activity_with_visible_variable()
-
-    #@ nested can see everything.
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
-      auto_wire: [sub_activity])
-
-    assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:seq, :what, :dont_look_at_me]}
-
-
-    #@ nested can only see {:what}.
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
-      auto_wire: [sub_activity]),
-      Trailblazer::Activity::Railway.In() => [:what]
-
-    assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:what]}
-  end
-
-# TODO: generic
-  it "decider's variables are discarded" do
-    sub_activity    = activity_with_visible_variable()
-    compute_nested  = ->(ctx, what:, **) do
-      ctx[:please_discard_me] = true
-      what
-    end
-
-  #@ for Static
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity])
-
-    #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
-
-  #@ for dynamic
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested)
-
-    #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
-  end
-
-# TODO: generic
-  it "without In/Out, decider and nested_activity see the same" do
-    sub_activity    = activity_with_visible_variable()
-    compute_nested  = method(:decider_with_visible_variable)
-
-  #@ for Static
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity])
-
-    #@ nested_activity and top activity cannot see things from decider.
-    options = {
-      what: sub_activity, expected_ctx_variables: {
-        visible:            [:seq, :what, :visible_in_decider],
-        visible_in_decider: [[:seq, :what, :visible_in_decider]]
-      }
-    }
-
-    assert_invoke activity, **options, visible_in_decider: []
-
-  #@ for dynamic
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested)
-
-    #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, **options, visible_in_decider: []
-  end
-
-# TODO: generic
-  it "with In/Out, decider and nested_activity see the same" do
-    sub_activity    = activity_with_visible_variable()
-    compute_nested  = method(:decider_with_visible_variable)
-    in_out_options  = {
-      Trailblazer::Activity::Railway.In() => {:activity_to_nest => :what},
-      Trailblazer::Activity::Railway.In() => [:visible_in_decider]
-    }
-
-  #@ for Static
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity]).merge(in_out_options)
-
-    #@ nested_activity and top activity cannot see things from decider.
-    options = {
-      please_discard_me: true,
-      activity_to_nest: sub_activity, # renamed to {:what}
-      expected_ctx_variables: {
-        visible:            [:what, :visible_in_decider],
-        visible_in_decider: [[:what, :visible_in_decider]]
-      }
-    }
-
-    assert_invoke activity, **options, visible_in_decider: []
-
-  #@ for dynamic
-    activity = Class.new(Trailblazer::Activity::Railway)
-    activity.step Trailblazer::Activity::Railway.Nested(compute_nested).
-      merge(in_out_options)
-
-    #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, **options, visible_in_decider: []
-  end
 end
 
 class DocsNestedDynamicTest < Minitest::Spec
@@ -548,6 +416,14 @@ class DocsNestedDynamicTest < Minitest::Spec
 end
 
 class GenericNestedUnitTest < Minitest::Spec
+  module ComputeNested
+    module_function
+
+    def compute_nested(ctx, what:, **)
+      what
+    end
+  end
+
   it "shows warning if `Nested()` is being used instead of `Subprocess()`" do
     activity_classes = [Trailblazer::Activity::Path, Trailblazer::Activity::Railway, Trailblazer::Activity::FastTrack, Trailblazer::Operation]
 
@@ -597,5 +473,125 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     end
 
     assert_invoke activity, seq: %{[]}, expected_ctx_variables: {status: Class}
+  end
+
+  # TODO: move this to some testing gem? We need it a lot of times.
+  def self.step_capturing_visible_variables(ctx, **)
+    ctx[:visible] = ctx.keys
+  end
+
+  def activity_with_visible_variable
+    Class.new(Trailblazer::Activity::Railway) do
+      step GenericNestedUnitTest.method(:step_capturing_visible_variables)
+    end
+  end
+
+  def decider_with_visible_variable(ctx, what:, **)
+    ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
+    what
+  end
+
+  it "nested activity can see everything Nested() can see" do
+    sub_activity = activity_with_visible_variable()
+
+    #@ nested can see everything.
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
+      auto_wire: [sub_activity])
+
+    assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:seq, :what, :dont_look_at_me]}
+
+
+    #@ nested can only see {:what}.
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
+      auto_wire: [sub_activity]),
+      Trailblazer::Activity::Railway.In() => [:what]
+
+    assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:what]}
+  end
+
+  it "decider's variables are discarded" do
+    sub_activity    = activity_with_visible_variable()
+    compute_nested  = ->(ctx, what:, **) do
+      ctx[:please_discard_me] = true
+      what
+    end
+
+  #@ for Static
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
+      auto_wire: [sub_activity])
+
+    #@ nested_activity and top activity cannot see things from decider.
+    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
+
+  #@ for dynamic
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
+  end
+
+  it "without In/Out, decider and nested_activity see the same" do
+    sub_activity    = activity_with_visible_variable()
+    compute_nested  = method(:decider_with_visible_variable)
+
+  #@ for Static
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
+      auto_wire: [sub_activity])
+
+    #@ nested_activity and top activity cannot see things from decider.
+    options = {
+      what: sub_activity, expected_ctx_variables: {
+        visible:            [:seq, :what, :visible_in_decider],
+        visible_in_decider: [[:seq, :what, :visible_in_decider]]
+      }
+    }
+
+    assert_invoke activity, **options, visible_in_decider: []
+
+  #@ for dynamic
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    assert_invoke activity, **options, visible_in_decider: []
+  end
+
+  it "with In/Out, decider and nested_activity see the same" do
+    sub_activity    = activity_with_visible_variable()
+    compute_nested  = method(:decider_with_visible_variable)
+    in_out_options  = {
+      Trailblazer::Activity::Railway.In() => {:activity_to_nest => :what},
+      Trailblazer::Activity::Railway.In() => [:visible_in_decider]
+    }
+
+  #@ for Static
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
+      auto_wire: [sub_activity]).merge(in_out_options)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    options = {
+      please_discard_me: true,
+      activity_to_nest: sub_activity, # renamed to {:what}
+      expected_ctx_variables: {
+        visible:            [:what, :visible_in_decider],
+        visible_in_decider: [[:what, :visible_in_decider]]
+      }
+    }
+
+    assert_invoke activity, **options, visible_in_decider: []
+
+  #@ for dynamic
+    activity = Class.new(Trailblazer::Activity::Railway)
+    activity.step Trailblazer::Activity::Railway.Nested(compute_nested).
+      merge(in_out_options)
+
+    #@ nested_activity and top activity cannot see things from decider.
+    assert_invoke activity, **options, visible_in_decider: []
   end
 end
