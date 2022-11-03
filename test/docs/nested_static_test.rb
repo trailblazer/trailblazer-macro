@@ -338,14 +338,40 @@ class DocsNestedDynamicTest < Minitest::Spec
     #:dynamic end
   end # A
 
+  #@ and the same with a decider callable
+  module AA
+    module Song
+      module Activity
+        Id3Tag        = A::Song::Activity::Id3Tag
+        VorbisComment = A::Song::Activity::VorbisComment
+
+        class Create < Trailblazer::Activity::Railway
+          MyDecider = DocsNestedStaticTest::AA::Song::Activity::Create::MyDecider
+
+          step :model
+          step Nested(MyDecider,
+            auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
+          step :save
+          #~meths
+          include T.def_steps(:model, :save)
+          #~meths end
+        end
+      end
+    end
+  end
+
   it "nested {success} and {failure} are wired to respective tracks on the outside" do
     #@ success for Id3Tag means success track on the  outside
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3]}, terminus: :failure, params: {type: "mp3"}, encode_id3: false
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :parse, :encode_id3]}, terminus: :failure, params: {type: "mp3"}, encode_id3: false
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3]}, terminus: :failure, params: {type: "mp3"}, encode_id3: false
 
     #@ success for {VorbisComment}
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, terminus: :failure, params: {type: "vorbis"}, prepare_metadata: false
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :prepare_metadata]}, terminus: :failure, params: {type: "vorbis"}, prepare_metadata: false
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, terminus: :failure, params: {type: "vorbis"}, prepare_metadata: false
   end
 
   #@ raises RuntimeError if we try to wire special terminus.
