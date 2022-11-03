@@ -1,7 +1,7 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
-    # @api private The internals here are considered private and might change in the near future.
+# TODO: rename auto_wire => static
     def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
       # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
       if callable.is_a?(Class) && callable < Nested.operation_class
@@ -14,14 +14,27 @@ module Trailblazer
         return Activity::Railway.Subprocess(callable)
       end
 
-# TODO: rename auto_wire => static
-      return Nested.Static(callable, id: id, auto_wire: auto_wire) if auto_wire.any?
+      task =
+        if auto_wire.any?
+          Nested.Static(callable, id: id, auto_wire: auto_wire)
+        else # no {auto_wire}
+          Nested.Dynamic(callable, id: id)
+        end
 
-      # no {auto_wire}
-      return Nested.Dynamic(callable, id: id)
+      merge = [
+        [Nested::Decider.new(callable), id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
+      ]
+
+      task_wrap_extension = Activity::TaskWrap::Extension::WrapStatic.new(extension: Activity::TaskWrap::Extension(*merge))
+
+      Activity::Railway.Subprocess(task).merge( # FIXME: allow this directly in Subprocess
+        id:         id,
+        extensions: [task_wrap_extension],
+      )
     end
 
     # @private
+    # @api private The internals here are considered private and might change in the near future.
     class Nested < Trailblazer::Activity::Railway
       # TODO: make this {Activity::KeepOuterExecContext} Interim or something
       # TODO: remove Strategy.call and let runner do this.
@@ -34,67 +47,42 @@ module Trailblazer
         Trailblazer::Activity::DSL::Linear::Strategy
       end
 
-      # Creates the "decider" activity that looks as follows.
-      #   step decider_task
-      #   ..your code...
-      # It is used for both Dynamic and Static.
-      def self.decider_activity_for(decider, id:, &block)
-        decider_task = Activity::Circuit::TaskAdapter.Binary(
-          decider,
-          adapter_class: Activity::Circuit::TaskAdapter::Step::AssignVariable,
-          variable_name: :nested_activity
-        )
-        # decider_task is a circuit-interface compatible task that internally calls {user_proc}
-        # and assigns the return value to {ctx[:nested_activity]}.
-
-        nesting_activity = Class.new(Nested) do
-          step task: decider_task # always run the decider!
-
-          instance_exec(&block)
-        end
-      end
-
-      def self.nesting_activity_step_for(decider_activity, id:, **options_for_decider_activity, &block)
-        nesting_activity = Class.new(Nested) do
-          # The separated decider_activity is so we can discard {:nested_activity} and
-          # keep any decider computation within {decider_activity}.
-          step Subprocess(decider_activity).merge({
-            id: :decide,
-            In()  => ->(ctx, **) { ctx }, # FIXME: generic solution for this.
-            Out() => [], # discard of {ctx[:nested_activity]}.
-          }).merge(options_for_decider_activity)
-
-          instance_exec(&block)
+      # TaskWrap step to run the decider.
+      # It's part of the API that the decider sees the original ctx.
+      # So this has to be placed in tW because we this step needs to be run *before* In() filters
+      # to resemble the behavior from pre 2.1.12.
+      class Decider
+        def initialize(nested_activity_decider)
+          @nested_activity_decider = Activity::Circuit::TaskAdapter.Binary(nested_activity_decider)
         end
 
-        Activity::Railway.Subprocess(nesting_activity).merge(id: id)
+        # TaskWrap API.
+        def call(wrap_ctx, original_args)
+          (ctx, flow_options), original_circuit_options = original_args
+
+          # FIXME: allow calling a Step task without the Binary decision (in Activity::TaskAdapter).
+          nested_activity = @nested_activity_decider.call_FIXME([ctx, flow_options], **original_circuit_options) # no TaskWrap::Runner because we shall not trace!
+
+          new_flow_options = flow_options.merge(
+            decision: nested_activity
+          )
+
+          return wrap_ctx, [[ctx, new_flow_options], original_circuit_options]
+        end
       end
 
       # Dynamic is without auto_wire where we don't even know what *could* be the actual
       # nested activity until it's runtime.
       def self.Dynamic(decider, id:)
-        decider_activity = decider_activity_for(decider, id: id) do
-          step task:  Dynamic.method(:decision_result_to_flow_options),
-               id:    :decision_result_to_flow_options
+        task = Class.new(Macro::Nested) do
+          step task: Dynamic.method(:call_dynamic_nested_activity)
         end
 
-        nesting_activity = nesting_activity_step_for(decider_activity, id: id) do
-          step task:  Dynamic.method(:call_dynamic_nested_activity),
-               id:    :call_dynamic_nested_activity
-        end
+        task
       end
 
       class Dynamic
         SUCCESS_SEMANTICS = [:success, :pass_fast] # TODO: make this injectable/or get it from operation.
-        # As we're discarding the decider_activity's ctx, the actual decision
-        # is put to the {flow_options}.
-        def self.decision_result_to_flow_options((ctx, flow_options), **circuit_options)
-          decision = ctx[:nested_activity]
-
-          new_flow_options = flow_options.merge(decision: decision)
-
-          return Activity::Right, [ctx, new_flow_options]
-        end
 
         def self.call_dynamic_nested_activity((ctx, flow_options), runner:, **circuit_options)
           nested_activity       = flow_options[:decision]
@@ -132,21 +120,18 @@ module Trailblazer
       #       this will help when semantics overlap.
       #
       def self.Static(decider, id:, auto_wire:)
-        # dispatch is wired to each possible Activity.
-
-        dispatch_outputs = auto_wire.collect do |activity|
-          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.End("decision:#{activity}")]
-        end.to_h
-
-        decider_activity = decider_activity_for(decider, id: id) do
-          step({task: Static.method(:dispatch), id: :dispatch_to_terminus}.merge(dispatch_outputs))
-        end
-
         decider_outputs = auto_wire.collect do |activity|
-          [Activity::Railway.Output("decision:#{activity}"), Activity::Railway.Track(activity)]
+          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
         end.to_h
 
-        nesting_activity_step_for(decider_activity, id: id, **decider_outputs) do
+        Class.new(Macro::Nested) do
+          step(
+            {
+              task: Static.method(:return_route_signal),
+              id:   :route_to_nested_activity, # returns the {nested_activity} signal
+            }.merge(decider_outputs)
+          )
+
           auto_wire.each do |activity|
             activity_step = Subprocess(activity)
 
@@ -167,10 +152,12 @@ module Trailblazer
       end
 
       module Static
-        def self.dispatch((ctx, flow_options), **circuit_options)
-          nested_activity = ctx[:nested_activity] # we use the decision class as a signal.
+        def self.return_route_signal((ctx, flow_options), **circuit_options)
+          nested_activity = flow_options[:decision] # we use the decision class as a signal.
 
-          return nested_activity, [ctx, flow_options]
+          original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
+
+          return nested_activity, [ctx, original_flow_options]
         end
       end
 
