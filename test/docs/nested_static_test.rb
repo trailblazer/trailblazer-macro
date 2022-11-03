@@ -4,6 +4,29 @@ require "test_helper"
 # Use #trace
 # Use #assert_invoke
 
+Minitest::Spec.class_eval do
+  def assert_invoke(activity, terminus: :success, seq: "[]", circuit_options: {}, expected_ctx_variables: {}, **ctx_variables) # DISCUSS: only for {activity} gem?
+    signal, (ctx, _flow_options) = Trailblazer::Activity::TaskWrap.invoke(
+      activity,
+      [
+        {seq: [], **ctx_variables},
+        {}                          # flow_options
+      ],
+      **circuit_options
+    )
+
+    assert_call_for(signal, ctx, terminus: terminus, seq: seq, **ctx_variables, **expected_ctx_variables) # DISCUSS: ordering of variables?
+  end
+
+  def assert_call_for(signal, ctx, terminus: :success, seq: "[]", **ctx_variables)
+    assert_equal signal.to_h[:semantic], terminus, "assert_call expected #{terminus} terminus, not #{signal}. Use assert_call(activity, terminus: #{signal.to_h[:semantic].inspect})"
+
+    assert_equal ctx.inspect, {seq: "%%%"}.merge(ctx_variables).inspect.sub('"%%%"', seq)
+
+    return ctx
+  end
+end
+
 class DocsNestedStaticTest < Minitest::Spec
 #@ {:auto_wire} without any other options
   module A
@@ -573,11 +596,11 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:what]}
   end
 
-  it "decider's variables are discarded" do
+  it "decider's variables are not discarded" do
     sub_activity    = activity_with_visible_variable()
     compute_nested  = ->(ctx, what:, **) do
-      ctx[:please_discard_me] = true
-      what
+      ctx[:please_discard_me] = true  # this bleeds through to all descendents.
+      what                            # this however is discarded.
     end
 
   #@ for Static
@@ -585,15 +608,17 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
       auto_wire: [sub_activity])
 
-    #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
+    #@ nested_activity and top activity can see things from decider.
+    expected_variables = {please_discard_me: true, visible: [:seq, :what, :please_discard_me]}
+
+    assert_invoke activity, what: sub_activity, expected_ctx_variables: expected_variables
 
   #@ for dynamic
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(compute_nested)
 
     #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, what: sub_activity, expected_ctx_variables: {visible: [:seq, :what]}
+    assert_invoke activity, what: sub_activity, expected_ctx_variables: expected_variables
   end
 
   it "without In/Out, decider and nested_activity see the same" do
@@ -623,12 +648,18 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     assert_invoke activity, **options, visible_in_decider: []
   end
 
-  it "with In/Out, decider and nested_activity see the same" do
+  it "with In/Out, decider sees original ctx, nested_activity sees filtered" do
+    # sees {:activity_to_nest}
+    decider_with_visible_variable = ->(ctx, activity_to_nest:, **) do
+      ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
+      activity_to_nest
+    end
+
     sub_activity    = activity_with_visible_variable()
-    compute_nested  = method(:decider_with_visible_variable)
+    compute_nested  = decider_with_visible_variable
     in_out_options  = {
-      Trailblazer::Activity::Railway.In() => {:activity_to_nest => :what},
-      Trailblazer::Activity::Railway.In() => [:visible_in_decider]
+      Trailblazer::Activity::Railway.In() => {:activity_to_nest => :what}#,
+      # Trailblazer::Activity::Railway.In() => [:visible_in_decider]
     }
 
   #@ for Static
@@ -641,8 +672,8 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
       please_discard_me: true,
       activity_to_nest: sub_activity, # renamed to {:what}
       expected_ctx_variables: {
-        visible:            [:what, :visible_in_decider],
-        visible_in_decider: [[:what, :visible_in_decider]]
+        visible:            [:what],
+        visible_in_decider: [[:seq, :please_discard_me, :activity_to_nest, :visible_in_decider]]
       }
     }
 
