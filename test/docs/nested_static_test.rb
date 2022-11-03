@@ -1,8 +1,5 @@
 require "test_helper"
 
-
-# TODO: insntacemetho, callable etc
-
 # Use {ComputeNested.method(:compute_nested)}
 # Use #trace
 # Use #assert_invoke
@@ -59,16 +56,47 @@ class DocsNestedStaticTest < Minitest::Spec
 
   end # A
 
+  #@ and the same with a decider callable
+  module AA
+    module Song
+      module Activity
+        Id3Tag        = A::Song::Activity::Id3Tag
+        VorbisComment = A::Song::Activity::VorbisComment
+
+        class Create < Trailblazer::Activity::Railway
+          class MyDecider
+            def self.call(ctx, params:, **)
+              params[:type] == "mp3" ? Id3Tag : VorbisComment
+            end
+          end
+
+          step :model
+          step Nested(MyDecider,
+            auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
+          step :save
+          #~meths
+          include T.def_steps(:model, :save)
+          #~meths end
+        end
+      end
+    end
+  end
+
   it "wires all nested termini to the outer tracks" do
     #@ success for Id3Tag
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+
     #@ failure for Id3Tag
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
 
     #@ success for VorbisComment
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
     #@ failure for VorbisComment
-    assert_invoke A::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
+    assert_invoke A::Song::Activity::Create,  seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
+    assert_invoke AA::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
   end
 
   it "is compatible with Debugging API" do
