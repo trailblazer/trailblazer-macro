@@ -4,29 +4,6 @@ require "test_helper"
 # Use #trace
 # Use #assert_invoke
 
-Minitest::Spec.class_eval do
-  def assert_invoke(activity, terminus: :success, seq: "[]", circuit_options: {}, expected_ctx_variables: {}, **ctx_variables) # DISCUSS: only for {activity} gem?
-    signal, (ctx, _flow_options) = Trailblazer::Activity::TaskWrap.invoke(
-      activity,
-      [
-        {seq: [], **ctx_variables},
-        {}                          # flow_options
-      ],
-      **circuit_options
-    )
-
-    assert_call_for(signal, ctx, terminus: terminus, seq: seq, **ctx_variables, **expected_ctx_variables) # DISCUSS: ordering of variables?
-  end
-
-  def assert_call_for(signal, ctx, terminus: :success, seq: "[]", **ctx_variables)
-    assert_equal signal.to_h[:semantic], terminus, "assert_call expected #{terminus} terminus, not #{signal}. Use assert_call(activity, terminus: #{signal.to_h[:semantic].inspect})"
-
-    assert_equal ctx.inspect, {seq: "%%%"}.merge(ctx_variables).inspect.sub('"%%%"', seq)
-
-    return ctx
-  end
-end
-
 class DocsNestedStaticTest < Minitest::Spec
 #@ {:auto_wire} without any other options
   module A
