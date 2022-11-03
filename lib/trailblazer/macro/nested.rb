@@ -75,7 +75,8 @@ module Trailblazer
       # nested activity until it's runtime.
       def self.Dynamic(decider, id:)
         task = Class.new(Macro::Nested) do
-          step task: Dynamic.method(:call_dynamic_nested_activity)
+          step task: Dynamic.method(:call_dynamic_nested_activity),
+               id:   :call_dynamic_nested_activity
         end
 
         task
@@ -139,7 +140,7 @@ module Trailblazer
 
             # TODO: detect if we have two identical "special" termini.
             output_wirings = outputs.collect do |semantic, output|
-              [Output(semantic), End(semantic)]
+              [Output(semantic), End(semantic)] # this will add a new termins to this activity.
             end.to_h
 
             # Each nested activity is a Subprocess.

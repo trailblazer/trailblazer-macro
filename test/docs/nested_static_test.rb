@@ -107,11 +107,7 @@ Song::Activity::Create
 |-- model
 |-- Nested(decide_file_type)
 |   |-- Start.default
-|   |-- decide
-|   |   |-- Start.default
-|   |   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=decide_file_type>
-|   |   |-- dispatch_to_terminus
-|   |   `-- End.decision:DocsNestedStaticTest::A::Song::Activity::VorbisComment
+|   |-- route_to_nested_activity
 |   |-- DocsNestedStaticTest::A::Song::Activity::VorbisComment
 |   |   |-- Start.default
 |   |   |-- prepare_metadata
@@ -132,11 +128,7 @@ Song::Activity::Create
 |-- model
 |-- Nested(decide_file_type)
 |   |-- Start.default
-|   |-- decide
-|   |   |-- Start.default
-|   |   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=decide_file_type>
-|   |   |-- dispatch_to_terminus
-|   |   `-- End.decision:DocsNestedStaticTest::A::Song::Activity::Id3Tag
+|   |-- route_to_nested_activity
 |   |-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
 |   |   |-- Start.default
 |   |   |-- parse
@@ -307,7 +299,55 @@ Song::Activity::Create
     assert_invoke D::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
   end
 
-  # TODO: return signal from Nested().
+
+  #@ FastTrack is mapped to outer FastTrack.
+  module E
+    class Song
+    end
+
+    module Song::Activity
+      class Id3Tag < Trailblazer::Activity::FastTrack
+        step :parse,
+          fail_fast: true,
+          pass_fast: true
+        step :encode_id3
+        include T.def_steps(:parse, :encode_id3)
+      end
+
+      VorbisComment = DocsNestedStaticTest::C::Song::Activity::VorbisComment # has an {End.unsupported_file_format} terminus.
+    end
+
+    #:static-fasttrack
+    module Song::Activity
+      class Create < Trailblazer::Activity::FastTrack
+        step :model
+        step Nested(:decide_file_type, auto_wire: [Id3Tag, VorbisComment]),
+          fast_track: true,
+          Output(:unsupported_file_format) => End(:unsupported_file_format)
+        step :save
+        #~meths
+        include T.def_steps(:model, :save)
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+        #~meths end
+      end
+    end
+    #:static-fasttrack end
+    # puts Trailblazer::Developer.render(Song::Activity::Create)
+  end # C
+
+  it "FastTrack from nested_activity are mapped to respective tracks" do
+    #@ {End.pass_fast} goes success for Id3Tag
+    assert_invoke E::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, terminus: :pass_fast
+    #@ {End.fail_fast} goes failure for Id3Tag
+    assert_invoke E::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :fail_fast
+
+    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, prepare_metadata: false, terminus: :failure
+    #@ VorbisComment :unsupported_file_format is mapped to :failure
+    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :unsupported_file_format
+  end
 end
 
 class DocsNestedDynamicTest < Minitest::Spec
@@ -402,14 +442,7 @@ class DocsNestedDynamicTest < Minitest::Spec
     end
 
     module Song::Activity
-      class Id3Tag < Trailblazer::Activity::FastTrack
-        step :parse,
-          fail_fast: true,
-          pass_fast: true
-        step :encode_id3
-        include T.def_steps(:parse, :encode_id3)
-      end
-
+      Id3Tag        = DocsNestedStaticTest::E::Song::Activity::Id3Tag        # has {fail_fast} and {pass_fast} termini.
       VorbisComment = DocsNestedStaticTest::C::Song::Activity::VorbisComment # has an {End.unsupported_file_format} terminus.
     end
 
@@ -450,11 +483,6 @@ class DocsNestedDynamicTest < Minitest::Spec
 |-- model
 |-- Nested(decide_file_type)
 |   |-- Start.default
-|   |-- decide
-|   |   |-- Start.default
-|   |   |-- #<Trailblazer::Activity::TaskBuilder::Task user_proc=decide_file_type>
-|   |   |-- decision_result_to_flow_options
-|   |   `-- End.success
 |   |-- call_dynamic_nested_activity
 |   |   `-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
 |   |       |-- Start.default
@@ -511,6 +539,7 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
       step :a
       step Nested(:decide)
       step Nested(:decide), id: "Nested(2)"
+      # TODO: with static, too!
       step :b
 
       def decide(ctx, **)
