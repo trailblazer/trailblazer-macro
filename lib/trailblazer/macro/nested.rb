@@ -1,7 +1,7 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
-# TODO: rename auto_wire => static
+    # DISCUSS: rename auto_wire => static
     def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
       # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
       if callable.is_a?(Class) && callable < Nested.operation_class
@@ -21,6 +21,8 @@ module Trailblazer
           Nested.Dynamic(callable, id: id)
         end
 
+      # |-- Nested.compute_nested_activity...Trailblazer::Macro::Nested::Decider
+      # `-- task_wrap.call_task..............Method
       merge = [
         [Nested::Decider.new(callable), id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
       ]
@@ -36,13 +38,6 @@ module Trailblazer
     # @private
     # @api private The internals here are considered private and might change in the near future.
     class Nested < Trailblazer::Activity::Railway
-      # TODO: make this {Activity::KeepOuterExecContext} Interim or something
-      # TODO: remove Strategy.call and let runner do this.
-      def self.call(args, **circuit_options)
-        # by calling the internal {Activity} directly we skip setting a new {:exec_context}
-        to_h[:activity].(args, **circuit_options)
-      end
-
       def self.operation_class # TODO: remove once we don't need the deprecation anymore.
         Trailblazer::Activity::DSL::Linear::Strategy
       end
