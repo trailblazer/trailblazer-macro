@@ -342,13 +342,21 @@ class DocsNestedDynamicTest < Minitest::Spec
   end
 
   #@ any internal "special" terminus is mapped to either failure or success.
+  #@ FastTrack is converted to Binary outcome.
   module C
     class Song
     end
 
     module Song::Activity
-      Id3Tag = DocsNestedStaticTest::A::Song::Activity::Id3Tag
-      VorbisComment = DocsNestedStaticTest::C::Song::Activity::VorbisComment # has a {End.unsupported_file_format} terminus.
+      class Id3Tag < Trailblazer::Activity::FastTrack
+        step :parse,
+          fail_fast: true,
+          pass_fast: true
+        step :encode_id3
+        include T.def_steps(:parse, :encode_id3)
+      end
+
+      VorbisComment = DocsNestedStaticTest::C::Song::Activity::VorbisComment # has an {End.unsupported_file_format} terminus.
     end
 
     #:dynamic-unsupported
@@ -369,10 +377,10 @@ class DocsNestedDynamicTest < Minitest::Spec
   end # C
 
   it "{VorbisComment}'s {End.unsupported_file_format} is mapped to {:failure}" do
-    #@ success for Id3Tag
-    assert_invoke C::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    #@ {End.pass_fast} goes success for Id3Tag
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :parse, :save]}, params: {type: "mp3"}
+    #@ {End.fail_fast} goes failure for Id3Tag
     assert_invoke C::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
-
 
     assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
     assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, prepare_metadata: false, terminus: :failure
