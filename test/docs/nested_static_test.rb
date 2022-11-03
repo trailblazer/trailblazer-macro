@@ -452,14 +452,12 @@ class DocsNestedDynamicTest < Minitest::Spec
     exception = assert_raises RuntimeError do
       module B
         class Song; end
-
           #:dynamic-output
           module Song::Activity
             class Create < Trailblazer::Activity::Railway
               step :model
               step Nested(:decide_file_type),
                 Output(:unsupported_file_format) => Track(:failure) # error!
-
               step :save
             end
           end
@@ -468,6 +466,45 @@ class DocsNestedDynamicTest < Minitest::Spec
     end # B
 
     assert_equal exception.message[0..34], %{No `unsupported_file_format` output}
+  end
+
+  #@ any internal "special" terminus is mapped to either failure or success.
+  module C
+    class Song
+    end
+
+    module Song::Activity
+      Id3Tag = DocsNestedStaticTest::A::Song::Activity::Id3Tag
+      VorbisComment = DocsNestedStaticTest::C::Song::Activity::VorbisComment # has a {End.unsupported_file_format} terminus.
+    end
+
+    #:dynamic-unsupported
+    module Song::Activity
+      class Create < Trailblazer::Activity::Railway
+        step :model
+        step Nested(:decide_file_type) # Run either {Id3Tag} or {VorbisComment}
+        step :save
+        #~meths
+        include T.def_steps(:model, :save)
+        def decide_file_type(ctx, params:, **)
+          params[:type] == "mp3" ? Id3Tag : VorbisComment
+        end
+        #~meths end
+      end
+    end
+    #:dynamic-unsupported end
+  end # C
+
+  it "{VorbisComment}'s {End.unsupported_file_format} is mapped to {:failure}" do
+    #@ success for Id3Tag
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3"}
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :failure
+
+
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, prepare_metadata: false, terminus: :failure
+    #@ VorbisComment :unsupported_file_format is mapped to :failure
+    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
   end
 
   it "is compatible with Debugging API" do
