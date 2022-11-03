@@ -37,6 +37,9 @@ module Trailblazer
 
     # @private
     # @api private The internals here are considered private and might change in the near future.
+    #
+    # We don't need to override {Strategy.call} here to prevent {:exec_context} from being changed.
+    # The decider is run in the taskWrap before the {Nested} subclass is actually called.
     class Nested < Trailblazer::Activity::Railway
       def self.operation_class # TODO: remove once we don't need the deprecation anymore.
         Trailblazer::Activity::DSL::Linear::Strategy
