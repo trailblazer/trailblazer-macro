@@ -290,9 +290,14 @@ Song::Activity::Create
     end
   end
 
+  # TODO: move this to some testing gem? We need it a lot of times.
+  def self.step_capturing_visible_variables(ctx, **)
+    ctx[:visible] = ctx.keys
+  end
+
   def activity_with_visible_variable
     Class.new(Trailblazer::Activity::Railway) do
-      step ->(ctx, **) { ctx[:visible] = ctx.keys }
+      step DocsNestedStaticTest.method(:step_capturing_visible_variables)
     end
   end
 
@@ -578,5 +583,19 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     end
 
     assert_invoke activity, seq: %{[:a, :model, :parse, :encode_id3, :save, :model, :parse, :encode_id3, :save, :b]}, params: {type: "mp3"}
+  end
+
+  it "allows I/O when using Nested(Activity) in Subprocess mode" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      nested_activity = Class.new(Trailblazer::Activity::Railway) do
+        step ->(ctx, **) { ctx[:message] = Object }
+        step ->(ctx, **) { ctx[:status]  = Class }
+      end
+
+      step Nested(nested_activity),
+        Out() => [:status]
+    end
+
+    assert_invoke activity, seq: %{[]}, expected_ctx_variables: {status: Class}
   end
 end
