@@ -51,7 +51,7 @@ module Trailblazer
       # to resemble the behavior from pre 2.1.12.
       class Decider
         def initialize(nested_activity_decider)
-          @nested_activity_decider = Activity::Circuit::TaskAdapter.Binary(nested_activity_decider)
+          @nested_activity_decider = Activity::Circuit.Step(nested_activity_decider, option: true)
         end
 
         # TaskWrap API.
@@ -59,7 +59,7 @@ module Trailblazer
           (ctx, flow_options), original_circuit_options = original_args
 
           # FIXME: allow calling a Step task without the Binary decision (in Activity::TaskAdapter).
-          nested_activity = @nested_activity_decider.call_FIXME([ctx, flow_options], **original_circuit_options) # no TaskWrap::Runner because we shall not trace!
+          nested_activity, _ = @nested_activity_decider.([ctx, flow_options], **original_circuit_options) # no TaskWrap::Runner because we shall not trace!
 
           new_flow_options = flow_options.merge(
             decision: nested_activity
@@ -72,12 +72,10 @@ module Trailblazer
       # Dynamic is without auto_wire where we don't even know what *could* be the actual
       # nested activity until it's runtime.
       def self.Dynamic(decider, id:)
-        task = Class.new(Macro::Nested) do
+        _task = Class.new(Macro::Nested) do
           step task: Dynamic.method(:call_dynamic_nested_activity),
                id:   :call_dynamic_nested_activity
         end
-
-        task
       end
 
       class Dynamic
@@ -87,10 +85,7 @@ module Trailblazer
           nested_activity       = flow_options[:decision]
           original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
 
-          hosting_activity = {
-            nodes:        [Trailblazer::Activity::NodeAttributes.new(nested_activity.to_s, nil, nested_activity)],
-            wrap_static:  {nested_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static},
-          }
+          host_activity = Dynamic.host_activity_for(activity: nested_activity)
 
           # TODO: make activity here that has only one step (plus In and Out config) which is {nested_activity}
 
@@ -99,7 +94,7 @@ module Trailblazer
             [ctx, original_flow_options], # pass {flow_options} without a {:decision}.
             runner:   runner,
             **circuit_options,
-            activity: hosting_activity
+            activity: host_activity
           )
 
           return compute_legacy_return_signal(return_signal), [ctx, flow_options]
@@ -109,6 +104,17 @@ module Trailblazer
           actual_semantic  = return_signal.to_h[:semantic]
           applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
         end
+
+        # This is used in Nested and Each where some tasks don't have a corresponding, hard-wired
+        # activity. This is needed for {TaskWrap.invoke} and the Debugging API in tracing.
+        # @private
+        def self.host_activity_for(activity:)
+          Activity::TaskWrap.container_activity_for(
+            activity,
+            nodes: [Trailblazer::Activity::NodeAttributes.new(activity.to_s, nil, activity)],
+          )
+        end
+
       end
 
       # Code to handle [:auto_wire]. This is called "static" as you configure the possible activities at
@@ -123,7 +129,7 @@ module Trailblazer
           [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
         end.to_h
 
-        Class.new(Macro::Nested) do
+        _task = Class.new(Macro::Nested) do
           step(
             {
               task: Static.method(:return_route_signal),
