@@ -48,6 +48,16 @@ module Trailblazer
       def self.default_dataset(ctx, dataset:, **)
         dataset
       end
+
+      # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
+      def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
+        # activity is the host activity
+        return compile_id unless activity[:each] == true
+
+        index = captured_node.captured_input.data[:ctx].fetch(:index)
+
+        ctx[:runtime_id] = "#{compile_id}.#{index}"
+      end
     end
 
     # @api private The internals here are considered private and might change in the near future.
@@ -105,5 +115,13 @@ module Trailblazer
 
       Activity::Railway.Subprocess(each_activity).merge(id: id)
     end
+  end
+
+  if const_defined?(:Developer) # FIXME: how do you properly check for a gem?
+    Developer::Trace::Debugger.add_normalizer_step!(
+      Macro::Each.method(:compute_runtime_id),
+      id:     "Each.runtime_id",
+      append: :runtime_id, # so that the following {#runtime_path} picks up those changes made here.
+    )
   end
 end

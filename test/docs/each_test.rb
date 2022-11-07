@@ -26,23 +26,7 @@ class DocsEachTest < Minitest::Spec
 
     stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
 
-    my_compute_runtime_id = ->(captured_node:, activity:, compile_id:, **) do
-      # activity is the host activity
-      puts "@@@@@ #{captured_node.captured_input.task.inspect}"
-
-      return compile_id unless activity[:each] == true
-
-      # puts "@@@@@   #{activity.inspect}"
-      index = captured_node.captured_input.data[:ctx].fetch(:index)
-
-      "#{compile_id}.#{index}"
-    end
-
-
     assert_equal Trailblazer::Developer::Trace::Present.(stack,
-
-      compute_runtime_id: my_compute_runtime_id,
-
       node_options: {stack.to_a[0] => {label: "<a-Each-b>"}}), %{<a-Each-b>
 |-- Start.default
 |-- a
