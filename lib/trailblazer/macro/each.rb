@@ -91,10 +91,10 @@ module Trailblazer
         # nodes
         [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
         # config
-        {
-          wrap_static:  {block_activity => Trailblazer::Activity::TaskWrap.initial_wrap_static},
+        Trailblazer::Activity::TaskWrap.container_activity_for(
+          block_activity,
           each:         true, # mark this activity for {compute_runtime_id}.
-        }
+        )
       )
 
       # The {Each.iterate.block} activity hosting a special {Circuit} that runs
