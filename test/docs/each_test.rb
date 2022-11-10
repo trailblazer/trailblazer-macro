@@ -1,8 +1,61 @@
 require "test_helper"
 
-# TODO: index in trace
 
-class DocsEachTest < Minitest::Spec
+# step Macro::Each(:report_templates, key: :report_template) {
+#   step Subprocess(ReportTemplate::Update), input: :input_report_template
+#   fail :set_report_template_errors
+# }
+
+# def report_templates(ctx, **)      ctx["result.contract.default"].report_templates
+# end
+
+class EachTest < Minitest::Spec
+  class Composer < Struct.new(:full_name, :email)
+
+  end
+
+  module B
+    class Song < Struct.new(:id, :title, :band, :composers)
+      def self.find_by(id:)
+        Song.new(id, nil, nil, [Composer.new("Fat Mike"), Composer.new("El Hefe")])
+      end
+    end
+
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        step :model
+        step Each(dataset_from: :composers_for_each) {
+          step :notify_composers
+        }
+
+        # circuit-step interface! "decider interface"
+        def composers_for_each(ctx, model:, **)
+          model.composers
+        end
+
+        def notify_composers(ctx, index:, item:, **)
+          ctx[:value] = [index, item.full_name]
+        end
+        #~meths
+        def model(ctx, params:, **)
+          ctx[:model] = Song.find_by(id: params[:id])
+        end
+        #~meths end
+      end
+    end
+  end # B
+
+  it "allows a dataset compute in the hosting activity" do
+  #@ {:dataset} is not part of the {ctx}.
+    assert_invoke B::Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: B::Song.find_by(id: 1),
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+      }
+  end
+end
+
+class DocsEachUnitTest < Minitest::Spec
   def self.block
     -> (*){
       step :compute_item
@@ -18,7 +71,7 @@ class DocsEachTest < Minitest::Spec
       include T.def_steps(:a, :b)
 
       step :a
-      step Each(&DocsEachTest.block), id: "Each/1"
+      step Each(&DocsEachUnitTest.block), id: "Each/1"
       step :b
     end
 
@@ -32,7 +85,6 @@ class DocsEachTest < Minitest::Spec
 |-- a
 |-- Each/1
 |   |-- Start.default
-|   |-- dataset_getter
 |   |-- Each.iterate.block
 |   |   |-- invoke_block_activity.0
 |   |   |   |-- Start.default
@@ -61,7 +113,7 @@ class DocsEachTest < Minitest::Spec
   end
 
   it "Each::Circuit" do
-    activity = Trailblazer::Macro.Each(&DocsEachTest.block)[:task]
+    activity = Trailblazer::Macro.Each(&DocsEachUnitTest.block)[:task]
 
     ctx = {
       dataset: [1,2,3]

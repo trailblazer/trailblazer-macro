@@ -1,6 +1,18 @@
 module Trailblazer
   module Macro
     class Each < Trailblazer::Activity::FastTrack
+      # FIXME: for Strategy that wants to pass-through the exec_context, so it
+      # looks "invisible" for steps.
+      module Transitive
+        def call(args, exec_context:, **circuit_options)
+          # exec_context is our hosting Song::Activity::Cover
+
+          to_h[:activity].call(args, exec_context: exec_context, **circuit_options)
+        end
+
+      end
+      extend Transitive
+
       class Circuit
         def initialize(block_activity:, inner_key:, success_terminus:, failure_terminus:)
           @inner_key      = inner_key
@@ -45,10 +57,6 @@ module Trailblazer
         end
       end # Circuit
 
-      def self.default_dataset(ctx, dataset:, **)
-        dataset
-      end
-
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
       def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
         # activity is the host activity
@@ -60,11 +68,21 @@ module Trailblazer
       end
     end
 
+
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_getter: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+    def self.Each(block_activity=nil, dataset_from: nil, inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       # TODO: logic here sucks.
       block_activity ||= Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
+        # include
+
+        if dataset_from
+          block_activity.extend Each::Transitive
+
+        end
+
+
+
 
       # returns {:collected_from_each}
       success_terminus = Trailblazer::Activity::End.new(semantic: :success)
@@ -102,15 +120,22 @@ module Trailblazer
 
 
 
-      each_activity = Class.new(Macro::Each) # DISCUSS: do we need this class? and what base class should we be using?
-      # each_activity.step dataset_getter, id: "dataset_getter" # returns {:value}
+      each_activity = Class.new(Macro::Each) # DISCUSS: what base class should we be using?
+        if dataset_from
+          dataset_task = Macro.task_adapter_for_decider(dataset_from, variable_name: :dataset)
+
+          each_activity.step task: dataset_task, id: "dataset_from" # returns {:value}
+        end
 
       each_activity.step Activity::Railway.Subprocess(iterate_activity),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
 
 
 
-      Activity::Railway.Subprocess(each_activity).merge(id: id)
+      Activity::Railway.Subprocess(each_activity).merge(
+        id: id,
+        Activity::Railway.Out() => [:collected_from_each], # TODO: allow renaming without leaking {:collected_from_each} as well.
+        )
     end
   end
 
