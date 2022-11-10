@@ -61,10 +61,7 @@ module Trailblazer
     end
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, enumerable: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
-
-      dataset_getter = enumerable
-
+    def self.Each(block_activity=nil, dataset_getter: Each.method(:default_dataset), inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       # TODO: logic here sucks.
       block_activity ||= Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
@@ -106,7 +103,7 @@ module Trailblazer
 
 
       each_activity = Class.new(Macro::Each) # DISCUSS: do we need this class? and what base class should we be using?
-      each_activity.step dataset_getter, id: "dataset_getter" # returns {:value}
+      # each_activity.step dataset_getter, id: "dataset_getter" # returns {:value}
 
       each_activity.step Activity::Railway.Subprocess(iterate_activity),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.

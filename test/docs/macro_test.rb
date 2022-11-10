@@ -31,6 +31,24 @@ class DocsMacroTest < Minitest::Spec
   it { Trailblazer::Developer.railway(Create).must_equal %{[>my_policy.manager]} }
 end
 
+
+class MacroAssignVariableTest < Minitest::Spec
+  it do
+    my_exec_context = Class.new do
+      def my_dataset(ctx, my_array:, **)
+        my_array.reverse
+      end
+    end.new
+
+    dataset_task = Trailblazer::Macro.task_adapter_for_decider(:my_dataset, variable_name: :dataset)
+
+    signal, (ctx, _) = dataset_task.([{my_array: [1,2]}, {}], exec_context: my_exec_context)
+
+    assert_equal signal, Trailblazer::Activity::Right
+    assert_equal ctx.inspect, %{{:my_array=>[1, 2], :dataset=>[2, 1]}}
+  end
+end
+
 # injectable option
 # nested pipe
 # using macros in macros
