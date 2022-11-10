@@ -54,7 +54,7 @@ module Trailblazer
         # activity is the host activity
         return compile_id unless activity[:each] == true
 
-        index = captured_node.captured_input.data[:ctx].fetch(:index)
+        index = captured_node.captured_input.data[:ctx_snapshot].fetch(:index)
 
         ctx[:runtime_id] = "#{compile_id}.#{index}"
       end
