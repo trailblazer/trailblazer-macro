@@ -14,6 +14,7 @@ class EachTest < Minitest::Spec
 
   end
 
+#@ operation has {#composers_for_each}
   module B
     class Song < Struct.new(:id, :title, :band, :composers)
       def self.find_by(id:)
@@ -27,6 +28,7 @@ class EachTest < Minitest::Spec
         step Each(dataset_from: :composers_for_each) {
           step :notify_composers
         }
+        step :rearrange
 
         # circuit-step interface! "decider interface"
         def composers_for_each(ctx, model:, **)
@@ -40,6 +42,8 @@ class EachTest < Minitest::Spec
         def model(ctx, params:, **)
           ctx[:model] = Song.find_by(id: params[:id])
         end
+
+        include T.def_steps(:rearrange)
         #~meths end
       end
     end
@@ -51,24 +55,81 @@ class EachTest < Minitest::Spec
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
         collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
-      }
+      },
+      seq: "[:rearrange]"
+  end
+
+#@ operation has dedicated step {#find_composers}
+  module C
+    class Song < B::Song; end
+
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        step :model
+        step :find_composers
+        step Each() {
+            step :notify_composers
+        }, In() => {:composers => :dataset}
+        step :rearrange
+
+        def find_composers(ctx, model:, **)
+          # You could also say {ctx[:dataset] = model.composers},
+          # and wouldn't need the In() mapping.
+          ctx[:composers] = model.composers
+        end
+        #~meths
+        def notify_composers(ctx, index:, item:, **)
+          ctx[:value] = [index, item.full_name]
+        end
+
+        def model(ctx, params:, **)
+          ctx[:model] = Song.find_by(id: params[:id])
+        end
+
+        include T.def_steps(:rearrange)
+        #~meths end
+      end
+    end
+  end # C
+
+  it "dataset can come from the hosting activity" do
+#@ {:dataset} is not part of the outgoing {ctx}.
+  assert_invoke B::Song::Activity::Cover, params: {id: 1},
+    expected_ctx_variables: {
+      model: B::Song.find_by(id: 1),
+      collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+    }, seq: "[:rearrange]"
+  end
+
+  it "dataset coming via In() from the operation" do
+  #@ {:dataset} is not part of the {ctx}.
+    assert_invoke C::Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: C::Song.find_by(id: 1),
+        composers: [Composer.new("Fat Mike"), Composer.new("El Hefe")],
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+      }, seq: "[:rearrange]"
   end
 end
 
+
 class DocsEachUnitTest < Minitest::Spec
+  module ComputeItem
+    def compute_item(ctx, item:, index:, **)
+      ctx[:value] = "#{item}-#{index.inspect}"
+    end
+  end
+
   def self.block
     -> (*){
       step :compute_item
-
-      def compute_item(ctx, item:, index:, **)
-        ctx[:value] = "#{item}-#{index.inspect}"
-      end
     }
   end
 
   it "with Trace" do
     activity = Class.new(Trailblazer::Activity::Railway) do
       include T.def_steps(:a, :b)
+      include ComputeItem
 
       step :a
       step Each(&DocsEachUnitTest.block), id: "Each/1"
@@ -127,12 +188,10 @@ class DocsEachUnitTest < Minitest::Spec
 
   it "accepts iterated {block}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
+      include ComputeItem
+
       step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item
-
-        def compute_item(ctx, item:, index:, **)
-          ctx[:value] = "#{item}-#{index.inspect}"
-        end
       }
     end
 
@@ -143,12 +202,12 @@ class DocsEachUnitTest < Minitest::Spec
 
   it "can see the entire ctx" do
     activity = Class.new(Trailblazer::Activity::Railway) do
+      def compute_item_with_current_user(ctx, item:, index:, current_user:, **)
+        ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
+      end
+
       step Each() { # expects {:dataset}
         step :compute_item_with_current_user
-
-        def compute_item_with_current_user(ctx, item:, index:, current_user:, **)
-          ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
-        end
       }
     end
 
@@ -167,12 +226,11 @@ class DocsEachUnitTest < Minitest::Spec
     activity = Class.new(Trailblazer::Activity::Railway) do
       step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
-
-        def compute_item(ctx, item:, index:, user:, **)
-          ctx[:value] = "#{item}-#{index.inspect}-#{user}"
-        end
       }
 
+      def compute_item(ctx, item:, index:, user:, **)
+        ctx[:value] = "#{item}-#{index.inspect}-#{user}"
+      end
     end
 
     assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
