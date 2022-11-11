@@ -73,10 +73,10 @@ module Trailblazer
     def self.Each(block_activity=nil, dataset_from: nil, inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       # TODO: logic here sucks.
-        if block
-          block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
-          block_activity.extend Each::Transitive
-        end
+      if block
+        block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
+        block_activity.extend Each::Transitive
+      end
 
 
       # returns {:collected_from_each}

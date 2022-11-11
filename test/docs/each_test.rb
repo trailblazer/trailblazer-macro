@@ -11,7 +11,6 @@ require "test_helper"
 
 class EachTest < Minitest::Spec
   class Composer < Struct.new(:full_name, :email)
-
   end
 
 #@ operation has {#composers_for_each}
@@ -59,6 +58,18 @@ class EachTest < Minitest::Spec
       seq: "[:rearrange]"
   end
 
+  module CoverMethods
+    def notify_composers(ctx, index:, item:, **)
+      ctx[:value] = [index, item.full_name]
+    end
+
+    def model(ctx, params:, **)
+      ctx[:model] = EachTest::B::Song.find_by(id: params[:id])
+    end
+
+    include T.def_steps(:rearrange)
+  end
+
 #@ operation has dedicated step {#find_composers}
   module C
     class Song < B::Song; end
@@ -78,15 +89,7 @@ class EachTest < Minitest::Spec
           ctx[:composers] = model.composers
         end
         #~meths
-        def notify_composers(ctx, index:, item:, **)
-          ctx[:value] = [index, item.full_name]
-        end
-
-        def model(ctx, params:, **)
-          ctx[:model] = Song.find_by(id: params[:id])
-        end
-
-        include T.def_steps(:rearrange)
+        include CoverMethods
         #~meths end
       end
     end
@@ -109,6 +112,49 @@ class EachTest < Minitest::Spec
         composers: [Composer.new("Fat Mike"), Composer.new("El Hefe")],
         collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
       }, seq: "[:rearrange]"
+  end
+
+  it "{dataset_key: :composers}" do
+
+  end
+
+
+#@ Each with operation
+  module D
+    class Song < B::Song; end
+
+    module Song::Activity
+      class Notify < Trailblazer::Activity::Railway
+        step :send_email
+
+        def send_email(ctx, index:, item:, **)
+          ctx[:value] = [index, item.full_name]
+        end
+      end
+    end
+
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        step :model
+        step Each(Notify, dataset_from: :composers_for_each)
+        step :rearrange
+        #~meths
+        def composers_for_each(ctx, model:, **)
+          model.composers
+        end
+        include CoverMethods
+        #~meths end
+      end
+    end
+  end
+
+  it "Each(Activity::Railway)" do
+    assert_invoke D::Song::Activity::Cover, params: {id: 1},
+      seq:                    "[:rearrange]",
+      expected_ctx_variables: {
+        model:                D::Song.find_by(id: 1),
+        collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
+      }
   end
 end
 
@@ -176,12 +222,16 @@ class DocsEachUnitTest < Minitest::Spec
   it "Each::Circuit" do
     activity = Trailblazer::Macro.Each(&DocsEachUnitTest.block)[:task]
 
+    my_exec_context = Class.new do
+      include ComputeItem
+    end.new
+
     ctx = {
       dataset: [1,2,3]
     }
 
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx])
+    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
     assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
   end
 
