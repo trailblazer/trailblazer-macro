@@ -114,8 +114,40 @@ class EachTest < Minitest::Spec
       }, seq: "[:rearrange]"
   end
 
-  it "{dataset_key: :composers}" do
+#@ {:item_key}
+  module E
+    class Song < B::Song; end
 
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        step :model
+        step Each(dataset_from: :composers_for_each, item_key: :composer) {
+          step :notify_composers
+        }
+        step :rearrange
+
+        def notify_composers(ctx, composer:, **)
+          ctx[:value] = composer.full_name
+        end
+
+        # circuit-step interface! "decider interface"
+        def composers_for_each(ctx, model:, **)
+          model.composers
+        end
+        #~meths
+        include CoverMethods
+        #~meths end
+      end
+    end
+  end # E
+
+  it "{item_key: :composer}" do
+    assert_invoke E::Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: B::Song.find_by(id: 1),
+        collected_from_each: ["Fat Mike", "El Hefe"]
+      },
+      seq: "[:rearrange]"
   end
 
 

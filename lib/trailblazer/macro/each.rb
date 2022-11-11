@@ -14,8 +14,8 @@ module Trailblazer
       extend Transitive
 
       class Circuit
-        def initialize(block_activity:, inner_key:, success_terminus:, failure_terminus:)
-          @inner_key      = inner_key
+        def initialize(block_activity:, item_key:, success_terminus:, failure_terminus:)
+          @item_key      = item_key
           @block_activity = block_activity
 
           @success_terminus = success_terminus
@@ -28,7 +28,7 @@ module Trailblazer
           collected_values = dataset.collect.with_index do |element, index|
             # This new {inner_ctx} will be disposed of after invoking the item activity.
             inner_ctx = ctx.merge(
-              @inner_key => element, # defaults to {:item}
+              @item_key => element, # defaults to {:item}
               :index     => index,
               # "#{key}_index" => index,
             )
@@ -70,7 +70,7 @@ module Trailblazer
 
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, inner_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
       # TODO: logic here sucks.
       if block
@@ -85,7 +85,7 @@ module Trailblazer
 
       circuit = Trailblazer::Macro::Each::Circuit.new(
         block_activity: block_activity,
-        inner_key:      inner_key,
+        item_key:      item_key,
 
         success_terminus: success_terminus,
         failure_terminus: failure_terminus,
