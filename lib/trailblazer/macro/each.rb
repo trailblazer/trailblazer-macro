@@ -1,6 +1,6 @@
 module Trailblazer
   module Macro
-    class Each < Trailblazer::Activity::FastTrack
+    class Each# < Trailblazer::Activity::FastTrack
       # FIXME: for Strategy that wants to pass-through the exec_context, so it
       # looks "invisible" for steps.
       module Transitive
@@ -11,21 +11,23 @@ module Trailblazer
         end
 
       end
-      extend Transitive
 
       class Circuit
-        def initialize(block_activity:, item_key:, success_terminus:, failure_terminus:)
+        def initialize(block_activity:, item_key:)
           @item_key      = item_key
           @block_activity = block_activity
 
-          @success_terminus = success_terminus
-          @failure_terminus = failure_terminus
+          @failing_semantic = [:failure, :fail_fast]
         end
 
         def call((ctx, flow_options), runner: Run, **circuit_options) # DISCUSS: do we need {start_task}?
           dataset = ctx.fetch(:dataset)
+          signal  = @success_terminus
 
-          collected_values = dataset.collect.with_index do |element, index|
+          collected_values = []
+
+          # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
+          dataset.each_with_index do |element, index|
             # This new {inner_ctx} will be disposed of after invoking the item activity.
             inner_ctx = ctx.merge(
               @item_key => element, # defaults to {:item}
@@ -44,16 +46,15 @@ module Trailblazer
               # wrap_static: @wrap_static,
             )
 
+            collected_values << returned_ctx[:value] # {:value} is guaranteed to be returned.
 
-            #   # Break the loop if {block} emits failure signal
-            #   return [signal, [ctx, flow_options]] if [:failure, :fail_fast].include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
-            # end
-            returned_ctx[:value] # {:value} is guaranteed to be returned.
+            # Break the loop if {block_activity} emits failure signal
+            break if @failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
           end
 
           ctx[:collected_from_each] = collected_values
 
-          return @success_terminus, [ctx, flow_options]
+          return signal, [ctx, flow_options]
         end
       end # Circuit
 
@@ -78,26 +79,18 @@ module Trailblazer
         block_activity.extend Each::Transitive
       end
 
+      # Those outputs we simply wire through to the Each() activity.
+      outputs_from_block_activity = block_activity.to_h[:outputs]
 
       # returns {:collected_from_each}
-      success_terminus = Trailblazer::Activity::End.new(semantic: :success)
-      failure_terminus = Trailblazer::Activity::End.new(semantic: :failure)
-
       circuit = Trailblazer::Macro::Each::Circuit.new(
         block_activity: block_activity,
         item_key:      item_key,
-
-        success_terminus: success_terminus,
-        failure_terminus: failure_terminus,
       )
 
-      outputs = [ # TODO: do we want more signals out of the iteration?
-        Trailblazer::Activity::Output(success_terminus, :success),
-        Trailblazer::Activity::Output(failure_terminus, :failure)
-      ]
-
-      schema = Trailblazer::Activity::Schema.new(circuit,
-        outputs, # outputs
+      schema = Trailblazer::Activity::Schema.new(
+        circuit,
+        outputs_from_block_activity, # outputs: we reuse block_activity's outputs.
         # nodes
         [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
         # config
@@ -113,24 +106,34 @@ module Trailblazer
       # {iterate_activity}'s schema.
       iterate_activity = Trailblazer::Activity.new(schema)
 
+      # TODO: move to Wrap.
+      termini_from_block_activity =
+        outputs_from_block_activity.
+          # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
+          sort { |a,b| a.semantic ==:success ? 1 : 0 }.
+          collect { |output|
+            [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
+          }
 
+      # each_activity = Class.new(Macro::Each) # DISCUSS: what base class should we be using?
+      each_activity = Activity::FastTrack(termini: termini_from_block_activity) # DISCUSS: what base class should we be using?
+      each_activity.extend Each::Transitive
 
-      each_activity = Class.new(Macro::Each) # DISCUSS: what base class should we be using?
-        if dataset_from
-          dataset_task = Macro.task_adapter_for_decider(dataset_from, variable_name: :dataset)
+      if dataset_from
+        dataset_task = Macro.task_adapter_for_decider(dataset_from, variable_name: :dataset)
 
-          each_activity.step task: dataset_task, id: "dataset_from" # returns {:value}
-        end
+        each_activity.step task: dataset_task, id: "dataset_from" # returns {:value}
+      end
 
+      # {Subprocess} will automatically wire all {block_activity}'s termini to the corresponding termini
+      # of {each_activity} as they have the same semantics (both termini sets are identical).
       each_activity.step Activity::Railway.Subprocess(iterate_activity),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
-
-
 
       Activity::Railway.Subprocess(each_activity).merge(
         id: id,
         Activity::Railway.Out() => [:collected_from_each], # TODO: allow renaming without leaking {:collected_from_each} as well.
-        )
+      )
     end
   end
 

@@ -17,6 +17,10 @@ class EachTest < Minitest::Spec
   module B
     class Song < Struct.new(:id, :title, :band, :composers)
       def self.find_by(id:)
+        if id == 2
+          return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe")])
+        end
+
         Song.new(id, nil, nil, [Composer.new("Fat Mike"), Composer.new("El Hefe")])
       end
     end
@@ -148,6 +152,55 @@ class EachTest < Minitest::Spec
         collected_from_each: ["Fat Mike", "El Hefe"]
       },
       seq: "[:rearrange]"
+  end
+
+#@ failure in Each
+  module F
+    class Song < B::Song; end
+
+    class Notify
+      def self.send_email(email)
+        return if email.nil?
+        true
+      end
+    end
+
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        step :model
+        step Each(dataset_from: :composers_for_each) {
+          step :notify_composers
+        }
+        step :rearrange
+
+        def notify_composers(ctx, item:, **)
+          if Notify.send_email(item.email)
+            ctx[:value] = item.email # let's collect all emails that could be sent.
+            return true
+          else
+            return false
+          end
+        end
+        #~meths
+
+        # circuit-step interface! "decider interface"
+        def composers_for_each(ctx, model:, **)
+          model.composers
+        end
+        include CoverMethods
+        #~meths end
+      end
+    end
+  end # F
+
+  it "failure in Each" do
+    assert_invoke F::Song::Activity::Cover, params: {id: 2},
+      expected_ctx_variables: {
+        model: B::Song.find_by(id: 2),
+        collected_from_each: ["mike@fat.wreck", nil],
+      },
+      seq: "[]",
+      terminus: :failure
   end
 
 
@@ -351,5 +404,40 @@ class DocsEachUnitTest < Minitest::Spec
     assert_invoke activity, dataset: [1,2,3], index: 9,
       expected_ctx_variables: {collected_from_each: ["1-0", "2-1", "3-2"]},
       seq: "[9]"
+  end
+
+  it "stops iterating when failure" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each() {
+        step :check
+      }
+      step :a
+
+      include T.def_steps(:a)
+      def check(ctx, item:, **)
+        ctx[:value] = item.to_s #@ always collect the value, even in failure case.
+
+        return false if item >= 3
+        true
+      end
+    end
+
+    #@ all works
+    assert_invoke activity, dataset: [1,2],
+      expected_ctx_variables: {collected_from_each: ["1", "2"]},
+      seq: "[:a]"
+
+    #@ fail at 3 but still collect 3rd iteration!
+    Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
+    assert_invoke activity, dataset: [1,2,3],
+      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+      seq: "[]",
+      terminus: :failure
+
+    #@ fail at 3, skip 4
+    assert_invoke activity, dataset: [1,2,3,4],
+      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+      seq: "[]",
+      terminus: :failure
   end
 end
