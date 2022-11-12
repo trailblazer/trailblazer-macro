@@ -21,6 +21,10 @@ class EachTest < Minitest::Spec
           return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe")])
         end
 
+        if id == 3
+          return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe", "scammer@spam")])
+        end
+
         Song.new(id, nil, nil, [Composer.new("Fat Mike"), Composer.new("El Hefe")])
       end
     end
@@ -239,6 +243,56 @@ class EachTest < Minitest::Spec
       expected_ctx_variables: {
         model:                D::Song.find_by(id: 1),
         collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
+      }
+  end
+
+#@ Each with operation with three outcomes
+# NOTE: this is not documented, yet.
+  module G
+    class Song < B::Song; end
+
+    module Song::Activity
+      class Notify < Trailblazer::Activity::Railway
+        terminus :spam_email
+        # SpamEmail = Class.new(Trailblazer::Activity::Signal)
+
+        step :send_email, Output(:failure) => Track(:spam_email)
+
+        def send_email(ctx, index:, item:, **)
+          puts "@@@@@ #{item.inspect}"
+          return false if item.email == "scammer@spam"
+          ctx[:value] = [index, item.full_name]
+        end
+      end
+    end
+
+    module Song::Activity
+      class Cover < Trailblazer::Activity::Railway
+        terminus :spam_alert
+
+        step :model
+        step Each(Notify, dataset_from: :composers_for_each, Output(:spam_email) => Track(:spam_email)),
+          Output(:spam_email) => Track(:spam_alert)
+        step :rearrange
+        #~meths
+        def composers_for_each(ctx, model:, **)
+          model.composers
+        end
+        include CoverMethods
+        #~meths end
+      end
+    end
+  end
+
+  it "Each(Activity::Railway) with End.spam_email" do
+    Trailblazer::Developer.wtf?(G::Song::Activity::Cover, [{params: {id: 3}}, {}])
+
+    assert_invoke G::Song::Activity::Cover, params: {id: 3},
+      terminus:                :spam_alert,
+      seq:                    "[]",
+      expected_ctx_variables: {
+        model:                G::Song.find_by(id: 3),
+        collected_from_each:  [[0, "Fat Mike"], nil,]
       }
   end
 end

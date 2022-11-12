@@ -71,7 +71,7 @@ module Trailblazer
 
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", **iterate_activity_options, &block)
 
       # TODO: logic here sucks.
       if block
@@ -128,7 +128,8 @@ module Trailblazer
       # {Subprocess} will automatically wire all {block_activity}'s termini to the corresponding termini
       # of {each_activity} as they have the same semantics (both termini sets are identical).
       each_activity.step Activity::Railway.Subprocess(iterate_activity),
-        id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
+        id: "Each.iterate.#{block ? :block : block_activity}", # FIXME: test :id.
+        **iterate_activity_options
 
       Activity::Railway.Subprocess(each_activity).merge(
         id: id,
