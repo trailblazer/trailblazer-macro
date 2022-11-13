@@ -1,11 +1,21 @@
-@ 2.1.12
+# 2.1.12
+
+## Each()
+
+* Introducing the `Each()` macro to iterate over datasets while invoking a particular operation, as if
+  they were run as separate serially connected operations.
 
 ## Nested()
 
+* Restructured internals, it's much more readable now. Dynamic and Static are completely separated now.
+* `Static` handles `:auto_wire` and now allows to route any nested output. This was not possible before,
+  you only had `FastTrack` generic termini.
 * Better warning when using `Nested(Operation)` without a dynamic decider.
 * Internal structure of `Nested()` has changed, the trace looks different.
 
-## Each()
+## Internals
+
+* Use `AssignVariable` in Each and
 
 # 2.1.11
 
