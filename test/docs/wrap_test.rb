@@ -1,5 +1,7 @@
 require "test_helper"
 
+# TODO: test ID properly.
+
 class DocsWrapTest < Minitest::Spec
 =begin
 When success: return the block's returns
@@ -454,8 +456,24 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
       assert_invoke Song::Activity::Upload, send_request: false, seq: "[:find_model, :send_request]", terminus: :fail_fast
     end
 
+    it "tracing" do
+      assert_equal trace(Song::Activity::Upload, {seq: []})[0], %{TOP
+|-- Start.default
+|-- find_model
+|-- Wrap/DocsWrapTest::WrapOperationWithCustomTerminus::Song::Activity::HandleUnsafeProcess
+|   |-- Start.default
+|   |-- send_request
+|   `-- End.success
+|-- upload
+`-- End.success}
 
-    # it { Song::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    # it { Song::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >} }
+  #@ compile time
+  #@ make sure we can find tasks/compile-time artifacts in Wrap by using their {compile_id}.
+    # assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Upload,
+    #   [Wrap])[0].task.inspect,
+    #   %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
+
+    end
   end
 end

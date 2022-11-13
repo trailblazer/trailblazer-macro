@@ -4,7 +4,7 @@ module Trailblazer
   module Macro
     # TODO: {user_wrap}: rename to {wrap_handler}.
 
-    def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
+    def self.Wrap(user_wrap, id: Macro.id_for(user_wrap, macro: :Wrap), &block)
       block_activity, outputs = Macro.block_activity_for(nil, &block)
 
       outputs   = Hash[outputs.collect { |output| [output.semantic, output] }] # FIXME: redundant to Subprocess().
@@ -71,14 +71,12 @@ module Trailblazer
             signal = returned
           end
 
-
           # If there's no mapping, use the original {signal} .
           # This usually means signal is a terminus or a custom signal.
           signal = @signal_to_output.fetch(signal, signal)
 
           return signal, [ctx, flow_options]
         end
-
       end
     end # Wrap
   end

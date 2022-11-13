@@ -42,7 +42,6 @@ module Trailblazer
       Activity::Circuit::TaskAdapter.new(assign_task) # call {assign_task} with circuit-interface, interpret result.
     end
 
-
     def self.block_activity_for(block_activity, &block)
       return block_activity, block_activity.to_h[:outputs] unless block_given?
 
@@ -50,6 +49,17 @@ module Trailblazer
       block_activity.extend Each::Transitive
 
       return block_activity, block_activity.to_h[:outputs]
+    end
+
+    def self.id_for(user_proc, macro:)
+      id =
+        if user_proc.is_a?(Class)
+          user_proc.to_s
+        else
+          SecureRandom.hex(4)
+        end
+
+      "#{macro}/#{id}"
     end
   end # Macro
 
