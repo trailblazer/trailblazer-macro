@@ -8,7 +8,6 @@ module Trailblazer
       block_activity, outputs = Macro.block_activity_for(nil, &block)
 
       outputs   = Hash[outputs.collect { |output| [output.semantic, output] }] # FIXME: redundant to Subprocess().
-
       task      = Wrap::Wrapped.new(block_activity, user_wrap, outputs)
 
       {
@@ -73,8 +72,8 @@ module Trailblazer
           end
 
 
-          # Use the original {signal} if there's no mapping.
-          # This usually means signal is an End instance or a custom signal.
+          # If there's no mapping, use the original {signal} .
+          # This usually means signal is a terminus or a custom signal.
           signal = @signal_to_output.fetch(signal, signal)
 
           return signal, [ctx, flow_options]
