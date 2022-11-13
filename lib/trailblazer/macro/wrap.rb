@@ -40,10 +40,10 @@ module Trailblazer
           # Since in the user block, you can return Railway.pass! etc, we need to map
           # those to the actual wrapped block_activity's end.
           @signal_to_output = {
-            Operation::Railway.pass!      => outputs[:success].signal,
-            Operation::Railway.fail!      => outputs[:failure].signal,
-            Operation::Railway.pass_fast! => outputs[:pass_fast].signal,
-            Operation::Railway.fail_fast! => outputs[:fail_fast].signal,
+            Activity::Right               => outputs[:success].signal,
+            Activity::Left                => outputs[:failure].signal,
+            Activity::FastTrack::PassFast => outputs[:pass_fast].signal,
+            Activity::FastTrack::FailFast => outputs[:fail_fast].signal,
             true               => outputs[:success].signal,
             false              => outputs[:failure].signal,
             nil                => outputs[:failure].signal,
