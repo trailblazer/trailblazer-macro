@@ -450,7 +450,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     it do
     #@ success path
       assert_invoke Song::Activity::Upload, seq: "[:find_model, :send_request, :upload]"
-
+    #@ we travel through {:timeout}
       assert_invoke Song::Activity::Upload, send_request: false, seq: "[:find_model, :send_request]", terminus: :fail_fast
     end
 

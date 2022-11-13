@@ -2,6 +2,8 @@ require 'securerandom'
 
 module Trailblazer
   module Macro
+    # TODO: {user_wrap}: rename to {wrap_handler}.
+
     def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
       block_activity, outputs = Macro.block_activity_for(nil, &block)
 
@@ -30,14 +32,14 @@ module Trailblazer
           end
         end
 
-        def initialize(operation, user_wrap, outputs)
+        def initialize(block_activity, user_wrap, outputs)
           user_wrap = deprecate_positional_wrap_signature(user_wrap)
 
-          @operation  = operation
-          @user_wrap  = user_wrap
+          @block_activity   = block_activity
+          @user_wrap        = user_wrap
 
           # Since in the user block, you can return Railway.pass! etc, we need to map
-          # those to the actual wrapped operation's end.
+          # those to the actual wrapped block_activity's end.
           @signal_to_output = {
             Operation::Railway.pass!      => outputs[:success].signal,
             Operation::Railway.fail!      => outputs[:failure].signal,
@@ -50,8 +52,9 @@ module Trailblazer
         end
 
         def call((ctx, flow_options), **circuit_options)
-          block_calling_wrapped = ->(wrapped_args = [ctx, flow_options], wrapped_kwargs: circuit_options) {
-            call_wrapped_activity(wrapped_args, **wrapped_kwargs)
+          # since yield is called without arguments, we need to pull default params from here. Oh ... tricky.
+          block_calling_wrapped = ->(args=[ctx, flow_options], kwargs=circuit_options) {
+            Activity::Circuit::Runner.(@block_activity, args, **kwargs)
           }
 
           # call the user's Wrap {} block in the operation.
@@ -77,9 +80,6 @@ module Trailblazer
           return signal, [ctx, flow_options]
         end
 
-        def call_wrapped_activity((ctx, flow_options), **circuit_options)
-          @operation.to_h[:activity].([ctx, flow_options], **circuit_options) # :exec_context is this instance.
-        end
       end
     end # Wrap
   end
