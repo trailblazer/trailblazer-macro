@@ -246,7 +246,8 @@ class EachTest < Minitest::Spec
       }
   end
 
-#@ Each with operation with three outcomes
+#@ Each with operation with three outcomes. Notify terminates on {End.spam_email},
+#  which is then routed to End.spam_alert in the hosting activity.
 # NOTE: this is not documented, yet.
   module G
     class Song < B::Song; end
@@ -259,7 +260,6 @@ class EachTest < Minitest::Spec
         step :send_email, Output(:failure) => Track(:spam_email)
 
         def send_email(ctx, index:, item:, **)
-          puts "@@@@@ #{item.inspect}"
           return false if item.email == "scammer@spam"
           ctx[:value] = [index, item.full_name]
         end
@@ -271,7 +271,7 @@ class EachTest < Minitest::Spec
         terminus :spam_alert
 
         step :model
-        step Each(Notify, dataset_from: :composers_for_each, Output(:spam_email) => Track(:spam_email)),
+        step Each(Notify, dataset_from: :composers_for_each),
           Output(:spam_email) => Track(:spam_alert)
         step :rearrange
         #~meths
