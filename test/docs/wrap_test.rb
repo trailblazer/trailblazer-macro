@@ -417,4 +417,45 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update]] >} }
     it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :log_error]] >} }
   end
+
+
+  class WrapOperationWithCustomTerminus < Minitest::Spec
+    Song = Module.new
+
+    module Song::Activity
+      class HandleUnsafeProcess
+        def self.call((ctx), *, &block)
+          yield # calls the wrapped steps
+        rescue
+          [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
+        end
+      end
+
+      class Upload < Trailblazer::Activity::FastTrack
+        step :find_model
+        step Wrap(HandleUnsafeProcess) {
+          step :send_request,
+            Output(:failure) => End(:timeout__) # adds a terminus {End.timeout}
+          # step :rehash
+        },
+          Output(:timeout__) => Track(:fail_fast)
+        step :upload
+        fail :log_error
+        #~methods
+        include T.def_steps(:find_model, :send_request, :upload, :log_error)
+        #~methods end
+      end
+    end
+
+    it do
+    #@ success path
+      assert_invoke Song::Activity::Upload, seq: "[:find_model, :send_request, :upload]"
+
+      assert_invoke Song::Activity::Upload, send_request: false, seq: "[:find_model, :send_request]", terminus: :fail_fast
+    end
+
+
+    # it { Song::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    # it { Song::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >} }
+  end
 end
