@@ -3,14 +3,17 @@ require 'securerandom'
 module Trailblazer
   module Macro
     def self.Wrap(user_wrap, id: "Wrap/#{SecureRandom.hex(4)}", &block)
-      activity = Class.new(Activity::FastTrack, &block) # This is currently coupled to {dsl-linear}.
+      block_activity, outputs = Macro.block_activity_for(nil, &block)
 
-      outputs  = activity.to_h[:outputs]
-      outputs  = Hash[outputs.collect { |output| [output.semantic, output] }] # TODO: make that a helper somewhere.
+      outputs   = Hash[outputs.collect { |output| [output.semantic, output] }] # FIXME: redundant to Subprocess().
 
-      wrapped  = Wrap::Wrapped.new(activity, user_wrap, outputs)
+      task      = Wrap::Wrapped.new(block_activity, user_wrap, outputs)
 
-      {task: wrapped, id: id, outputs: outputs}
+      {
+        task:     task,
+        id:       id,
+        outputs:  outputs,
+      }
     end
 
     module Wrap
@@ -65,6 +68,7 @@ module Trailblazer
             # TODO: deprecate this?
             signal = returned
           end
+
 
           # Use the original {signal} if there's no mapping.
           # This usually means signal is an End instance or a custom signal.
