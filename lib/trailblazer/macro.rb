@@ -41,7 +41,17 @@ module Trailblazer
 
       Activity::Circuit::TaskAdapter.new(assign_task) # call {assign_task} with circuit-interface, interpret result.
     end
-  end
+
+
+    def self.block_activity_for(block_activity, &block)
+      return block_activity, block_activity.to_h[:outputs] unless block_given?
+
+      block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
+      block_activity.extend Each::Transitive
+
+      return block_activity, block_activity.to_h[:outputs]
+    end
+  end # Macro
 
   # All macros sit in the {Trailblazer::Macro} namespace, where we forward calls from
   # operations and activities to.

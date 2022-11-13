@@ -73,14 +73,9 @@ module Trailblazer
     # @api private The internals here are considered private and might change in the near future.
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", &block)
 
-      # TODO: logic here sucks.
-      if block
-        block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
-        block_activity.extend Each::Transitive
-      end
+      block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
 
-      # Those outputs we simply wire through to the Each() activity.
-      outputs_from_block_activity = block_activity.to_h[:outputs]
+
 
       # returns {:collected_from_each}
       circuit = Trailblazer::Macro::Each::Circuit.new(
@@ -90,6 +85,7 @@ module Trailblazer
 
       schema = Trailblazer::Activity::Schema.new(
         circuit,
+      # Those outputs we simply wire through to the Each() activity.
         outputs_from_block_activity, # outputs: we reuse block_activity's outputs.
         # nodes
         [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
