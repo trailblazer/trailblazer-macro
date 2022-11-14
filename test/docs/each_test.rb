@@ -29,22 +29,29 @@ class EachTest < Minitest::Spec
       end
     end
 
+    #:each
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         step :model
+        #:each-dataset
         step Each(dataset_from: :composers_for_each) {
           step :notify_composers
         }
+        #:each-dataset end
         step :rearrange
 
-        # circuit-step interface! "decider interface"
+        # "decider interface"
+        #:dataset_from
         def composers_for_each(ctx, model:, **)
           model.composers
         end
+        #:dataset_from end
 
+        #:iterated
         def notify_composers(ctx, index:, item:, **)
           ctx[:value] = [index, item.full_name]
         end
+        #:iterated end
         #~meths
         def model(ctx, params:, **)
           ctx[:model] = Song.find_by(id: params[:id])
@@ -54,6 +61,7 @@ class EachTest < Minitest::Spec
         #~meths end
       end
     end
+    #:each end
   end # B
 
   it "allows a dataset compute in the hosting activity" do
@@ -64,6 +72,16 @@ class EachTest < Minitest::Spec
         collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
       },
       seq: "[:rearrange]"
+
+=begin
+    ctx = {params: {id: 1}, seq: []} # Song 1 has two composers.
+    #:collected_from_each
+    ctx = {params: {id: 1}} # Song 1 has two composers.
+    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(B::Song::Activity::Cover, [ctx, {}])
+
+    puts ctx[:collected_from_each] #=> [[0, "Fat Mike"], [1, "El Hefe"]]
+    #:collected_from_each end
+=end
   end
 
   module CoverMethods
@@ -126,27 +144,31 @@ class EachTest < Minitest::Spec
   module E
     class Song < B::Song; end
 
+    #:composer
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
+        #~meths
         step :model
+        #:item_key
         step Each(dataset_from: :composers_for_each, item_key: :composer) {
           step :notify_composers
         }
+        #:item_key end
         step :rearrange
 
-        def notify_composers(ctx, composer:, **)
-          ctx[:value] = composer.full_name
-        end
 
         # circuit-step interface! "decider interface"
         def composers_for_each(ctx, model:, **)
           model.composers
         end
-        #~meths
         include CoverMethods
         #~meths end
+        def notify_composers(ctx, composer:, **)
+          ctx[:value] = composer.full_name
+        end
       end
     end
+    #:composer end
   end # E
 
   it "{item_key: :composer}" do
