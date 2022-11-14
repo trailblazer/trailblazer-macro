@@ -55,6 +55,8 @@ module Trailblazer
       id =
         if user_proc.is_a?(Class)
           user_proc.to_s
+        elsif user_proc.instance_of?(Method)
+          "method(:#{user_proc.name})"
         else
           SecureRandom.hex(4)
         end

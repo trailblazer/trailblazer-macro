@@ -175,36 +175,6 @@ When raise:   return {Railway.fail!}
   end
 
 =begin
-Tracing with Wrap()
-=end
-  it do
-    options = { seq: [] }
-    #:trace-call
-    result  = Memo::Create.trace( options )
-    #:trace-call end
-    result.wtf.gsub("\n", "").must_match /.*Start.*model.*Wrap.*update.*rehash.*success.*notify.*success/
-=begin
-#:trace-success
-result.wtf? #=>
-|-- #<Trailblazer::Activity::Start semantic=:default>
-|-- model
-|-- Wrap/85
-|   |-- #<Trailblazer::Activity::Start semantic=:default>
-|   |-- update
-|   |-- rehash
-|   `-- #<Trailblazer::Operation::Railway::End::Success semantic=:success>
-|-- notify
-`-- #<Trailblazer::Operation::Railway::End::Success semantic=:success>
-#:trace-success end
-=end
-  end
-
-=begin
-Writing into ctx in a Wrap()
-=end
-  it { Memo::Create.( { seq: [], rehash_raise: true } )[:exception].must_equal("nope!") }
-
-=begin
 When success: return the block's returns
 When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
 =end
@@ -612,5 +582,43 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
     end
+  end
+end
+
+class WrapUnitTest < Minitest::Spec
+  class HandleUnsafeProcess
+    def self.call((ctx, flow_options), **, &block)
+      yield # calls the wrapped steps
+    end
+  end
+
+  it "assigns IDs via Macro.id_for" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      def self.my_wrap_handler((ctx, flow_options), **, &block)
+        yield # calls the wrapped steps
+      end
+
+      my_wrap_handler = ->((ctx, flow_options), **, &block) do
+        block.call # calls the wrapped steps
+      end
+
+      step Wrap(HandleUnsafeProcess) {}
+      # step Wrap(:my_wrap_handler) {} # FIXME: this doesn't work, yet.
+      step Wrap(method(:my_wrap_handler)) {}
+      step Wrap(my_wrap_handler) {}, id: "proc:my_wrap_handler"
+    end
+
+    assert_equal trace(activity, {seq: []})[0], %{TOP
+|-- Start.default
+|-- Wrap/WrapUnitTest::HandleUnsafeProcess
+|   |-- Start.default
+|   `-- End.success
+|-- Wrap/method(:my_wrap_handler)
+|   |-- Start.default
+|   `-- End.success
+|-- proc:my_wrap_handler
+|   |-- Start.default
+|   `-- End.success
+`-- End.success}
   end
 end
