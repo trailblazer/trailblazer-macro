@@ -227,6 +227,8 @@ class EachTest < Minitest::Spec
       },
       seq: "[]",
       terminus: :failure
+
+    Trailblazer::Developer.wtf?(F::Song::Activity::Cover, [{params: {id: 2}, seq: []}])
   end
 
 
@@ -234,6 +236,7 @@ class EachTest < Minitest::Spec
   module D
     class Song < B::Song; end
 
+    #:operation-class
     module Song::Activity
       class Notify < Trailblazer::Activity::Railway
         step :send_email
@@ -243,7 +246,9 @@ class EachTest < Minitest::Spec
         end
       end
     end
+    #:operation-class end
 
+    #:operation
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         step :model
@@ -257,6 +262,7 @@ class EachTest < Minitest::Spec
         #~meths end
       end
     end
+    #:operation end
   end
 
   it "Each(Activity::Railway)" do
