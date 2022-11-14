@@ -37,34 +37,31 @@ class WrapSimpleHandlerTest < Minitest::Spec
   it do
   #@ happy days
     assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
-  #@ transfer raises
+  #@ transfer returns false
     assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
       terminus: :failure
   end
 end
 
-class WrapMyRescueTest < Minitest::Spec
-  #:my_rescue
-  class MyRescue
-    def self.call((ctx, flow_options), **, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
-
-      return signal, [ctx, flow_options]
-    end
-  end
-  #:my_rescue end
+class WrapSimpleHandlerRoutesCustomTerminsTest < Minitest::Spec
+  MyTransaction = WrapSimpleHandlerTest::MyTransaction
 
   class Song
   end
 
-  #:upload
   module Song::Activity
     class Upload < Trailblazer::Activity::FastTrack
       step :model
-      step Wrap(MyRescue) {
+      #:out
+      #:out-wrap
+      step Wrap(MyTransaction) {
         step :update   # this changes the database.
-        step :transfer # this might even break!
-      }
+        step :transfer,
+          Output(:failure) => End(:timeout) # creates a third terminus.
+      },
+      #:out-wrap end
+        Output(:timeout) => Track(:fail_fast) # any wiring is possible here.
+      #:out end
       step :notify
       fail :log_error
       #~meths
@@ -72,14 +69,66 @@ class WrapMyRescueTest < Minitest::Spec
       #~meths end
     end
   end
-  #:upload end
+
+  it do
+  #@ happy days
+    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+  #@ transfer returns false
+    assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer]",
+      terminus: :fail_fast
+  #@ update returns false
+    assert_invoke Song::Activity::Upload, update: false, seq: "[:model, :update, :log_error]",
+      terminus: :failure
+  end
+end
+
+#@ handler uses rescue. Pretty sure we got identical tests below.
+class WrapMyRescueTest < Minitest::Spec
+  #:my_rescue
+  class MyRescue
+    def self.call((ctx, flow_options), **, &block)
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+
+      return signal, [ctx, flow_options]
+    rescue
+      ctx[:exception] = $!.message
+      return Trailblazer::Activity::Left, [ctx, flow_options]
+    end
+  end
+  #:my_rescue end
+
+  class Song
+  end
+
+  #:upload-rescue
+  module Song::Activity
+    class Upload < Trailblazer::Activity::FastTrack
+      step :model
+      step Wrap(MyRescue) {
+        step :update
+        step :transfer # might raise an exception.
+      }
+      step :notify
+      fail :log_error
+      #~meths
+      include T.def_steps(:model, :update, :transfer, :notify, :log_error)
+      def transfer(ctx, seq:, transfer: true, **)
+        seq << :transfer
+        raise RuntimeError.new("transfer failed") unless transfer
+        transfer
+      end
+      #~meths end
+    end
+  end
+  #:upload-rescue end
 
   it do
   #@ happy days
     assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
   #@ transfer raises
     assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
-      terminus: :failure
+      terminus: :failure,
+      expected_ctx_variables: {exception: "transfer failed"}
   end
 end
 
