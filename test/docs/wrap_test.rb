@@ -2,6 +2,87 @@ require "test_helper"
 
 # TODO: test ID properly.
 
+class WrapSimpleHandlerTest < Minitest::Spec
+  #@ yield returns a circuit-interface result set, we can return it to the flow
+  #:my_transaction
+  class MyTransaction
+    def self.call((ctx, flow_options), **, &block)
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+
+      return signal, [ctx, flow_options]
+    end
+  end
+  #:my_transaction end
+
+  class Song
+  end
+
+  #:upload
+  module Song::Activity
+    class Upload < Trailblazer::Activity::FastTrack
+      step :model
+      step Wrap(MyTransaction) {
+        step :update   # this changes the database.
+        step :transfer # this might even break!
+      }
+      step :notify
+      fail :log_error
+      #~meths
+      include T.def_steps(:model, :update, :transfer, :notify, :log_error)
+      #~meths end
+    end
+  end
+  #:upload end
+
+  it do
+  #@ happy days
+    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+  #@ transfer raises
+    assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
+      terminus: :failure
+  end
+end
+
+class WrapMyRescueTest < Minitest::Spec
+  #:my_rescue
+  class MyRescue
+    def self.call((ctx, flow_options), **, &block)
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+
+      return signal, [ctx, flow_options]
+    end
+  end
+  #:my_rescue end
+
+  class Song
+  end
+
+  #:upload
+  module Song::Activity
+    class Upload < Trailblazer::Activity::FastTrack
+      step :model
+      step Wrap(MyRescue) {
+        step :update   # this changes the database.
+        step :transfer # this might even break!
+      }
+      step :notify
+      fail :log_error
+      #~meths
+      include T.def_steps(:model, :update, :transfer, :notify, :log_error)
+      #~meths end
+    end
+  end
+  #:upload end
+
+  it do
+  #@ happy days
+    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+  #@ transfer raises
+    assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
+      terminus: :failure
+  end
+end
+
 class DocsWrapTest < Minitest::Spec
 =begin
 When success: return the block's returns
@@ -10,7 +91,8 @@ When raise:   return {Railway.fail!}
   #:wrap-handler
   class HandleUnsafeProcess
     def self.call((ctx, flow_options), *, &block)
-      yield # calls the wrapped steps
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+      return signal, [ctx, flow_options]
     rescue
       ctx[:exception] = $!.message
       [ Trailblazer::Operation::Railway.fail!, [ctx, flow_options] ]
@@ -20,7 +102,7 @@ When raise:   return {Railway.fail!}
 
   #:wrap
   class Memo::Create < Trailblazer::Operation
-    step :find_model
+    step :model
     step Wrap( HandleUnsafeProcess ) {
       step :update
       step :rehash
@@ -28,14 +110,20 @@ When raise:   return {Railway.fail!}
     step :notify
     fail :log_error
     #~methods
-    include T.def_steps(:find_model, :update, :notify, :log_error)
+    include T.def_steps(:model, :update, :notify, :log_error)
     include Rehash
     #~methods end
   end
   #:wrap end
 
-  it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-  it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
+  it do
+  #@ happy days
+    assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]"
+  #@ rehash raises
+    assert_invoke Memo::Create, rehash_raise: true, seq: "[:model, :update, :rehash, :log_error]",
+      terminus: :failure,
+      expected_ctx_variables: {exception: "nope!"}
+  end
 
 =begin
 Tracing with Wrap()
@@ -45,12 +133,12 @@ Tracing with Wrap()
     #:trace-call
     result  = Memo::Create.trace( options )
     #:trace-call end
-    result.wtf.gsub("\n", "").must_match /.*Start.*find_model.*Wrap.*update.*rehash.*success.*notify.*success/
+    result.wtf.gsub("\n", "").must_match /.*Start.*model.*Wrap.*update.*rehash.*success.*notify.*success/
 =begin
 #:trace-success
 result.wtf? #=>
 |-- #<Trailblazer::Activity::Start semantic=:default>
-|-- find_model
+|-- model
 |-- Wrap/85
 |   |-- #<Trailblazer::Activity::Start semantic=:default>
 |   |-- update
@@ -83,7 +171,7 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
         end
       end
 
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -92,13 +180,13 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       fail :log_error
 
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
   end
 
 =begin
@@ -120,7 +208,7 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 
     #:fail-fast
     class Memo::Create < Trailblazer::Operation
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -128,14 +216,14 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
     #:fail-fast end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
   end
 
 =begin
@@ -159,7 +247,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
 
     #:custom
     class Memo::Create < Trailblazer::Operation
-      step :find_model
+      step :model
       step Wrap( MyTransaction ) {
         step :update
         step :rehash
@@ -169,7 +257,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
@@ -177,13 +265,13 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
 
     it do
       result = Memo::Create.( { seq: [] } )
-      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >}
+      result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:transaction_worked>}
     end
 
     it do
       result = Memo::Create.( { seq: [], rehash_raise: true } )
-      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash]] >}
+      result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:transaction_failed>}
     end
   end
@@ -204,7 +292,7 @@ When raise:   return {Railway.pass!} and go "successful"
         end
       end
 
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -213,13 +301,13 @@ When raise:   return {Railway.pass!} and go "successful"
       fail :log_error
 
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
   end
 
 =begin
@@ -239,7 +327,7 @@ You can return boolean true in wrap.
         end
       end
 
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -248,14 +336,14 @@ You can return boolean true in wrap.
       fail :log_error
 
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: true } )
-      result.inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >}
+      result.inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
     end
   end
@@ -277,7 +365,7 @@ You can return boolean false in wrap.
         end
       end
 
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -286,14 +374,14 @@ You can return boolean false in wrap.
       fail :log_error
 
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: true } )
-      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >}
+      result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
   end
@@ -315,7 +403,7 @@ You can return nil in wrap.
         end
       end
 
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
         step :rehash
@@ -324,14 +412,14 @@ You can return nil in wrap.
       fail :log_error
 
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
     it "translates nil returned form a wrap to a signal with a `failure` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: true } )
-      result.inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >}
+      result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
   end
@@ -362,7 +450,7 @@ This one is mostly to show how one could wrap steps in a transaction
 
     #:transaction
     class Memo::Create < Trailblazer::Operation
-      step :find_model
+      step :model
       step Wrap( MyTransaction ) {
         step :update
         step :rehash
@@ -370,14 +458,14 @@ This one is mostly to show how one could wrap steps in a transaction
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
       #~methods end
     end
     #:transaction end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >} }
   end
 
 =begin
@@ -404,20 +492,20 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
 
     #:transaction
     class Memo::Create < Trailblazer::Operation
-      step :find_model
+      step :model
       step Wrap( HandleUnsafeProcess ) {
         step :update
       }, fast_track: true # because Wrap can return pass_fast! now
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:model, :update, :notify, :log_error)
       #~methods end
     end
     #:transaction end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update]] >} }
-    it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :log_error]] >} }
+    it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update]] >} }
+    it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :log_error]] >} }
   end
 
 
@@ -434,7 +522,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
       end
 
       class Upload < Trailblazer::Activity::FastTrack
-        step :find_model
+        step :model
         step Wrap(HandleUnsafeProcess) {
           step :send_request,
             Output(:failure) => End(:timeout__) # adds a terminus {End.timeout}
@@ -444,22 +532,22 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
         step :upload
         fail :log_error
         #~methods
-        include T.def_steps(:find_model, :send_request, :upload, :log_error)
+        include T.def_steps(:model, :send_request, :upload, :log_error)
         #~methods end
       end
     end
 
     it do
     #@ success path
-      assert_invoke Song::Activity::Upload, seq: "[:find_model, :send_request, :upload]"
+      assert_invoke Song::Activity::Upload, seq: "[:model, :send_request, :upload]"
     #@ we travel through {:timeout}
-      assert_invoke Song::Activity::Upload, send_request: false, seq: "[:find_model, :send_request]", terminus: :fail_fast
+      assert_invoke Song::Activity::Upload, send_request: false, seq: "[:model, :send_request]", terminus: :fail_fast
     end
 
     it "tracing" do
       assert_equal trace(Song::Activity::Upload, {seq: []})[0], %{TOP
 |-- Start.default
-|-- find_model
+|-- model
 |-- Wrap/DocsWrapTest::WrapOperationWithCustomTerminus::Song::Activity::HandleUnsafeProcess
 |   |-- Start.default
 |   |-- send_request
