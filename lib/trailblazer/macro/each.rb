@@ -25,7 +25,7 @@ module Trailblazer
           signal  = @success_terminus
 
           collected_values = []
-
+# raise "implement :value collecting per default "
           # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
           dataset.each_with_index do |element, index|
             # This new {inner_ctx} will be disposed of after invoking the item activity.
@@ -92,9 +92,19 @@ module Trailblazer
 
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", **dsl_options_for_iterated, &block)
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", collect: false, **dsl_options_for_iterated, &block)
 
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
+
+
+      collect_options = { # TODO: constant
+        Activity::Railway.In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
+        Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
+        # Out(:collected_from_each) => :add
+        Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+      }
+      collect_options = {} unless collect # FIXME: horrible code haha
+
 
       # returns {:collected_from_each}
       circuit = Trailblazer::Macro::Each::Circuit.new(
@@ -114,7 +124,8 @@ module Trailblazer
           each:         true, # mark this activity for {compute_runtime_id}.
           wrap_static:  task_wrap_for_iterated(
             Activity::Railway.Out() => [], # per default, don't let anything out.
-            **dsl_options_for_iterated
+            **collect_options,
+            **dsl_options_for_iterated,
           ), # In/Out per iteration
         )
       )
@@ -149,13 +160,16 @@ module Trailblazer
       each_activity.step Activity::Railway.Subprocess(iterate_activity, strict: true),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
 
-      Activity::Railway.Subprocess(each_activity).merge(
-        id: id,
-        # Activity::Railway.Out() => [:collected_from_each], # TODO: allow renaming without leaking {:collected_from_each} as well.
-
+      dataset_from_options = {}
+      dataset_from_options = { # FIXME: constant
         Activity::Railway.In() => ->(ctx, **) { ctx }, # FIXME: FUCK THIS. implement {always: true}
         Activity::Railway.Inject(:dataset, always: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
 
+      } if dataset_from
+
+      Activity::Railway.Subprocess(each_activity).merge(
+        id: id,
+        **dataset_from_options,
       )
     end
 

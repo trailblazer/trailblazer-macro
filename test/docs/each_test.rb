@@ -34,7 +34,7 @@ class EachTest < Minitest::Spec
       class Cover < Trailblazer::Activity::Railway
         step :model
         #:each-dataset
-        step Each(dataset_from: :composers_for_each) {
+        step Each(dataset_from: :composers_for_each, collect: true) {
           step :notify_composers
         }
         #:each-dataset end
@@ -110,7 +110,7 @@ class EachTest < Minitest::Spec
       class Cover < Trailblazer::Activity::Railway
         step :model
         step :find_composers
-        step Each() {
+        step Each(collect: true) {
             step :notify_composers
         }, In() => {:composers => :dataset}
         step :rearrange
@@ -156,7 +156,7 @@ class EachTest < Minitest::Spec
         #~meths
         step :model
         #:item_key
-        step Each(dataset_from: :composers_for_each, item_key: :composer) {
+        step Each(dataset_from: :composers_for_each, item_key: :composer, collect: true) {
           step :notify_composers
         }
         #:item_key end
@@ -200,7 +200,7 @@ class EachTest < Minitest::Spec
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         step :model
-        step Each(dataset_from: :composers_for_each) {
+        step Each(dataset_from: :composers_for_each, collect: true) {
           step :notify_composers
         }
         step :rearrange
@@ -258,7 +258,7 @@ class EachTest < Minitest::Spec
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         step :model
-        step Each(Notify, dataset_from: :composers_for_each)
+        step Each(Notify, dataset_from: :composers_for_each, collect: true)
         step :rearrange
         #~meths
         def composers_for_each(ctx, model:, **)
@@ -305,7 +305,7 @@ class EachTest < Minitest::Spec
         terminus :spam_alert
 
         step :model
-        step Each(Notify, dataset_from: :composers_for_each),
+        step Each(Notify, dataset_from: :composers_for_each, collect: true),
           Output(:spam_email) => Track(:spam_alert)
         step :rearrange
         #~meths
@@ -393,7 +393,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "Each::Circuit" do
-    activity = Trailblazer::Macro.Each(&DocsEachUnitTest.block)[:task]
+    activity = Trailblazer::Macro.Each(collect: true, &DocsEachUnitTest.block)[:task]
 
     my_exec_context = Class.new do
       include ComputeItem
@@ -413,7 +413,7 @@ class DocsEachUnitTest < Minitest::Spec
     activity = Class.new(Trailblazer::Activity::Railway) do
       include ComputeItem
 
-      step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
+      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item
       }
     end
@@ -429,7 +429,7 @@ class DocsEachUnitTest < Minitest::Spec
         ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
       end
 
-      step Each() { # expects {:dataset}
+      step Each(collect: true) { # expects {:dataset}
         step :compute_item_with_current_user
       }
     end
@@ -447,7 +447,7 @@ class DocsEachUnitTest < Minitest::Spec
 
   it "allows taskWrap in Each" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each() { # expects {:dataset} # NOTE: use {} not {do ... end}
+      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
       }
 
@@ -469,7 +469,7 @@ class DocsEachUnitTest < Minitest::Spec
     end
 
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each(nested_activity)  # expects {:dataset}
+      step Each(nested_activity, collect: true)  # expects {:dataset}
     end
     # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
 
@@ -481,7 +481,7 @@ class DocsEachUnitTest < Minitest::Spec
       include T.def_steps(:a, :b)
       include ComputeItem
 
-      step Each(&DocsEachUnitTest.block), id: "Each/1"
+      step Each(collect: true, &DocsEachUnitTest.block), id: "Each/1"
       step :b
       def b(ctx, seq:, index:, **)
         ctx[:seq] = seq + [index]
@@ -496,7 +496,7 @@ class DocsEachUnitTest < Minitest::Spec
 
   it "stops iterating when failure" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each() {
+      step Each(collect: true) {
         step :check
       }
       step :a
