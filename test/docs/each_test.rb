@@ -96,6 +96,12 @@ class EachTest < Minitest::Spec
     include T.def_steps(:rearrange)
   end
 
+  module ComposersForEach
+    def composers_for_each(ctx, model:, **)
+      model.composers
+    end
+  end
+
 #@ operation has dedicated step {#find_composers}
   module C
     class Song < B::Song; end
@@ -521,5 +527,136 @@ class DocsEachUnitTest < Minitest::Spec
       expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
       seq: "[]",
       terminus: :failure
+  end
+end
+
+#@ Iteration doesn't add anything to ctx.
+class EachCtxDiscardedTest < Minitest::Spec
+  Composer  = EachTest::Composer
+  Song      = Class.new(EachTest::B::Song)
+
+#@ iterated steps write to ctx, gets discarded.
+  module Song::Activity
+    class Cover < Trailblazer::Activity::Railway
+      step :model
+      step Each(dataset_from: :composers_for_each) {
+        step :notify_composers
+        step :write_to_ctx
+      }
+      step :rearrange
+
+      def write_to_ctx(ctx, index:, seq:, **)
+        seq << :write_to_ctx
+
+        ctx[:variable] = index
+      end
+
+      #~meths
+      include EachTest::CoverMethods
+      include EachTest::ComposersForEach
+      #~meths end
+    end
+  end
+
+  it "discards {ctx[:variable]}" do
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: Song.find_by(id: 1),
+        # collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+      },
+      seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
+  end
+end
+
+# We add {:collected_from_each}
+class EachCtxAddsCollectedFromEachTest < Minitest::Spec
+  Composer  = EachTest::Composer
+  Song      = Class.new(EachTest::B::Song)
+
+  module Song::Activity
+    class Cover < Trailblazer::Activity::Railway
+      step :model
+      step Each(dataset_from: :composers_for_each,
+
+        # all filters called before/after each iteration!
+        In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
+        Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
+        # Out(:collected_from_each) => :add
+        Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+
+
+
+      ) {
+        step :notify_composers
+        step :write_to_ctx
+      }
+      step :rearrange
+
+      def write_to_ctx(ctx, index:, seq:, item:, **)
+        seq << :write_to_ctx
+
+        ctx[:value] = [index, item.full_name]
+      end
+
+      #~meths
+      include EachTest::CoverMethods
+      include EachTest::ComposersForEach
+      #~meths end
+    end
+  end
+
+  it "provides {:collected_from_each}" do
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: Song.find_by(id: 1),
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+      },
+      seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
+  end
+end
+
+class EachCtxInOutTest < Minitest::Spec
+  Composer  = EachTest::Composer
+  Song      = Class.new(EachTest::B::Song)
+
+  module Song::Activity
+    class Cover < Trailblazer::Activity::Railway
+      step :model
+      step Each(dataset_from: :composers_for_each,
+        # Inject(always: true) => {
+        In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
+        Inject(:composer_index) => ->(ctx, index:, **) { index },
+        # all filters called before/after each iteration!
+        Out() => ->(ctx, index:, variable:, **) { {"composer-#{index}-value" => variable} }
+
+
+
+
+
+      ) {
+        step :notify_composers
+        step :write_to_ctx
+      }
+      step :rearrange
+
+      def write_to_ctx(ctx, composer_index:, model:, **)
+        ctx[:variable] = "#{composer_index} + #{model.class}"
+      end
+
+      #~meths
+      include EachTest::CoverMethods
+      include EachTest::ComposersForEach
+      #~meths end
+    end
+  end
+
+  it "discards {ctx[:variable]}" do
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: Song.find_by(id: 1),
+        "composer-0-value" => "0 + EachTest::B::Song",
+        "composer-1-value" => "1 + EachTest::B::Song",
+      },
+      seq: "[:rearrange]"
   end
 end
