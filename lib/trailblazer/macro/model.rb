@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
 
     def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
-      task = Activity::TaskBuilder::Binary(Model.new)
+      task = Activity::Circuit::TaskAdapter.for_step(Model.new)
 
       injections = {
         Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.

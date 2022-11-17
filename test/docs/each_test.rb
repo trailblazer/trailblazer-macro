@@ -530,7 +530,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 end
 
-#@ Iteration doesn't add anything to ctx.
+#@ Iteration doesn't add anything to ctx when {collect: false}.
 class EachCtxDiscardedTest < Minitest::Spec
   Composer  = EachTest::Composer
   Song      = Class.new(EachTest::B::Song)
@@ -568,7 +568,7 @@ class EachCtxDiscardedTest < Minitest::Spec
   end
 end
 
-# We add {:collected_from_each}
+# We add {:collected_from_each} ourselves.
 class EachCtxAddsCollectedFromEachTest < Minitest::Spec
   Composer  = EachTest::Composer
   Song      = Class.new(EachTest::B::Song)
