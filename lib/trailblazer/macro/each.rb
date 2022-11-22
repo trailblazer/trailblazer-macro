@@ -52,10 +52,8 @@ module Trailblazer
 
             #
             # {returned_ctx} at this point has Each(..., In => Out =>) applied!
-            #
+            #   Without configuration, this means {returned_ctx} is empty.
 
-# TODO: decompose ctx
-            # collected_values << returned_ctx[:value] # {:value} is guaranteed to be returned.
 
             # DISCUSS: this is what usually happens in Out().
             outer_ctx, mutable_ctx = returned_ctx.decompose
@@ -119,6 +117,7 @@ module Trailblazer
         # nodes
         [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
         # config
+        # This taskWrap applies to every iterated activity.
         Trailblazer::Activity::TaskWrap.container_activity_for(
           block_activity,
           each:         true, # mark this activity for {compute_runtime_id}.

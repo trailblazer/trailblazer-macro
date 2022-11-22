@@ -539,17 +539,23 @@ class EachCtxDiscardedTest < Minitest::Spec
   module Song::Activity
     class Cover < Trailblazer::Activity::Railway
       step :model
+      #:write_to_ctx
       step Each(dataset_from: :composers_for_each) {
         step :notify_composers
         step :write_to_ctx
       }
+      #:write_to_ctx end
       step :rearrange
 
+      #:write
       def write_to_ctx(ctx, index:, seq:, **)
+        #~meths
         seq << :write_to_ctx
 
-        ctx[:variable] = index
+        #~meths end
+        ctx[:variable] = index # this is discarded!
       end
+      #:write end
 
       #~meths
       include EachTest::CoverMethods
@@ -615,6 +621,8 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
   end
 end
 
+#@ You can use Inject() to compute new variables.
+#@ and Out() to compute what goes into the iterated {ctx}.
 class EachCtxInOutTest < Minitest::Spec
   Composer  = EachTest::Composer
   Song      = Class.new(EachTest::B::Song)
@@ -659,4 +667,52 @@ class EachCtxInOutTest < Minitest::Spec
       },
       seq: "[:rearrange]"
   end
+end
+
+class EachOuterCtxTest < Minitest::Spec
+
+end
+
+
+#@ {:errors} is first initialized with a default injection,
+#@ then passed across iterations.
+# TODO: similar test above with {:collected_from_each}.
+class EachSharedIterationVariableTest < Minitest::Spec
+  Song      = Class.new(EachTest::B::Song)
+
+  #:inject
+  module Song::Activity
+    class Cover < Trailblazer::Activity::Railway
+      step :model
+      step Each(dataset_from: :composers_for_each,
+        # Inject(always: true) => {
+        In() => ->(ctx, **) { ctx }, # FIXME: this will be removed soon
+        Inject(:messages) => ->(*) { {} },
+
+        # all filters called before/after each iteration!
+        Out() => [:messages]
+      ) {
+        step :write_to_ctx
+      }
+      step :rearrange
+
+      def write_to_ctx(ctx, item:, messages:, index:, **)
+        ctx[:messages] = messages.merge(index => item.full_name)
+      end
+      #~meths
+      include EachTest::CoverMethods
+      include EachTest::ComposersForEach
+      #~meths end
+    end
+  end
+  #:inject end
+
+  it "passes {ctx[:messages]} across iterations and makes it grow" do
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: Song.find_by(id: 1),
+        messages: {0=>"Fat Mike", 1=>"El Hefe"}},
+      seq: "[:rearrange]"
+  end
+
 end
