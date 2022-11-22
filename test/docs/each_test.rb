@@ -13,6 +13,17 @@ class EachTest < Minitest::Spec
   class Composer < Struct.new(:full_name, :email)
   end
 
+  class Mailer
+    def self.send(**options)
+      @send_options ||= []
+      @send_options << options
+    end
+
+    class << self
+      attr_reader :send_options
+    end
+  end
+
 #@ operation has {#composers_for_each}
   module B
     class Song < Struct.new(:id, :title, :band, :composers)
@@ -41,17 +52,14 @@ class EachTest < Minitest::Spec
         step :rearrange
 
         # "decider interface"
-        #:dataset_from
         def composers_for_each(ctx, model:, **)
           model.composers
         end
-        #:dataset_from end
 
-        #:iterated
         def notify_composers(ctx, index:, item:, **)
           ctx[:value] = [index, item.full_name]
         end
-        #:iterated end
+
         #~meths
         def model(ctx, params:, **)
           ctx[:model] = Song.find_by(id: params[:id])
@@ -150,13 +158,15 @@ class EachTest < Minitest::Spec
   module E
     class Song < B::Song; end
 
+    Mailer = Class.new(EachTest::Mailer)
+
     #:composer
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         #~meths
         step :model
         #:item_key
-        step Each(dataset_from: :composers_for_each, item_key: :composer, collect: true) {
+        step Each(dataset_from: :composers_for_each, item_key: :composer) {
           step :notify_composers
         }
         #:item_key end
@@ -169,8 +179,8 @@ class EachTest < Minitest::Spec
         end
         include CoverMethods
         #~meths end
-        def notify_composers(ctx, composer:, **)
-          ctx[:value] = composer.full_name
+        def notify_composers(ctx, index:, composer:, **)
+          Mailer.send(to: composer.email, message: "#{index}) You, #{composer.full_name}, have been warned about your song being copied.")
         end
       end
     end
@@ -181,9 +191,10 @@ class EachTest < Minitest::Spec
     assert_invoke E::Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
-        collected_from_each: ["Fat Mike", "El Hefe"]
+        # collected_from_each: ["Fat Mike", "El Hefe"]
       },
       seq: "[:rearrange]"
+    assert_equal E::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
 
 #@ failure in Each
@@ -241,6 +252,7 @@ class EachTest < Minitest::Spec
 #@ Each with operation
   module D
     class Song < B::Song; end
+    Mailer = Class.new(EachTest::Mailer)
 
     #:operation-class
     module Song::Activity
@@ -248,7 +260,7 @@ class EachTest < Minitest::Spec
         step :send_email
 
         def send_email(ctx, index:, item:, **)
-          ctx[:value] = [index, item.full_name]
+          Mailer.send(to: item.email, message: "#{index}) You, #{item.full_name}, have been warned about your song being copied.")
         end
       end
     end
@@ -258,7 +270,7 @@ class EachTest < Minitest::Spec
     module Song::Activity
       class Cover < Trailblazer::Activity::Railway
         step :model
-        step Each(Notify, dataset_from: :composers_for_each, collect: true)
+        step Each(Notify, dataset_from: :composers_for_each)
         step :rearrange
         #~meths
         def composers_for_each(ctx, model:, **)
@@ -276,8 +288,9 @@ class EachTest < Minitest::Spec
       seq:                    "[:rearrange]",
       expected_ctx_variables: {
         model:                D::Song.find_by(id: 1),
-        collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
+        # collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
       }
+    assert_equal D::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
 
 #@ Each with operation with three outcomes. Notify terminates on {End.spam_email},
@@ -715,4 +728,56 @@ class EachSharedIterationVariableTest < Minitest::Spec
       seq: "[:rearrange]"
   end
 
+end
+
+#@ Each without any option
+class EachPureTest < Minitest::Spec
+  Song      = Class.new(EachTest::B::Song)
+
+  Mailer = Class.new(EachTest::Mailer)
+
+  #:each-pure
+  module Song::Activity
+    class Cover < Trailblazer::Activity::Railway
+      step :model
+      #:each-pure-macro
+      step Each(dataset_from: :composers_for_each) {
+        step :notify_composers
+      }
+      #:each-pure-macro end
+      step :rearrange
+
+      # "decider interface"
+      #:dataset_from
+      def composers_for_each(ctx, model:, **)
+        model.composers
+      end
+      #:dataset_from end
+
+      #:iterated
+      def notify_composers(ctx, index:, item:, **)
+        Mailer.send(to: item.email, message: "#{index}) You, #{item.full_name}, have been warned about your song being copied.")
+      end
+      #:iterated end
+      #~meths
+      def model(ctx, params:, **)
+        ctx[:model] = Song.find_by(id: params[:id])
+      end
+
+      include T.def_steps(:rearrange)
+      #~meths end
+    end
+  end
+  #:each-pure end
+
+  it "allows a dataset compute in the hosting activity" do
+  #@ {:dataset} is not part of the {ctx}.
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+        model: Song.find_by(id: 1),
+      },
+      seq: "[:rearrange]"
+
+    assert_equal Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
+  end
 end
