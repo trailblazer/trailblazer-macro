@@ -621,4 +621,24 @@ class WrapUnitTest < Minitest::Spec
 |   `-- End.success
 `-- End.success}
   end
+
+  it "complies with Introspect API" do
+    class MyValidation < Trailblazer::Activity::Railway
+      step :validate
+      include T.def_steps(:validate)
+    end
+
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Wrap(HandleUnsafeProcess) {
+        step Subprocess(MyValidation), id: :validation
+      }
+    end
+
+    # FIXME: TaskMap.find_by_id
+    wrapped         = Trailblazer::Activity::Introspect.TaskMap(activity).to_a[1][0] # HandleUnsafeProcess
+    block_activity  = Trailblazer::Activity::Introspect.TaskMap(wrapped).to_a[0][0] # block_activity inside Wrap
+    validation      = Trailblazer::Activity::Introspect.TaskMap(block_activity).to_a[1][0] # MyValidation
+
+    assert_equal validation, MyValidation
+  end
 end

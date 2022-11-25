@@ -77,6 +77,13 @@ module Trailblazer
 
           return signal, [ctx, flow_options]
         end
+
+        def to_h
+          {
+            # activity: @block_activity,
+            nodes: [Trailblazer::Activity::NodeAttributes.new(:block_activity, nil, @block_activity)]
+          }
+        end
       end
     end # Wrap
   end
