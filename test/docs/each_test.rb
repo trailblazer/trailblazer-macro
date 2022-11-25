@@ -598,9 +598,7 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
       step Each(dataset_from: :composers_for_each,
 
         # all filters called before/after each iteration!
-        In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
         Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        # Out(:collected_from_each) => :add
         Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
 
 
@@ -645,7 +643,6 @@ class EachCtxInOutTest < Minitest::Spec
       step :model
       step Each(dataset_from: :composers_for_each,
         # Inject(always: true) => {
-        In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
         Inject(:composer_index) => ->(ctx, index:, **) { index },
         # all filters called before/after each iteration!
         Out() => ->(ctx, index:, variable:, **) { {"composer-#{index}-value" => variable} }
@@ -698,8 +695,6 @@ class EachSharedIterationVariableTest < Minitest::Spec
     class Cover < Trailblazer::Activity::Railway
       step :model
       step Each(dataset_from: :composers_for_each,
-        # Inject(always: true) => {
-        In() => ->(ctx, **) { ctx }, # FIXME: this will be removed soon
         Inject(:messages) => ->(*) { {} },
 
         # all filters called before/after each iteration!

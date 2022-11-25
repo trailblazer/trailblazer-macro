@@ -96,9 +96,7 @@ module Trailblazer
 
 
       collect_options = { # TODO: constant
-        Activity::Railway.In() => ->(ctx, **) { ctx }, # FIXME: ignore this, Richard!
         Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        # Out(:collected_from_each) => :add
         Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
       }
       collect_options = {} unless collect # FIXME: horrible code haha
@@ -161,7 +159,6 @@ module Trailblazer
 
       dataset_from_options = {}
       dataset_from_options = { # FIXME: constant
-        Activity::Railway.In() => ->(ctx, **) { ctx }, # FIXME: FUCK THIS. implement {always: true}
         Activity::Railway.Inject(:dataset, always: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
 
       } if dataset_from
