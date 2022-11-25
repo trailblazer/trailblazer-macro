@@ -634,11 +634,19 @@ class WrapUnitTest < Minitest::Spec
       }
     end
 
-    # FIXME: TaskMap.find_by_id
-    wrapped         = Trailblazer::Activity::Introspect.TaskMap(activity).to_a[1][0] # HandleUnsafeProcess
-    block_activity  = Trailblazer::Activity::Introspect.TaskMap(wrapped).to_a[0][0] # block_activity inside Wrap
-    validation      = Trailblazer::Activity::Introspect.TaskMap(block_activity).to_a[1][0] # MyValidation
+    mock_validation = ->(ctx, seq:, **) { ctx[:seq] = seq + [:mock_validation] }
 
-    assert_equal validation, MyValidation
+
+    # new_railway = Trailblazer::Activity::DSL::Linear::Patch.customize(
+    #   activity,
+    #   options: {
+    #     ["Wrap/WrapUnitTest::HandleUnsafeProcess"] => ->(*) { step mock_validation, replace: :validation, id: :validation }
+    #   }
+    # )
+
+    block_activity  = Trailblazer::Activity::Introspect.TaskMap(activity).find_by_id("Wrap/WrapUnitTest::HandleUnsafeProcess")
+    validation      = Trailblazer::Activity::Introspect.TaskMap(block_activity.task).find_by_id(:validation)
+
+    assert_equal validation.task, MyValidation
   end
 end

@@ -79,10 +79,7 @@ module Trailblazer
         end
 
         def to_h
-          {
-            # activity: @block_activity,
-            nodes: [Trailblazer::Activity::NodeAttributes.new(:block_activity, nil, @block_activity)]
-          }
+          @block_activity.to_h
         end
       end
     end # Wrap
