@@ -2,17 +2,19 @@ require "test_helper"
 
 # TODO: test ID properly.
 
-class WrapSimpleHandlerTest < Minitest::Spec
   #@ yield returns a circuit-interface result set, we can return it to the flow
-  #:my_transaction
-  class MyTransaction
-    def self.call((ctx, flow_options), **, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
+#:my_transaction
+class MyTransaction
+  def self.call((ctx, flow_options), **, &block)
+    signal, (ctx, flow_options) = yield # calls the wrapped steps
 
-      return signal, [ctx, flow_options]
-    end
+    return signal, [ctx, flow_options]
   end
-  #:my_transaction end
+end
+#:my_transaction end
+
+class WrapSimpleHandlerTest < Minitest::Spec
+  MyTransaction = ::MyTransaction
 
   class Song
   end
@@ -652,5 +654,25 @@ class WrapUnitTest < Minitest::Spec
 
     #@ the patched version only runs {mock_validation}.
     assert_invoke patched_activity, seq: %{[:mock_validation]}
+  end
+end
+
+class WrapPatchTest < Minitest::Spec
+  # MyTransaction = WrapSimpleHandlerTest::MyTransaction
+  Song          = WrapSimpleHandlerTest::Song
+
+  it do
+    #:patch
+    upload_with_upsert = Trailblazer::Activity::DSL::Linear.Patch(
+      Song::Activity::Upload,
+      ["Wrap/MyTransaction"] => -> { step :upsert, replace: :update }
+    )
+    #:patch end
+    upload_with_upsert.include(T.def_steps(:upsert))
+
+  #@ Original class isn't changed.
+    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+  #@ Patched class runs
+    assert_invoke upload_with_upsert, seq: "[:model, :upsert, :transfer, :notify]"
   end
 end
