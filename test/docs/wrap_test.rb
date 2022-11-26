@@ -622,7 +622,7 @@ class WrapUnitTest < Minitest::Spec
 `-- End.success}
   end
 
-  it "complies with Introspect API" do
+  it "complies with Introspect API/Patch API" do
     class MyValidation < Trailblazer::Activity::Railway
       step :validate
       include T.def_steps(:validate)
@@ -636,17 +636,21 @@ class WrapUnitTest < Minitest::Spec
 
     mock_validation = ->(ctx, seq:, **) { ctx[:seq] = seq + [:mock_validation] }
 
+    #@ Introspect::TaskMap  interface
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
+      ["Wrap/WrapUnitTest::HandleUnsafeProcess", :validation, :validate])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=validate>}
 
-    # new_railway = Trailblazer::Activity::DSL::Linear::Patch.customize(
-    #   activity,
-    #   options: {
-    #     ["Wrap/WrapUnitTest::HandleUnsafeProcess"] => ->(*) { step mock_validation, replace: :validation, id: :validation }
-    #   }
-    # )
+    #@ Patch interface
+    patched_activity = Trailblazer::Activity::DSL::Linear.Patch(
+      activity,
+      ["Wrap/WrapUnitTest::HandleUnsafeProcess"] => -> { step mock_validation, replace: :validation, id: :validation }
+    )
 
-    block_activity  = Trailblazer::Activity::Introspect.TaskMap(activity).find_by_id("Wrap/WrapUnitTest::HandleUnsafeProcess")
-    validation      = Trailblazer::Activity::Introspect.TaskMap(block_activity.task).find_by_id(:validation)
+    #@ the original activity with Wrap is unchanged.
+    assert_invoke activity, seq: %{[:validate]}
 
-    assert_equal validation.task, MyValidation
+    #@ the patched version only runs {mock_validation}.
+    assert_invoke patched_activity, seq: %{[:mock_validation]}
   end
 end
