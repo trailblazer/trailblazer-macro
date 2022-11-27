@@ -786,12 +786,14 @@ class EachIDTest < Minitest::Spec
       step Each() {}
       step Each(Validate)
       step Each() {}, id: "Each-1"
+      step Each(dataset_from: :composers_for_each) {}
     end
 
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id, "Each/EachIDTest::Validate"
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
 
-    assert_match /Each\/\d+/, Trailblazer::Activity::Introspect::TaskMap(activity).values[1].id
+    assert_match /Each\/\w+/, Trailblazer::Activity::Introspect::TaskMap(activity).values[1].id
   end
 end
 
@@ -800,17 +802,27 @@ class EachStrategyComplianceTest < Minitest::Spec
 
   it do
     #:patch
-    upload_with_upsert = Trailblazer::Activity::DSL::Linear.Patch(
+    cover_patched = Trailblazer::Activity::DSL::Linear.Patch(
       Song::Activity::Cover,
-      ["Wrap/MyTransaction"] => -> { step :upsert, replace: :update }
+      ["Each/composers_for_each", "Each.iterate.block"] => -> { step :log_email }
     )
     #:patch end
-    upload_with_upsert.include(T.def_steps(:upsert))
+    cover_patched.include(T.def_steps(:log_email, :notify_composers))
 
   #@ Original class isn't changed.
-    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+    assert_invoke Song::Activity::Cover, params: {id: 1},
+      expected_ctx_variables: {
+          model: Song.find_by(id: 1),
+        },
+      seq: "[:rearrange]"
+
   #@ Patched class runs
-    assert_invoke upload_with_upsert, seq: "[:model, :upsert, :transfer, :notify]"
+  # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
+    assert_invoke cover_patched, params: {id: 1},
+      expected_ctx_variables: {
+          model: Song.find_by(id: 1),
+        },
+      seq: "[:notify_composers, :log_email, :rearrange]"
   end
 
   it "find_path" do

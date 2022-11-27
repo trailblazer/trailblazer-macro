@@ -62,14 +62,14 @@ module Trailblazer
       return block_activity, block_activity.to_h[:outputs]
     end
 
-    def self.id_for(user_proc, macro:)
+    def self.id_for(user_proc, macro:, hint: nil)
       id =
         if user_proc.is_a?(Class)
           user_proc.to_s
         elsif user_proc.instance_of?(Method)
           "method(:#{user_proc.name})"
         else
-          SecureRandom.hex(4)
+          hint || rand(4)
         end
 
       "#{macro}/#{id}"

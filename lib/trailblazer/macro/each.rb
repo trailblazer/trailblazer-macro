@@ -90,7 +90,7 @@ module Trailblazer
 
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each), collect: false, **dsl_options_for_iterated, &block)
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
 
 
@@ -157,8 +157,8 @@ module Trailblazer
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
 
       dataset_from_options = {}
-      dataset_from_options = { # FIXME: constant
-        Activity::Railway.Inject(:dataset, always: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
+      dataset_from_options = {
+        Activity::Railway.Inject(:dataset) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
 
       } if dataset_from
 
