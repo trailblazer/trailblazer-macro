@@ -610,6 +610,14 @@ class WrapUnitTest < Minitest::Spec
       step Wrap(my_wrap_handler) {}, id: "proc:my_wrap_handler"
     end
 
+    [
+      "Wrap/WrapUnitTest::HandleUnsafeProcess",
+      "Wrap/method(:my_wrap_handler)",
+      "proc:my_wrap_handler"
+    ].each do |id|
+      assert_equal Trailblazer::Developer::Introspect.find_path(activity, [id])[0].id, id
+    end
+
     assert_equal trace(activity, {seq: []})[0], %{TOP
 |-- Start.default
 |-- Wrap/WrapUnitTest::HandleUnsafeProcess
@@ -657,9 +665,8 @@ class WrapUnitTest < Minitest::Spec
   end
 end
 
-class WrapPatchTest < Minitest::Spec
-  # MyTransaction = WrapSimpleHandlerTest::MyTransaction
-  Song          = WrapSimpleHandlerTest::Song
+class WrapComplianceTest < Minitest::Spec
+  Song = WrapSimpleHandlerTest::Song
 
   it do
     #:patch
@@ -674,5 +681,24 @@ class WrapPatchTest < Minitest::Spec
     assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
   #@ Patched class runs
     assert_invoke upload_with_upsert, seq: "[:model, :upsert, :transfer, :notify]"
+  end
+
+  it "find_path" do
+    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Upload,
+      ["Wrap/MyTransaction", :transfer])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=transfer>}
+
+=begin
+#:find_path
+node, _ = Trailblazer::Developer::Introspect.find_path(
+  Song::Activity::Upload,
+  ["Wrap/MyTransaction", :transfer])
+#=> #<Node ...>
+#:find_path end
+=end
+  end
+
+  it "tracing" do
+    # Trailblazer::Developer.wtf?(Song::Activity::Upload, {seq: []})
   end
 end
