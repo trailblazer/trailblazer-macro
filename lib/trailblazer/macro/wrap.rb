@@ -3,7 +3,6 @@ require 'securerandom'
 module Trailblazer
   module Macro
     # TODO: {user_wrap}: rename to {wrap_handler}.
-
     def self.Wrap(user_wrap, id: Macro.id_for(user_wrap, macro: :Wrap), &block)
       user_wrap = Wrap.deprecate_positional_wrap_signature(user_wrap)
 
@@ -31,7 +30,7 @@ module Trailblazer
       )
 
       task = Class.new(Wrap) do
-        extend Macro::State # now, the Wrap subclass can inherit its state and copy the {block_activity}.
+        extend Macro::Strategy::State # now, the Wrap subclass can inherit its state and copy the {block_activity}.
         initialize!(state)
       end
       # DISCUSS: unfortunately, Ruby doesn't allow to set this during {Class.new}.
@@ -45,12 +44,7 @@ module Trailblazer
 
     # Wrap exposes {#inherited} which will also copy the block activity.
     # Currently, this is only used for patching (as it will try to subclass Wrap).
-    class Wrap # TODO: it would be cool to have Activity::Interface and Strategy::Interface
-      class << self
-        extend Forwardable
-        def_delegators :block_activity, :step, :pass, :fail # TODO: add all DSL::Helper
-      end
-
+    class Wrap < Macro::Strategy # TODO: it would be cool to have Activity::Interface and Strategy::Interface
       # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
       # class Wrapped
       # @private
@@ -91,14 +85,6 @@ module Trailblazer
         signal = @state.get(:signal_to_output).fetch(signal, signal)
 
         return signal, [ctx, flow_options]
-      end
-
-      def self.to_h
-        block_activity.to_h
-      end
-
-      def self.block_activity
-        @state.get(:block_activity)
       end
     end # Wrap
   end

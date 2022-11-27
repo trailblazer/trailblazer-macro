@@ -1,6 +1,6 @@
 module Trailblazer
   module Macro
-    class Each# < Trailblazer::Activity::FastTrack
+    class Each < Macro::Strategy
       # FIXME: for Strategy that wants to pass-through the exec_context, so it
       # looks "invisible" for steps.
       module Transitive
@@ -12,70 +12,64 @@ module Trailblazer
 
       end
 
-      class Circuit
-        def initialize(block_activity:, item_key:)
-          @item_key      = item_key
-          @block_activity = block_activity
+      def self.call((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
+        dataset = ctx.fetch(:dataset)
+        signal  = nil
+        item_key                        = @state.get(:item_key)
+        failing_semantic                = @state.get(:failing_semantic)
+        activity                        = @state.get(:activity)
 
-          @failing_semantic = [:failure, :fail_fast]
-        end
-
-        def call((ctx, flow_options), runner: Run, **circuit_options) # DISCUSS: do we need {start_task}?
-          dataset = ctx.fetch(:dataset)
-          signal  = @success_terminus
-
-          collected_values = []
+        # collected_values = []
 # raise "implement :value collecting per default "
-          # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
-          dataset.each_with_index do |element, index|
-            # This new {inner_ctx} will be disposed of after invoking the item activity.
-            # DISCUSS: this is what happens when you use In().
-            _inner_ctx = ctx.merge(
-              @item_key => element, # defaults to {:item}
-              :index     => index,
-              # "#{key}_index" => index,
-            )
+        # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
+        dataset.each_with_index do |element, index|
+          # This new {inner_ctx} will be disposed of after invoking the item activity.
+          # DISCUSS: this is what happens when you use In().
+          _inner_ctx = ctx.merge(
+            item_key => element, # defaults to {:item}
+            :index     => index,
+            # "#{key}_index" => index,
+          )
 
-            # TODO: test aliasing
-            inner_ctx = Trailblazer.Context(_inner_ctx, {}, **circuit_options) # everything we write to inner_ctx is guaranteed to be data from iterated.
+          # TODO: test aliasing
+          inner_ctx = Trailblazer.Context(_inner_ctx, {}, **circuit_options) # everything we write to inner_ctx is guaranteed to be data from iterated.
 
-            # using this runner will make it look as if block_activity is being run consequetively within {Each.iterate} as if they were steps
-            # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
-            # and literally simply invokes {block_activity.call}, which will set its own {wrap_static}.
-            signal, (returned_ctx, flow_options) = runner.(
-              @block_activity,
-              [inner_ctx, flow_options],
-              runner: runner,
-              **circuit_options,
-              # wrap_static: @wrap_static,
-            )
+          # using this runner will make it look as if block_activity is being run consequetively within {Each.iterate} as if they were steps
+          # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
+          # and literally simply invokes {block_activity.call}, which will set its own {wrap_static}.
+          signal, (returned_ctx, flow_options) = runner.(
+            block_activity,
+            [inner_ctx, flow_options],
+            runner: runner,
+            **circuit_options,
+            activity: activity,
+          )
 
-            #
-            # {returned_ctx} at this point has Each(..., In => Out =>) applied!
-            #   Without configuration, this means {returned_ctx} is empty.
-
-
-            # DISCUSS: this is what usually happens in Out().
-            outer_ctx, mutable_ctx = returned_ctx.decompose
-            # raise mutable_ctx.keys.inspect
-            puts "@@@@@ merging #{mutable_ctx.inspect}"
-            # ctx.merge(mutable_ctx) # TODO: next iteration can see that!
-            mutable_ctx.each { |k,v| ctx[k] = v } # FIXME: copied from Out().
+          #
+          # {returned_ctx} at this point has Each(..., In => Out =>) applied!
+          #   Without configuration, this means {returned_ctx} is empty.
 
 
-            # mutable_ctx are the parts the user wants written outside.
+          # DISCUSS: this is what usually happens in Out().
+          outer_ctx, mutable_ctx = returned_ctx.decompose
+          # raise mutable_ctx.keys.inspect
+          puts "@@@@@ merging #{mutable_ctx.inspect}"
+          # ctx.merge(mutable_ctx) # TODO: next iteration can see that!
+          mutable_ctx.each { |k,v| ctx[k] = v } # FIXME: copied from Out().
 
 
-            # Break the loop if {block_activity} emits failure signal
-            break if @failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
-          end
-
-          # ctx[:collected_from_each] = collected_values
+          # mutable_ctx are the parts the user wants written outside.
 
 
-          return signal, [ctx, flow_options]
+          # Break the loop if {block_activity} emits failure signal
+          break if failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
         end
-      end # Circuit
+
+        # ctx[:collected_from_each] = collected_values
+
+
+        return signal, [ctx, flow_options]
+      end
 
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
       def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
@@ -101,36 +95,38 @@ module Trailblazer
       collect_options = {} unless collect # FIXME: horrible code haha
 
 
-      # returns {:collected_from_each}
-      circuit = Trailblazer::Macro::Each::Circuit.new(
-        block_activity: block_activity,
-        item_key:      item_key,
+      wrap_static_for_block_activity = task_wrap_for_iterated(
+        Activity::Railway.Out() => [], # per default, don't let anything out.
+        **collect_options,
+        **dsl_options_for_iterated,
       )
 
-      schema = Trailblazer::Activity::Schema.new(
-        circuit,
-      # Those outputs we simply wire through to the Each() activity.
-        outputs_from_block_activity, # outputs: we reuse block_activity's outputs.
-        # nodes
-        [Trailblazer::Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
-        # config
-        # This taskWrap applies to every iterated activity.
-        Trailblazer::Activity::TaskWrap.container_activity_for(
-          block_activity,
-          each:         true, # mark this activity for {compute_runtime_id}.
-          wrap_static:  task_wrap_for_iterated(
-            Activity::Railway.Out() => [], # per default, don't let anything out.
-            **collect_options,
-            **dsl_options_for_iterated,
-          ), # In/Out per iteration
-        )
+      # This activity is passed into the {Runner} for each iteration of {block_activity}.
+      container_activity = Activity::TaskWrap.container_activity_for(
+        block_activity,
+        each:         true, # mark this activity for {compute_runtime_id}.
+        nodes:        [Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
+      ).merge(
+        wrap_static: Hash.new(wrap_static_for_block_activity)
+      )
+
+      state = Declarative::State(
+        block_activity:   [block_activity, {copy: Trailblazer::Declarative::State.method(:subclass)}], # DISCUSS: move to Macro::Strategy.
+        item_key:         [item_key, {}], # DISCUSS: we could even allow the wrap_handler to be patchable.
+        failing_semantic: [[:failure, :fail_fast], {}],
+        activity:         [container_activity, {}],
       )
 
       # The {Each.iterate.block} activity hosting a special {Circuit} that runs
       # {block_activity} looped. In the Stack, this will look as if {block_activity} is
       # a child of {iterate_activity}, that's why we add {block_activity} as a Node in
       # {iterate_activity}'s schema.
-      iterate_activity = Trailblazer::Activity.new(schema)
+      iterate_strategy = Class.new(Each) do
+        extend Macro::Strategy::State # now, the Wrap subclass can inherit its state and copy the {block_activity}.
+        initialize!(state)
+      end
+
+      # returns {:collected_from_each}
 
       # TODO: move to Wrap.
       termini_from_block_activity =
@@ -153,7 +149,7 @@ module Trailblazer
 
       # {Subprocess} with {strict: true} will automatically wire all {block_activity}'s termini to the corresponding termini
       # of {each_activity} as they have the same semantics (both termini sets are identical).
-      each_activity.step Activity::Railway.Subprocess(iterate_activity, strict: true),
+      each_activity.step Activity::Railway.Subprocess(iterate_strategy, strict: true),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
 
       dataset_from_options = {}
@@ -175,10 +171,6 @@ module Trailblazer
       end
 
       activity.to_h[:config][:wrap_static]["iterated"]
-    end
-
-    def self.task_wrap_for_iterator(**dsl_options)
-      task_wrap_for_iterated(**dsl_options)
     end
   end
 

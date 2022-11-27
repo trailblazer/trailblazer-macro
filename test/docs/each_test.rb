@@ -15,12 +15,11 @@ class EachTest < Minitest::Spec
 
   class Mailer
     def self.send(**options)
-      @send_options ||= []
       @send_options << options
     end
 
     class << self
-      attr_reader :send_options
+      attr_accessor :send_options
     end
   end
 
@@ -188,6 +187,7 @@ class EachTest < Minitest::Spec
   end # E
 
   it "{item_key: :composer}" do
+    E::Mailer.send_options = []
     assert_invoke E::Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
@@ -284,6 +284,7 @@ class EachTest < Minitest::Spec
   end
 
   it "Each(Activity::Railway)" do
+    D::Mailer.send_options = []
     assert_invoke D::Song::Activity::Cover, params: {id: 1},
       seq:                    "[:rearrange]",
       expected_ctx_variables: {
@@ -398,7 +399,7 @@ class DocsEachUnitTest < Minitest::Spec
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
+      ["Each/1", "Each.iterate.block", :compute_item])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
@@ -766,6 +767,7 @@ class EachPureTest < Minitest::Spec
   #:each-pure end
 
   it "allows a dataset compute in the hosting activity" do
+    Mailer.send_options = []
   #@ {:dataset} is not part of the {ctx}.
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
@@ -801,6 +803,8 @@ class EachStrategyComplianceTest < Minitest::Spec
   Song = EachPureTest::Song
 
   it do
+    EachPureTest::Mailer.send_options = []
+
     #:patch
     cover_patched = Trailblazer::Activity::DSL::Linear.Patch(
       Song::Activity::Cover,
@@ -810,7 +814,7 @@ class EachStrategyComplianceTest < Minitest::Spec
     cover_patched.include(T.def_steps(:log_email, :notify_composers))
 
   #@ Original class isn't changed.
-    assert_invoke Song::Activity::Cover, params: {id: 1},
+    assert_invoke Song::Activity::Cover, params: {id: 1}, seq: [],
       expected_ctx_variables: {
           model: Song.find_by(id: 1),
         },
@@ -818,23 +822,23 @@ class EachStrategyComplianceTest < Minitest::Spec
 
   #@ Patched class runs
   # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
-    assert_invoke cover_patched, params: {id: 1},
+    assert_invoke cover_patched, params: {id: 1}, seq: [],
       expected_ctx_variables: {
           model: Song.find_by(id: 1),
         },
-      seq: "[:notify_composers, :log_email, :rearrange]"
+      seq: "[:notify_composers, :log_email, :notify_composers, :log_email, :rearrange]"
   end
 
   it "find_path" do
     assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Wrap/MyTransaction", :transfer])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=transfer>}
+      ["Each/composers_for_each", "Each.iterate.block", :notify_composers])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
 
 =begin
 #:find_path
 node, _ = Trailblazer::Developer::Introspect.find_path(
-  Song::Activity::Upload,
-  ["Wrap/MyTransaction", :transfer])
+  Song::Activity::Cover,
+  ["Each/composers_for_each", "Each.iterate.block", :notify_composers])
 #=> #<Node ...>
 #:find_path end
 =end
@@ -842,6 +846,7 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
   end
 
   it "tracing" do
-    Trailblazer::Developer.wtf?(Song::Activity::Cover, {params: {id: 1}})
+    EachPureTest::Mailer.send_options = []
+    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{params: {id: 1}, seq: []}])
   end
 end

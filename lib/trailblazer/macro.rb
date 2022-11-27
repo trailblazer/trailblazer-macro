@@ -2,6 +2,7 @@ require "forwardable"
 require "trailblazer/activity/dsl/linear"
 require "trailblazer/operation" # TODO: remove this dependency
 
+require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"
 require "trailblazer/macro/policy"
 require "trailblazer/macro/guard"
@@ -13,18 +14,6 @@ require "trailblazer/macro/each"
 
 module Trailblazer
   module Macro
-    # DISCUSS: move this to Strategy.
-    module State
-      def initialize!(state)
-        @state = state
-      end
-
-      def inherited(inheritor)
-        super
-        inheritor.initialize!(@state.copy)
-      end
-    end
-
       # TaskAdapter::AssignVariable
         # Run {user_proc} with "step interface" and assign its return value to ctx[@variable_name].
         # @private
