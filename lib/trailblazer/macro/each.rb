@@ -90,8 +90,7 @@ module Trailblazer
 
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: "Each/#{SecureRandom.hex(4)}", collect: false, **dsl_options_for_iterated, &block)
-
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each), collect: false, **dsl_options_for_iterated, &block)
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
 
 

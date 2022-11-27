@@ -776,3 +776,60 @@ class EachPureTest < Minitest::Spec
     assert_equal Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
 end
+
+class EachIDTest < Minitest::Spec
+  class Validate < Trailblazer::Activity::Railway
+  end
+
+  it "assigns IDs via {Macro.id_for}" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each() {}
+      step Each(Validate)
+      step Each() {}, id: "Each-1"
+    end
+
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id, "Each/EachIDTest::Validate"
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
+
+    assert_match /Each\/\d+/, Trailblazer::Activity::Introspect::TaskMap(activity).values[1].id
+  end
+end
+
+class EachStrategyComplianceTest < Minitest::Spec
+  Song = EachPureTest::Song
+
+  it do
+    #:patch
+    upload_with_upsert = Trailblazer::Activity::DSL::Linear.Patch(
+      Song::Activity::Cover,
+      ["Wrap/MyTransaction"] => -> { step :upsert, replace: :update }
+    )
+    #:patch end
+    upload_with_upsert.include(T.def_steps(:upsert))
+
+  #@ Original class isn't changed.
+    assert_invoke Song::Activity::Upload, seq: "[:model, :update, :transfer, :notify]"
+  #@ Patched class runs
+    assert_invoke upload_with_upsert, seq: "[:model, :upsert, :transfer, :notify]"
+  end
+
+  it "find_path" do
+    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
+      ["Wrap/MyTransaction", :transfer])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=transfer>}
+
+=begin
+#:find_path
+node, _ = Trailblazer::Developer::Introspect.find_path(
+  Song::Activity::Upload,
+  ["Wrap/MyTransaction", :transfer])
+#=> #<Node ...>
+#:find_path end
+=end
+
+  end
+
+  it "tracing" do
+    Trailblazer::Developer.wtf?(Song::Activity::Cover, {params: {id: 1}})
+  end
+end

@@ -594,7 +594,7 @@ class WrapUnitTest < Minitest::Spec
     end
   end
 
-  it "assigns IDs via Macro.id_for" do
+  it "assigns IDs via {Macro.id_for}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
       def self.my_wrap_handler((ctx, flow_options), **, &block)
         yield # calls the wrapped steps
@@ -665,7 +665,7 @@ class WrapUnitTest < Minitest::Spec
   end
 end
 
-class WrapComplianceTest < Minitest::Spec
+class WrapStrategyComplianceTest < Minitest::Spec
   Song = WrapSimpleHandlerTest::Song
 
   it do
