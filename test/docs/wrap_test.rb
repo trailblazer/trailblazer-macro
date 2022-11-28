@@ -1,7 +1,5 @@
 require "test_helper"
 
-# TODO: test ID properly.
-
   #@ yield returns a circuit-interface result set, we can return it to the flow
 #:my_transaction
 class MyTransaction

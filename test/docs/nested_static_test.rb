@@ -699,8 +699,14 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, 
     assert_match /user_proc=encode_id3>/, output
   end
 
-  it "ID via {Macro.id_for}" do
+  # TODO: test more options.
+  it "assigns ID via {Macro.id_for}" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Nested(:decide_file_type, auto_wire: [Trailblazer::Activity::Railway])
+    end
 
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
+      ["Nested/decide_file_type"])[0].id, %{Nested/decide_file_type}
   end
 
   it do
