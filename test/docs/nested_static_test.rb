@@ -422,7 +422,7 @@ class DocsNestedDynamicTest < Minitest::Spec
     assert_equal output, %{TOP
 |-- Start.default
 |-- model
-|-- Nested(decide_file_type)
+|-- Nested/decide_file_type
 |   |-- Start.default
 |   |-- call_dynamic_nested_activity
 |   |   `-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
@@ -436,12 +436,12 @@ class DocsNestedDynamicTest < Minitest::Spec
 
     #@ we can look into non-dynamic parts
     assert_equal Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
-      ["Nested(decide_file_type)", :call_dynamic_nested_activity])[0].task.class.inspect, %{Method}
+      ["Nested/decide_file_type", :call_dynamic_nested_activity])[0].task.class.inspect, %{Method}
 
     #@ we can't look into the dynamic parts
     assert_raises do
       Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
-        ["Nested(decide_file_type)", :call_dynamic_nested_activity, DocsNestedStaticTest::A::Song::Activity::Id3Tag])[0]
+        ["Nested/decide_file_type", :call_dynamic_nested_activity, DocsNestedStaticTest::A::Song::Activity::Id3Tag])[0]
     end
   end
 end
@@ -645,7 +645,7 @@ class NestedStrategyComplianceTest < Minitest::Spec
 Song::Activity::Create
 |-- Start.default
 |-- model
-|-- Nested(decide_file_type)
+|-- Nested/decide_file_type
 |   |-- Start.default
 |   |-- route_to_nested_activity
 |   |-- DocsNestedStaticTest::A::Song::Activity::VorbisComment
@@ -668,7 +668,7 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, 
     assert_equal output, %{TOP
 |-- Start.default
 |-- model
-|-- Nested(decide_file_type)
+|-- Nested/decide_file_type
 |   |-- Start.default
 |   |-- route_to_nested_activity
 |   |-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
@@ -684,14 +684,14 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, 
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
     assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Create,
-      ["Nested(decide_file_type)", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
+      ["Nested/decide_file_type", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=encode_id3>}
 
     output =
     #:create-introspect
     Trailblazer::Developer.render(Song::Activity::Create,
       path: [
-        "Nested(decide_file_type)", # ID of Nested()
+        "Nested/decide_file_type", # ID of Nested()
         Song::Activity::Id3Tag      # ID of the nested {Id3Tag} activity.
       ]
     )
@@ -709,7 +709,7 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, 
     #:patch
     faster_mp3 = Trailblazer::Activity::DSL::Linear.Patch(
       Song::Activity::Create,
-      ["Nested(decide_file_type)", Song::Activity::Id3Tag] => -> { step :fast_encode_id3, replace: :encode_id3 }
+      ["Nested/decide_file_type", Song::Activity::Id3Tag] => -> { step :fast_encode_id3, replace: :encode_id3 }
     )
     #:patch end
     faster_mp3.include(T.def_steps(:fast_encode_id3))

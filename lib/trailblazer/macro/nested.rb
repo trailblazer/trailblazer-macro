@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
     # {Nested} macro.
     # DISCUSS: rename auto_wire => static
-    def self.Nested(callable, id: "Nested(#{callable})", auto_wire: [])
+    def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [])
       # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
       if callable.is_a?(Class) && callable < Nested.operation_class
         caller_location = caller_locations(2, 1)[0]
