@@ -36,6 +36,14 @@ class EachTest < Minitest::Spec
           return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe", "scammer@spam")])
         end
 
+        if id == 4
+          return Song.new(id, nil, nil, [])
+        end
+
+        if id == 5
+          return Song.new(id, nil, nil, "Do I iterate?")
+        end
+
         Song.new(id, nil, nil, [Composer.new("Fat Mike"), Composer.new("El Hefe")])
       end
     end
@@ -90,6 +98,22 @@ class EachTest < Minitest::Spec
     puts ctx[:collected_from_each] #=> [[0, "Fat Mike"], [1, "El Hefe"]]
     #:collected_from_each end
 =end
+  end
+
+  it "does nothing if dataset is empty" do
+    assert_invoke B::Song::Activity::Cover, params: {id: 4},
+      expected_ctx_variables: {
+        model: B::Song.find_by(id: 4)
+      },
+      seq: "[:rearrange]"
+  end
+
+  it "raises an exception if dataset is not an enumerable" do
+    exception = assert_raises Trailblazer::Macro::Each::DatasetIsNotEnumerableError do
+      assert_invoke B::Song::Activity::Cover, params: {id: 5}
+    end
+
+    assert_equal exception.message, %{"Do I iterate?" is not an enumerable}
   end
 
   module CoverMethods

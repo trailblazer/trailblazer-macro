@@ -1,6 +1,8 @@
 module Trailblazer
   module Macro
     class Each# < Trailblazer::Activity::FastTrack
+      DatasetIsNotEnumerableError = Class.new(RuntimeError)
+
       # FIXME: for Strategy that wants to pass-through the exec_context, so it
       # looks "invisible" for steps.
       module Transitive
@@ -17,11 +19,14 @@ module Trailblazer
           @item_key      = item_key
           @block_activity = block_activity
 
+          @success_terminus = block_activity.to_h[:outputs].find { |output| output.signal.to_h[:semantic] == :success }.signal
           @failing_semantic = [:failure, :fail_fast]
         end
 
         def call((ctx, flow_options), runner: Run, **circuit_options) # DISCUSS: do we need {start_task}?
           dataset = ctx.fetch(:dataset)
+          raise DatasetIsNotEnumerableError.new("#{dataset.inspect} is not an enumerable") unless dataset.is_a?(Enumerable)
+
           signal  = @success_terminus
 
           collected_values = []
