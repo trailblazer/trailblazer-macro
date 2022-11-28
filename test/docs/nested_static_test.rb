@@ -99,65 +99,6 @@ class DocsNestedStaticTest < Minitest::Spec
     assert_invoke AA::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :failure
   end
 
-  it "is compatible with Debugging API" do
-    trace = %{
-#:create-trace
-Song::Activity::Create
-|-- Start.default
-|-- model
-|-- Nested(decide_file_type)
-|   |-- Start.default
-|   |-- route_to_nested_activity
-|   |-- DocsNestedStaticTest::A::Song::Activity::VorbisComment
-|   |   |-- Start.default
-|   |   |-- prepare_metadata
-|   |   |-- encode_cover
-|   |   `-- End.success
-|   `-- End.success
-|-- save
-`-- End.success
-#:create-trace end
-}
-
-    output, _ = trace A::Song::Activity::Create, params: {type: "vorbis"}, seq: []
-    assert_equal output, trace.split("\n")[2..-2].join("\n").sub("Song::Activity::Create", "TOP")
-
-    output, _ = trace A::Song::Activity::Create, params: {type: "mp3"}, seq: []
-    assert_equal output, %{TOP
-|-- Start.default
-|-- model
-|-- Nested(decide_file_type)
-|   |-- Start.default
-|   |-- route_to_nested_activity
-|   |-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
-|   |   |-- Start.default
-|   |   |-- parse
-|   |   |-- encode_id3
-|   |   `-- End.success
-|   `-- End.success
-|-- save
-`-- End.success}
-
-
-  #@ compile time
-  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    assert_equal Trailblazer::Developer::Introspect.find_path(A::Song::Activity::Create,
-      ["Nested(decide_file_type)", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=encode_id3>}
-
-    Song = A::Song
-    output =
-    #:create-introspect
-    Trailblazer::Developer.render(Song::Activity::Create,
-      path: [
-        "Nested(decide_file_type)", # ID of Nested()
-        Song::Activity::Id3Tag      # ID of the nested {Id3Tag} activity.
-      ]
-    )
-    #:create-introspect end
-    assert_match /user_proc=encode_id3>/, output
-  end
-
 #@ Additional terminus {End.invalid_metadata} in Nested activity
   module B
     class Song
@@ -692,5 +633,91 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
 
     #@ nested_activity and top activity cannot see things from decider.
     assert_invoke activity, **options, visible_in_decider: []
+  end
+end
+
+class NestedStrategyComplianceTest < Minitest::Spec
+  Song = DocsNestedStaticTest::A::Song
+
+  it "is compatible with Debugging API" do
+    trace = %{
+#:create-trace
+Song::Activity::Create
+|-- Start.default
+|-- model
+|-- Nested(decide_file_type)
+|   |-- Start.default
+|   |-- route_to_nested_activity
+|   |-- DocsNestedStaticTest::A::Song::Activity::VorbisComment
+|   |   |-- Start.default
+|   |   |-- prepare_metadata
+|   |   |-- encode_cover
+|   |   `-- End.success
+|   `-- End.success
+|-- save
+`-- End.success
+#:create-trace end
+}
+
+Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, seq: []}])
+
+    output, _ = trace Song::Activity::Create, params: {type: "vorbis"}, seq: []
+    assert_equal output, trace.split("\n")[2..-2].join("\n").sub("Song::Activity::Create", "TOP")
+
+    output, _ = trace Song::Activity::Create, params: {type: "mp3"}, seq: []
+    assert_equal output, %{TOP
+|-- Start.default
+|-- model
+|-- Nested(decide_file_type)
+|   |-- Start.default
+|   |-- route_to_nested_activity
+|   |-- DocsNestedStaticTest::A::Song::Activity::Id3Tag
+|   |   |-- Start.default
+|   |   |-- parse
+|   |   |-- encode_id3
+|   |   `-- End.success
+|   `-- End.success
+|-- save
+`-- End.success}
+
+
+  #@ compile time
+  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
+    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Create,
+      ["Nested(decide_file_type)", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=encode_id3>}
+
+    output =
+    #:create-introspect
+    Trailblazer::Developer.render(Song::Activity::Create,
+      path: [
+        "Nested(decide_file_type)", # ID of Nested()
+        Song::Activity::Id3Tag      # ID of the nested {Id3Tag} activity.
+      ]
+    )
+    #:create-introspect end
+    assert_match /user_proc=encode_id3>/, output
+  end
+
+  it "ID via {Macro.id_for}" do
+
+  end
+
+  it do
+    skip
+
+    #:patch
+    faster_mp3 = Trailblazer::Activity::DSL::Linear.Patch(
+      Song::Activity::Create,
+      ["Nested(decide_file_type)", Song::Activity::Id3Tag] => -> { step :fast_encode_id3, replace: :encode_id3 }
+    )
+    #:patch end
+    faster_mp3.include(T.def_steps(:fast_encode_id3))
+# Trailblazer::Developer.wtf?(faster_mp3, [{params: {type: "mp3"}, seq: []}])
+
+  #@ Original class isn't changed.
+    assert_invoke Song::Activity::Create, params: {type: "mp3"}, seq: "[:model, :parse, :encode_id3, :save]"
+  #@ Patched class runs
+    assert_invoke faster_mp3, params: {type: "mp3"}, seq: "[:model, :parse, :fast_encode_id3, :save]"
   end
 end
