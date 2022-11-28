@@ -847,6 +847,13 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
 
   it "tracing" do
     EachPureTest::Mailer.send_options = []
-    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{params: {id: 1}, seq: []}])
+    #:wtf
+    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{
+      params: {id: 1},
+      #~meths
+      seq: []
+      #~meths end
+    }])
+    #:wtf end
   end
 end
