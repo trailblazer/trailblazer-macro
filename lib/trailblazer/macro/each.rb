@@ -6,10 +6,8 @@ module Trailblazer
       module Transitive
         def call(args, exec_context:, **circuit_options)
           # exec_context is our hosting Song::Activity::Cover
-
           to_h[:activity].call(args, exec_context: exec_context, **circuit_options)
         end
-
       end
 
       def self.call((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
@@ -19,8 +17,6 @@ module Trailblazer
         failing_semantic  = @state.get(:failing_semantic)
         activity          = @state.get(:activity)
 
-        # collected_values = []
-# raise "implement :value collecting per default "
         # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
         dataset.each_with_index do |element, index|
           # This new {inner_ctx} will be disposed of after invoking the item activity.
@@ -28,7 +24,6 @@ module Trailblazer
           _inner_ctx = ctx.merge(
             item_key => element, # defaults to {:item}
             :index     => index,
-            # "#{key}_index" => index,
           )
 
           # TODO: test aliasing
@@ -45,7 +40,6 @@ module Trailblazer
             activity: activity,
           )
 
-          #
           # {returned_ctx} at this point has Each(..., In => Out =>) applied!
           #   Without configuration, this means {returned_ctx} is empty.
 
@@ -54,9 +48,7 @@ module Trailblazer
           outer_ctx, mutable_ctx = returned_ctx.decompose
           # raise mutable_ctx.keys.inspect
           puts "@@@@@ merging #{mutable_ctx.inspect}"
-          # ctx.merge(mutable_ctx) # TODO: next iteration can see that!
           mutable_ctx.each { |k,v| ctx[k] = v } # FIXME: copied from Out().
-
 
           # mutable_ctx are the parts the user wants written outside.
 
@@ -64,9 +56,6 @@ module Trailblazer
           # Break the loop if {block_activity} emits failure signal
           break if failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
         end
-
-        # ctx[:collected_from_each] = collected_values
-
 
         return signal, [ctx, flow_options]
       end
@@ -154,7 +143,7 @@ module Trailblazer
     end
 
     # DSL options added to {block_activity} to implement {collect: true}.
-    def self.options_for_collect(collect:, **)
+    def self.options_for_collect(collect:)
       return {} unless collect
 
       {
@@ -164,7 +153,7 @@ module Trailblazer
     end
 
     def self.options_for_dataset_from(dataset_from:)
-      return {} unless if dataset_from
+      return {} unless dataset_from
 
       {
         Activity::Railway.Inject(:dataset) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
