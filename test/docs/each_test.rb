@@ -779,6 +779,19 @@ class EachPureTest < Minitest::Spec
   end
 end
 
+#@ dataset: []
+class EachEmptyDatasetTest < Minitest::Spec
+  it do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each() {
+        step :raise
+      }
+    end
+
+    assert_invoke activity, dataset: []
+  end
+end
+
 class EachIDTest < Minitest::Spec
   class Validate < Trailblazer::Activity::Railway
   end

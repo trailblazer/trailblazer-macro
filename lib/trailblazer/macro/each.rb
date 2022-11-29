@@ -13,11 +13,11 @@ module Trailblazer
       end
 
       def self.call((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
-        dataset = ctx.fetch(:dataset)
-        signal  = nil
-        item_key                        = @state.get(:item_key)
-        failing_semantic                = @state.get(:failing_semantic)
-        activity                        = @state.get(:activity)
+        dataset           = ctx.fetch(:dataset)
+        signal            = @state.get(:success_signal)
+        item_key          = @state.get(:item_key)
+        failing_semantic  = @state.get(:failing_semantic)
+        activity          = @state.get(:activity)
 
         # collected_values = []
 # raise "implement :value collecting per default "
@@ -110,11 +110,21 @@ module Trailblazer
         wrap_static: Hash.new(wrap_static_for_block_activity)
       )
 
+      # TODO: move to Wrap.
+      termini_from_block_activity =
+        outputs_from_block_activity.
+          # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
+          sort { |a,b| a.semantic ==:success ? 1 : 0 }.
+          collect { |output|
+            [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
+          }
+
       state = Declarative::State(
         block_activity:   [block_activity, {copy: Trailblazer::Declarative::State.method(:subclass)}], # DISCUSS: move to Macro::Strategy.
         item_key:         [item_key, {}], # DISCUSS: we could even allow the wrap_handler to be patchable.
         failing_semantic: [[:failure, :fail_fast], {}],
         activity:         [container_activity, {}],
+        success_signal:   [termini_from_block_activity[-1][0], {}] # FIXME: when subclassing (e.g. patching) this must be recomputed.
       )
 
       # The {Each.iterate.block} activity hosting a special {Circuit} that runs
@@ -128,14 +138,6 @@ module Trailblazer
 
       # returns {:collected_from_each}
 
-      # TODO: move to Wrap.
-      termini_from_block_activity =
-        outputs_from_block_activity.
-          # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
-          sort { |a,b| a.semantic ==:success ? 1 : 0 }.
-          collect { |output|
-            [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
-          }
 
       # each_activity = Class.new(Macro::Each) # DISCUSS: what base class should we be using?
       each_activity = Activity::FastTrack(termini: termini_from_block_activity) # DISCUSS: what base class should we be using?
