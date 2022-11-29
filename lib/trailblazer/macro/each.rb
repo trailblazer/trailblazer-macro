@@ -87,13 +87,8 @@ module Trailblazer
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
 
-
-      collect_options = { # TODO: constant
-        Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
-      }
-      collect_options = {} unless collect # FIXME: horrible code haha
-
+      collect_options       = options_for_collect(collect: collect)
+      dataset_from_options  = options_for_dataset_from(dataset_from: dataset_from)
 
       wrap_static_for_block_activity = task_wrap_for_iterated(
         Activity::Railway.Out() => [], # per default, don't let anything out.
@@ -127,7 +122,6 @@ module Trailblazer
         success_signal:   [termini_from_block_activity[-1][0], {}] # FIXME: when subclassing (e.g. patching) this must be recomputed.
       )
 
-      # The {Each.iterate.block} activity hosting a special {Circuit} that runs
       # {block_activity} looped. In the Stack, this will look as if {block_activity} is
       # a child of {iterate_activity}, that's why we add {block_activity} as a Node in
       # {iterate_activity}'s schema.
@@ -136,29 +130,13 @@ module Trailblazer
         initialize!(state)
       end
 
-      # returns {:collected_from_each}
-
-
-      # each_activity = Class.new(Macro::Each) # DISCUSS: what base class should we be using?
       each_activity = Activity::FastTrack(termini: termini_from_block_activity) # DISCUSS: what base class should we be using?
       each_activity.extend Each::Transitive
-
-      # if dataset_from
-      #   dataset_task = Macro.task_adapter_for_decider(dataset_from, variable_name: :dataset)
-
-      #   each_activity.step task: dataset_task, id: "dataset_from" # returns {:dataset}
-      # end
 
       # {Subprocess} with {strict: true} will automatically wire all {block_activity}'s termini to the corresponding termini
       # of {each_activity} as they have the same semantics (both termini sets are identical).
       each_activity.step Activity::Railway.Subprocess(iterate_strategy, strict: true),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
-
-      dataset_from_options = {}
-      dataset_from_options = {
-        Activity::Railway.Inject(:dataset) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
-
-      } if dataset_from
 
       Activity::Railway.Subprocess(each_activity).merge(
         id: id,
@@ -173,6 +151,24 @@ module Trailblazer
       end
 
       activity.to_h[:config][:wrap_static]["iterated"]
+    end
+
+    # DSL options added to {block_activity} to implement {collect: true}.
+    def self.options_for_collect(collect:, **)
+      return {} unless collect
+
+      {
+        Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
+        Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+      }
+    end
+
+    def self.options_for_dataset_from(dataset_from:)
+      return {} unless if dataset_from
+
+      {
+        Activity::Railway.Inject(:dataset) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
+      }
     end
   end
 
