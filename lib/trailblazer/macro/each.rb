@@ -74,15 +74,17 @@ module Trailblazer
 
     # @api private The internals here are considered private and might change in the near future.
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
+      dsl_options_for_iterated = block_activity if block_activity.is_a?(Hash) # Ruby 2.5 and 2.6
+
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
 
       collect_options       = options_for_collect(collect: collect)
       dataset_from_options  = options_for_dataset_from(dataset_from: dataset_from)
 
       wrap_static_for_block_activity = task_wrap_for_iterated(
-        Activity::Railway.Out() => [], # per default, don't let anything out.
-        **collect_options,
-        **dsl_options_for_iterated,
+        {Activity::Railway.Out() => []}. # per default, don't let anything out.
+        merge(collect_options).
+        merge(dsl_options_for_iterated)
       )
 
       # This activity is passed into the {Runner} for each iteration of {block_activity}.
@@ -127,16 +129,15 @@ module Trailblazer
       each_activity.step Activity::Railway.Subprocess(iterate_strategy, strict: true),
         id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
 
-      Activity::Railway.Subprocess(each_activity).merge(
-        id: id,
-        **dataset_from_options,
-      )
+      Activity::Railway.Subprocess(each_activity).
+        merge(id: id).
+        merge(dataset_from_options) # FIXME: provide that service via Subprocess.
     end
 
-    def self.task_wrap_for_iterated(**dsl_options)
+    def self.task_wrap_for_iterated(dsl_options)
       # TODO: maybe the DSL API could be more "open" here? I bet it is, but I'm too lazy.
       activity = Class.new(Activity::Railway) do
-        step task: "iterated", **dsl_options
+        step({task: "iterated"}.merge(dsl_options))
       end
 
       activity.to_h[:config][:wrap_static]["iterated"]

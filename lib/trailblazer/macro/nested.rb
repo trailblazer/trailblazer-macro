@@ -5,11 +5,13 @@ module Trailblazer
     def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [])
       # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
       if callable.is_a?(Class) && callable < Nested.operation_class
-        caller_location = caller_locations(2, 1)[0]
-        warn "[Trailblazer] #{caller_location.absolute_path}:#{caller_location.lineno} " \
-             "Using the `Nested()` macro without a dynamic decider is deprecated.\n" \
-             "To simply nest an activity or operation, replace `Nested(#{callable})` with `Subprocess(#{callable})`.\n" \
-             "Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess"
+        caller_locations = caller_locations(1, 2)
+        caller_location = caller_locations[0].to_s =~ /forwardable/ ? caller_locations[1] : caller_locations[0]
+
+        Activity::Deprecate.warn caller_location,
+          "Using the `Nested()` macro without a dynamic decider is deprecated.\n" \
+          "To simply nest an activity or operation, replace `Nested(#{callable})` with `Subprocess(#{callable})`.\n" \
+          "Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess"
 
         return Activity::Railway.Subprocess(callable)
       end

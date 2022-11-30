@@ -1,5 +1,3 @@
-require 'securerandom'
-
 module Trailblazer
   module Macro
     # TODO: {user_wrap}: rename to {wrap_handler}.
@@ -54,7 +52,7 @@ module Trailblazer
         return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
 
         ->((ctx, flow_options), **circuit_options, &block) do
-          warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block)"
+          warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block) XXX"
           user_wrap.(ctx, &block)
         end
       end

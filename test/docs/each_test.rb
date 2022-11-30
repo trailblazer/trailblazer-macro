@@ -646,7 +646,7 @@ class EachCtxInOutTest < Minitest::Spec
         # Inject(always: true) => {
         Inject(:composer_index) => ->(ctx, index:, **) { index },
         # all filters called before/after each iteration!
-        Out() => ->(ctx, index:, variable:, **) { {"composer-#{index}-value" => variable} }
+        Out() => ->(ctx, index:, variable:, **) { {:"composer-#{index}-value" => variable} }
 
 
 
@@ -673,8 +673,8 @@ class EachCtxInOutTest < Minitest::Spec
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
-        "composer-0-value" => "0 + EachTest::B::Song",
-        "composer-1-value" => "1 + EachTest::B::Song",
+        :"composer-0-value" => "0 + EachTest::B::Song",
+        :"composer-1-value" => "1 + EachTest::B::Song",
       },
       seq: "[:rearrange]"
   end

@@ -467,8 +467,9 @@ class GenericNestedUnitTest < Minitest::Spec
         end
       end
       line_number_for_nested = __LINE__ - 3
+      puts _
 
-      assert_equal warnings, %Q{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} Using the `Nested()` macro without a dynamic decider is deprecated.
+      assert_equal warnings, %{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} Using the `Nested()` macro without a dynamic decider is deprecated.
 To simply nest an activity or operation, replace `Nested(#{activity})` with `Subprocess(#{activity})`.
 Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess
 }
