@@ -100,7 +100,7 @@ module Trailblazer
       termini_from_block_activity =
         outputs_from_block_activity.
           # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
-          sort { |a,b| a.semantic ==:success ? 1 : 0 }.
+          sort { |a,b| a.semantic == :success ? 1 : -1 }.
           collect { |output|
             [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
           }
