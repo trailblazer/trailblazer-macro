@@ -20,14 +20,14 @@ module Trailblazer
         # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
         dataset.each_with_index do |element, index|
           # This new {inner_ctx} will be disposed of after invoking the item activity.
-          # DISCUSS: this is what happens when you use In().
-          _inner_ctx = ctx.merge(
+          inner_ctx = ctx.merge(
             item_key => element, # defaults to {:item}
-            :index     => index,
+            :index   => index,
           )
 
           # TODO: test aliasing
-          inner_ctx = Trailblazer.Context(_inner_ctx, {}, **circuit_options) # everything we write to inner_ctx is guaranteed to be data from iterated.
+          wrap_ctx, _ = ITERATION_INPUT_PIPE.({aggregate: {}, original_ctx: inner_ctx}, [[ctx, flow_options], circuit_options])
+          inner_ctx   = wrap_ctx[:input_ctx]
 
           # using this runner will make it look as if block_activity is being run consequetively within {Each.iterate} as if they were steps
           # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
@@ -35,23 +35,17 @@ module Trailblazer
           signal, (returned_ctx, flow_options) = runner.(
             block_activity,
             [inner_ctx, flow_options],
-            runner: runner,
+            runner:   runner,
             **circuit_options,
             activity: activity,
           )
 
           # {returned_ctx} at this point has Each(..., In => Out =>) applied!
           #   Without configuration, this means {returned_ctx} is empty.
-
-
           # DISCUSS: this is what usually happens in Out().
-          outer_ctx, mutable_ctx = returned_ctx.decompose
-          # raise mutable_ctx.keys.inspect
-          puts "@@@@@ merging #{mutable_ctx.inspect}"
-          mutable_ctx.each { |k,v| ctx[k] = v } # FIXME: copied from Out().
-
-          # mutable_ctx are the parts the user wants written outside.
-
+          # merge all mutable parts into the original_ctx.
+          wrap_ctx, _ = ITERATION_OUTPUT_PIPE.({returned_ctx: returned_ctx, aggregate: {}, original_ctx: ctx}, [])
+          ctx         = wrap_ctx[:aggregate]
 
           # Break the loop if {block_activity} emits failure signal
           break if failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
@@ -59,6 +53,11 @@ module Trailblazer
 
         return signal, [ctx, flow_options]
       end
+
+      # This is basically Out() => {copy all mutable variables}
+      ITERATION_OUTPUT_PIPE = Activity::DSL::Linear::VariableMapping::DSL.pipe_for_composable_output()
+      # and this In() => {copy everything}
+      ITERATION_INPUT_PIPE  = Activity::DSL::Linear::VariableMapping::DSL.pipe_for_composable_input()
 
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
       def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
@@ -70,7 +69,6 @@ module Trailblazer
         ctx[:runtime_id] = "#{compile_id}.#{index}"
       end
     end
-
 
     # @api private The internals here are considered private and might change in the near future.
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
@@ -96,7 +94,7 @@ module Trailblazer
         wrap_static: Hash.new(wrap_static_for_block_activity)
       )
 
-      # TODO: move to Wrap.
+      # DISCUSS: move to Wrap.
       termini_from_block_activity =
         outputs_from_block_activity.
           # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
