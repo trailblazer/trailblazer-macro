@@ -7,15 +7,19 @@
 
 ## Nested()
 
-* Restructured internals, it's much more readable now. Dynamic and Static are completely separated now.
-* `Static` handles `:auto_wire` and now allows to route any nested output. This was not possible before,
+* Restructured internals, it's much more readable, `Dynamic` and `Static` are completely separated now.
+* `Static` handles `:auto_wire` and allows to route any nested terminus. This was not possible before,
   you only had `FastTrack` generic termini.
 * Better warning when using `Nested(Operation)` without a dynamic decider.
 * Internal structure of `Nested()` has changed, the trace looks different.
 
+## Wrap()
+
+* Now implements patching.
+
 ## Internals
 
-* Use `AssignVariable` in Each and
+* Introduce `AssignVariable`.
 
 # 2.1.11
 
