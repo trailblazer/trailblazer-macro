@@ -56,13 +56,6 @@ class DocsModelTest < Minitest::Spec
   end
   #:update-with-find-by-key end
 
-  #:update-with-not-found-end
-  class UpdateFailureWithModelNotFound < Trailblazer::Operation
-    step Model( Song, :find_by, not_found_terminus: true )
-    # ..
-  end
-  #:update-with-not-found-end end
-
   it do
     #:update-ok
     result = Update.(params: { id: 1 })
@@ -99,19 +92,6 @@ class DocsModelTest < Minitest::Spec
     #:update-with-find-by-key-fail end
     result[:model].must_be_nil
     result.success?.must_equal false
-  end
-
-  it do
-    #:update-with-not-found-end-use
-    result = UpdateFailureWithModelNotFound.(params: {title: nil})
-    result[:model] #=> nil
-    result.success? #=> false
-    result.event #=> #<Trailblazer::Activity::End semantic=:not_found>
-    #:update-with-not-found-end-use end
-
-    result[:model].must_be_nil
-    result.success?.must_equal false
-    result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:not_found>}
   end
 
   #:show
@@ -192,5 +172,34 @@ result = Create.(my_id: 1)
     result[:model].inspect.must_equal %{#<struct DocsModelTest::Song id=1, title=nil>}
 
     end
+  end
+end
+
+class Model404TerminusTest < Minitest::Spec
+  Song = Class.new(DocsModelTest::Song)
+  #:update-with-not-found-end
+  class Song
+    module Activity
+      class Update < Trailblazer::Activity::Railway
+        step Model(Song, :find_by, not_found_terminus: true)
+        step :validate
+        step :save
+        #~meths
+        include T.def_steps(:validate, :save)
+        #~meths end
+      end
+    end
+  end
+  #:update-with-not-found-end end
+
+  it do
+    assert_invoke Song::Activity::Update, params: {id: 1},
+      seq: "[:validate, :save]", expected_ctx_variables: {model: Song.find_by(id: 1)}
+    assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
+
+    #:not_found
+    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
+    puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
+    #:not_found end
   end
 end

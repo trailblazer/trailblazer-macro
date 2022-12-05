@@ -24,11 +24,10 @@ module Trailblazer
 
     class Model
       def call(ctx, params: {}, **)
-        builder                 = Model::Builder.new
-        ctx[:model]         = model = builder.call(ctx, params)
-        ctx[:"result.model"] = result = Operation::Result.new(!model.nil?, {})
+        builder = Builder.new
+        model   = builder.call(ctx, params) or return
 
-        result.success?
+        ctx[:model] = model
       end
 
       class Builder

@@ -17,6 +17,11 @@
 
 * Now implements patching.
 
+## Model()
+
+* Remove `ctx[:"result.model"]`.
+* Don't set `ctx[:model]` unless `Builder` returns a model.
+
 ## Internals
 
 * Introduce `AssignVariable`.
