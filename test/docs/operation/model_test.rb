@@ -167,7 +167,8 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
 
   # inject all variables
     #:di-all
-    result = Song::Operation::Create.(      params:               {title: "Olympia"}, # some random variable.
+    result = Song::Operation::Create.(
+      params:               {title: "Olympia"}, # some random variable.
       "model.class":        Hit,
       "model.action":       :find_by,
       "model.find_by_key":  :title, seq: []
@@ -248,7 +249,7 @@ class Model404TerminusTest < Minitest::Spec
     assert_invoke Song::Operation::Update, params: {id: nil}, terminus: :not_found
 
     #:not_found
-    result = Song::Operation::Update.({params: {id: nil}})
+    result = Song::Operation::Update.(params: {id: nil})
     result.success? # => false
     #:not_found end
   end

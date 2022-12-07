@@ -249,7 +249,7 @@ class Model404TerminusTest < Minitest::Spec
     assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
 
     #:not_found
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, {params: {id: nil}})
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil})
     puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
     #:not_found end
   end

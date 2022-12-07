@@ -86,9 +86,8 @@ def convert_operation_test(filepath)
       line = line.sub("signal, (ctx, _) =", "result =")
       line = line.sub("ctx[", "result[")
 
-      if match = line.match(/(Trailblazer::Operation\.\(([\w:]+),\s?)/)
+      if match = line.match(/(Trailblazer::Operation\.\(([\w:]+), ?)/)
         activity = match[2]
-
         line = line.sub(match[0], "#{activity}.(")
       end
 
@@ -104,7 +103,7 @@ def convert_operation_test(filepath)
     line
   end
 
-  File.write "test/operation/" + File.basename(filepath), op_test.join("")
+  File.write "test/docs/operation/" + File.basename(filepath), op_test.join("")
 end
 
 convert_operation_test("test/docs/model_test.rb")
