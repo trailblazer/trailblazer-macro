@@ -53,3 +53,58 @@ Minitest::Spec.class_eval do
     return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
   end
 end
+
+
+
+# signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create,
+#       params:               {title: "Olympia"}, # some random variable.
+#       "model.class":        Hit,
+#       "model.action":       :find_by,
+#       "model.find_by_key":  :title, seq: []
+#     )
+
+# #:update-ok
+#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
+#     ctx[:model] #=> #<Song id=1, ...>
+#     puts signal #=> #<Trailblazer::Activity::End semantic=:success>
+# #:update-ok end
+def convert_operation_test(filepath)
+  within_marker = false
+  op_test =
+  File.foreach(filepath).collect do |line|
+    if line.match(/#:[\w]+/)
+      within_marker = true
+    end
+    if line.match(/#:.+ end/)
+      within_marker = false
+    end
+
+    line = line.sub("< Trailblazer::Activity::Railway", "< Trailblazer::Operation")
+    line = line.gsub("::Activity", "::Operation")
+
+    # if within_marker
+      line = line.sub("signal, (ctx, _) =", "result =")
+      line = line.sub("ctx[", "result[")
+
+      if match = line.match(/(Trailblazer::Operation\.\(([\w:]+),\s?)/)
+        activity = match[2]
+
+        line = line.sub(match[0], "#{activity}.(")
+      end
+
+      if match = line.match(/(\s+)puts signal.+(:\w+)>/)
+        semantic = match[2]
+        line = "#{match[1]}result.success? # => #{semantic == ":success" ?  true : false}\n"
+      end
+    # end
+
+    line = line.sub("assert_equal ctx", "assert_equal result")
+    line = line.sub("assert_equal signal", "assert_equal result.event")
+
+    line
+  end
+
+  File.write "test/operation/" + File.basename(filepath), op_test.join("")
+end
+
+convert_operation_test("test/docs/model_test.rb")
