@@ -48,6 +48,7 @@ class DocsModelTest < Minitest::Spec
       terminus: :failure
   end
 
+  #~ctx_to_result
   it do
     #:create
     result = Song::Operation::Create.(params: {}, seq: [])
@@ -80,6 +81,7 @@ class DocsModelTest < Minitest::Spec
     assert_equal result[:model].inspect, %{nil}
     assert_equal result.event.to_h[:semantic], :failure
   end
+  #~ctx_to_result end
 end
 
 class DocsModelFindByTitleTest < Minitest::Spec
@@ -98,6 +100,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
   end
   #:update-with-find-by-key end
 
+  #~ctx_to_result
   it do
     #:update-with-find-by-key-ok
     result = Song::Operation::Update.(params: {title: "Test"}, seq: [])
@@ -113,6 +116,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
     assert_equal result[:model].inspect, %{nil}
     #:key-title-fail end
   end
+  #~ctx_to_result end
 end
 
 class DocsModelAccessorTest < Minitest::Spec
@@ -131,6 +135,7 @@ class DocsModelAccessorTest < Minitest::Spec
   end
   #:show end
 
+  #~ctx_to_result
   it do
     #:show-ok
     result = Song::Operation::Update.(params: {id: 1}, seq: [])
@@ -139,6 +144,7 @@ class DocsModelAccessorTest < Minitest::Spec
 
     assert_equal result[:model].inspect, %{#<struct DocsModelAccessorTest::Song id=100, title=nil>}
   end
+  #~ctx_to_result end
 end
 
 class DocsModelDependencyInjectionTest < Minitest::Spec

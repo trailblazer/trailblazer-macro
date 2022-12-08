@@ -345,205 +345,6 @@ class EachTest < Minitest::Spec
   end
 end
 
-
-class DocsEachUnitTest < Minitest::Spec
-  module ComputeItem
-    def compute_item(ctx, item:, index:, **)
-      ctx[:value] = "#{item}-#{index.inspect}"
-    end
-  end
-
-  def self.block
-    -> (*){
-      step :compute_item
-    }
-  end
-
-  it "with Trace" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      include T.def_steps(:a, :b)
-      include ComputeItem
-
-      step :a
-      step Each(&DocsEachUnitTest.block), id: "Each/1"
-      step :b
-    end
-
-    ctx = {seq: [], dataset: [3,2,1]}
-
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
-
-    assert_equal Trailblazer::Developer::Trace::Present.(stack,
-      node_options: {stack.to_a[0] => {label: "<a-Each-b>"}}), %{<a-Each-b>
-|-- Start.default
-|-- a
-|-- Each/1
-|   |-- Start.default
-|   |-- Each.iterate.block
-|   |   |-- invoke_block_activity.0
-|   |   |   |-- Start.default
-|   |   |   |-- compute_item
-|   |   |   `-- End.success
-|   |   |-- invoke_block_activity.1
-|   |   |   |-- Start.default
-|   |   |   |-- compute_item
-|   |   |   `-- End.success
-|   |   `-- invoke_block_activity.2
-|   |       |-- Start.default
-|   |       |-- compute_item
-|   |       `-- End.success
-|   `-- End.success
-|-- b
-`-- End.success}
-
-  #@ compile time
-  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", :compute_item])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
-    # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
-
-  # TODO: grab runtime ctx for iteration 134
-  end
-
-  it "Each::Circuit" do
-    activity = Trailblazer::Macro.Each(collect: true, &DocsEachUnitTest.block)[:task]
-
-    my_exec_context = Class.new do
-      include ComputeItem
-    end.new
-
-    ctx = {
-      dataset: [1,2,3]
-    }
-
-    # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
-    assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
-  end
-
-
-  it "accepts iterated {block}" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      include ComputeItem
-
-      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
-        step :compute_item
-      }
-    end
-
-    Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
-
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
-  end
-
-  it "can see the entire ctx" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      def compute_item_with_current_user(ctx, item:, index:, current_user:, **)
-        ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
-      end
-
-      step Each(collect: true) { # expects {:dataset}
-        step :compute_item_with_current_user
-      }
-    end
-
-    Trailblazer::Developer.wtf?(
-      activity,
-      [{
-          dataset:      ["one", "two", "three"],
-          current_user: Object,
-        },
-      {}]
-    )
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
-  end
-
-  it "allows taskWrap in Each" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
-        step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
-      }
-
-      def compute_item(ctx, item:, index:, user:, **)
-        ctx[:value] = "#{item}-#{index.inspect}-#{user}"
-      end
-    end
-
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
-  end
-
-  it "accepts operation" do
-    nested_activity = Class.new(Trailblazer::Activity::Railway) do
-      step :compute_item
-
-      def compute_item(ctx, item:, index:, **)
-        ctx[:value] = "#{item}-#{index.inspect}"
-      end
-    end
-
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each(nested_activity, collect: true)  # expects {:dataset}
-    end
-    # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
-
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
-  end
-
-  it "doesn't override an existing ctx[:index]" do
-   activity = Class.new(Trailblazer::Activity::Railway) do
-      include T.def_steps(:a, :b)
-      include ComputeItem
-
-      step Each(collect: true, &DocsEachUnitTest.block), id: "Each/1"
-      step :b
-      def b(ctx, seq:, index:, **)
-        ctx[:seq] = seq + [index]
-      end
-
-    end
-
-    assert_invoke activity, dataset: [1,2,3], index: 9,
-      expected_ctx_variables: {collected_from_each: ["1-0", "2-1", "3-2"]},
-      seq: "[9]"
-  end
-
-  it "stops iterating when failure" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each(collect: true) {
-        step :check
-      }
-      step :a
-
-      include T.def_steps(:a)
-      def check(ctx, item:, **)
-        ctx[:value] = item.to_s #@ always collect the value, even in failure case.
-
-        return false if item >= 3
-        true
-      end
-    end
-
-    #@ all works
-    assert_invoke activity, dataset: [1,2],
-      expected_ctx_variables: {collected_from_each: ["1", "2"]},
-      seq: "[:a]"
-
-    #@ fail at 3 but still collect 3rd iteration!
-    Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
-    assert_invoke activity, dataset: [1,2,3],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
-      seq: "[]",
-      terminus: :failure
-
-    #@ fail at 3, skip 4
-    assert_invoke activity, dataset: [1,2,3,4],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
-      seq: "[]",
-      terminus: :failure
-  end
-end
-
 #@ Iteration doesn't add anything to ctx when {collect: false}.
 class EachCtxDiscardedTest < Minitest::Spec
   Composer  = EachTest::Composer
@@ -779,6 +580,69 @@ class EachPureTest < Minitest::Spec
   end
 end
 
+#~ignore
+class EachStrategyComplianceTest < Minitest::Spec
+  Song = EachPureTest::Song
+
+  it do
+    EachPureTest::Mailer.send_options = []
+
+    #:patch
+    cover_patched = Trailblazer::Activity::DSL::Linear.Patch(
+      Song::Activity::Cover,
+      ["Each/composers_for_each", "Each.iterate.block"] => -> { step :log_email }
+    )
+    #:patch end
+    cover_patched.include(T.def_steps(:log_email, :notify_composers))
+
+  #@ Original class isn't changed.
+    assert_invoke Song::Activity::Cover, params: {id: 1}, seq: [],
+      expected_ctx_variables: {
+          model: Song.find_by(id: 1),
+        },
+      seq: "[:rearrange]"
+
+  #@ Patched class runs
+  # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
+    assert_invoke cover_patched, params: {id: 1}, seq: [],
+      expected_ctx_variables: {
+          model: Song.find_by(id: 1),
+        },
+      seq: "[:notify_composers, :log_email, :notify_composers, :log_email, :rearrange]"
+  end
+
+
+  it "find_path" do
+    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
+      ["Each/composers_for_each", "Each.iterate.block", :notify_composers])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+
+=begin
+#:find_path
+node, _ = Trailblazer::Developer::Introspect.find_path(
+  Song::Activity::Cover,
+  ["Each/composers_for_each", "Each.iterate.block", :notify_composers])
+#=> #<Node ...>
+#:find_path end
+=end
+
+  end
+
+
+  it "tracing" do
+    EachPureTest::Mailer.send_options = []
+    #:wtf
+    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{
+      params: {id: 1},
+      #~meths
+      seq: []
+      #~meths end
+    }])
+    #:wtf end
+  end
+end
+
+
 #@ dataset: []
 class EachEmptyDatasetTest < Minitest::Spec
   it do
@@ -812,61 +676,207 @@ class EachIDTest < Minitest::Spec
   end
 end
 
-class EachStrategyComplianceTest < Minitest::Spec
-  Song = EachPureTest::Song
+class DocsEachUnitTest < Minitest::Spec
+  module ComputeItem
+    def compute_item(ctx, item:, index:, **)
+      ctx[:value] = "#{item}-#{index.inspect}"
+    end
+  end
 
-  it do
-    EachPureTest::Mailer.send_options = []
+  def self.block
+    -> (*){
+      step :compute_item
+    }
+  end
 
-    #:patch
-    cover_patched = Trailblazer::Activity::DSL::Linear.Patch(
-      Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block"] => -> { step :log_email }
+  it "with Trace" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      include T.def_steps(:a, :b)
+      include ComputeItem
+
+      step :a
+      step Each(&DocsEachUnitTest.block), id: "Each/1"
+      step :b
+    end
+
+    ctx = {seq: [], dataset: [3,2,1]}
+
+    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+
+    assert_equal Trailblazer::Developer::Trace::Present.(stack,
+      node_options: {stack.to_a[0] => {label: "<a-Each-b>"}}), %{<a-Each-b>
+|-- Start.default
+|-- a
+|-- Each/1
+|   |-- Start.default
+|   |-- Each.iterate.block
+|   |   |-- invoke_block_activity.0
+|   |   |   |-- Start.default
+|   |   |   |-- compute_item
+|   |   |   `-- End.success
+|   |   |-- invoke_block_activity.1
+|   |   |   |-- Start.default
+|   |   |   |-- compute_item
+|   |   |   `-- End.success
+|   |   `-- invoke_block_activity.2
+|   |       |-- Start.default
+|   |       |-- compute_item
+|   |       `-- End.success
+|   `-- End.success
+|-- b
+`-- End.success}
+
+  #@ compile time
+  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
+    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
+      ["Each/1", "Each.iterate.block", :compute_item])[0].task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
+
+  # TODO: grab runtime ctx for iteration 134
+  end
+
+  it "Each::Circuit" do
+    activity = Trailblazer::Macro.Each(collect: true, &DocsEachUnitTest.block)[:task]
+
+    my_exec_context = Class.new do
+      include ComputeItem
+    end.new
+
+    ctx = {
+      dataset: [1,2,3]
+    }
+
+    # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
+    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
+    assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
+  end
+
+
+  it "accepts iterated {block}" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      include ComputeItem
+
+      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
+        step :compute_item
+      }
+    end
+
+    Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
+
+    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+  end
+
+  it "can see the entire ctx" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      def compute_item_with_current_user(ctx, item:, index:, current_user:, **)
+        ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
+      end
+
+      step Each(collect: true) { # expects {:dataset}
+        step :compute_item_with_current_user
+      }
+    end
+
+    Trailblazer::Developer.wtf?(
+      activity,
+      [{
+          dataset:      ["one", "two", "three"],
+          current_user: Object,
+        },
+      {}]
     )
-    #:patch end
-    cover_patched.include(T.def_steps(:log_email, :notify_composers))
-
-  #@ Original class isn't changed.
-    assert_invoke Song::Activity::Cover, params: {id: 1}, seq: [],
-      expected_ctx_variables: {
-          model: Song.find_by(id: 1),
-        },
-      seq: "[:rearrange]"
-
-  #@ Patched class runs
-  # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
-    assert_invoke cover_patched, params: {id: 1}, seq: [],
-      expected_ctx_variables: {
-          model: Song.find_by(id: 1),
-        },
-      seq: "[:notify_composers, :log_email, :notify_composers, :log_email, :rearrange]"
+    assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
   end
 
-  it "find_path" do
-    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block", :notify_composers])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+  it "allows taskWrap in Each" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
+        step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
+      }
 
-=begin
-#:find_path
-node, _ = Trailblazer::Developer::Introspect.find_path(
-  Song::Activity::Cover,
-  ["Each/composers_for_each", "Each.iterate.block", :notify_composers])
-#=> #<Node ...>
-#:find_path end
-=end
+      def compute_item(ctx, item:, index:, user:, **)
+        ctx[:value] = "#{item}-#{index.inspect}-#{user}"
+      end
+    end
 
+    assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
   end
 
-  it "tracing" do
-    EachPureTest::Mailer.send_options = []
-    #:wtf
-    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{
-      params: {id: 1},
-      #~meths
-      seq: []
-      #~meths end
-    }])
-    #:wtf end
+  it "accepts operation" do
+    nested_activity = Class.new(Trailblazer::Activity::Railway) do
+      step :compute_item
+
+      def compute_item(ctx, item:, index:, **)
+        ctx[:value] = "#{item}-#{index.inspect}"
+      end
+    end
+
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each(nested_activity, collect: true)  # expects {:dataset}
+    end
+    # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
+
+    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+  end
+
+  it "doesn't override an existing ctx[:index]" do
+   activity = Class.new(Trailblazer::Activity::Railway) do
+      include T.def_steps(:a, :b)
+      include ComputeItem
+
+      step Each(collect: true, &DocsEachUnitTest.block), id: "Each/1"
+      step :b
+      def b(ctx, seq:, index:, **)
+        ctx[:seq] = seq + [index]
+      end
+
+    end
+
+    assert_invoke activity, dataset: [1,2,3], index: 9,
+      expected_ctx_variables: {collected_from_each: ["1-0", "2-1", "3-2"]},
+      seq: "[9]"
+  end
+
+  it "stops iterating when failure" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each(collect: true) {
+        step :check
+      }
+      step :a
+
+      include T.def_steps(:a)
+      def check(ctx, item:, **)
+        ctx[:value] = item.to_s #@ always collect the value, even in failure case.
+
+        return false if item >= 3
+        true
+      end
+    end
+
+    #@ all works
+    assert_invoke activity, dataset: [1,2],
+      expected_ctx_variables: {collected_from_each: ["1", "2"]},
+      seq: "[:a]"
+
+    #@ fail at 3 but still collect 3rd iteration!
+    Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
+    assert_invoke activity, dataset: [1,2,3],
+      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+      seq: "[]",
+      terminus: :failure
+
+    #@ fail at 3, skip 4
+    assert_invoke activity, dataset: [1,2,3,4],
+      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+      seq: "[]",
+      terminus: :failure
+  end
+end
+
+
+class EachInEachTest < Minitest::Spec
+  it "what" do
+    raise
   end
 end
