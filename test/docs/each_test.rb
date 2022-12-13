@@ -81,12 +81,14 @@ class EachTest < Minitest::Spec
       seq: "[:rearrange]"
 
 =begin
-    ctx = {params: {id: 1}, seq: []} # Song 1 has two composers.
     #:collected_from_each
+    #~ctx_to_result
     ctx = {params: {id: 1}} # Song 1 has two composers.
-    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(B::Song::Activity::Cover, [ctx, {}])
+
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Cover, ctx)
 
     puts ctx[:collected_from_each] #=> [[0, "Fat Mike"], [1, "El Hefe"]]
+    #~ctx_to_result end
     #:collected_from_each end
 =end
   end
