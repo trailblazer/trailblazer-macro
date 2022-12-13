@@ -460,7 +460,7 @@ class EachCtxInOutTest < Minitest::Spec
       step :rearrange
 
       def write_to_ctx(ctx, composer_index:, model:, **)
-        ctx[:variable] = "#{composer_index} + #{model.class}"
+        ctx[:variable] = "#{composer_index} + #{model.class.name.split('::').last}"
       end
 
       #~meths
@@ -474,8 +474,8 @@ class EachCtxInOutTest < Minitest::Spec
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
-        :"composer-0-value" => "0 + EachTest::B::Song",
-        :"composer-1-value" => "1 + EachTest::B::Song",
+        :"composer-0-value" => "0 + Song",
+        :"composer-1-value" => "1 + Song",
       },
       seq: "[:rearrange]"
   end
@@ -877,6 +877,29 @@ end
 
 class EachInEachTest < Minitest::Spec
   it "what" do
-    raise
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each(item_key: :outer) {
+        step :capture_outer
+
+        step Each(dataset_from: :inner_dataset, item_key: :inner) {
+          step :capture_inner
+        }
+      }
+
+      def capture_outer(ctx, outer:, **)
+        ctx[:seq] << outer
+      end
+
+      def capture_inner(ctx, inner:, **)
+        ctx[:seq] << inner
+      end
+
+      def inner_dataset(ctx, outer:, **)
+        outer.collect { |i| i * 10 }
+      end
+    end
+
+    assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
+      seq: %{[[1, 2], 10, 20, [3, 4], 30, 40, [5, 6], 50, 60]}
   end
 end

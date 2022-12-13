@@ -68,69 +68,8 @@ end
 #     ctx[:model] #=> #<Song id=1, ...>
 #     puts signal #=> #<Trailblazer::Activity::End semantic=:success>
 # #:update-ok end
-def convert_operation_test(filepath)
-  within_marker = false
-  within_ignore = false
-  within_ctx_to_result = false
-
-  op_test =
-  File.foreach(filepath).collect do |line|
-    if line.match(/#:[\w]+/) # FIXME: we don't use this!
-      within_marker = true
-    end
-    if line.match(/#:.+ end/)
-      within_marker = false
-    end
-
-    if line.match(/#~ignore/) # FIXME: we don't use this!
-      within_ignore = true
-    end
-    if line.match(/#~ignore end/)
-      within_ignore = false
-    end
-
-    if line.match(/#~ctx_to_result/)
-      within_ctx_to_result = true
-    end
-    if line.match(/#~ctx_to_result end/)
-      within_ctx_to_result = false
-    end
 
 
-
-    if within_ignore
-      # puts "@@@@@ #{line.inspect}"
-      line = ""
-    else
-      line = line.sub("< Trailblazer::Activity::Railway", "< Trailblazer::Operation")
-      line = line.gsub("::Activity", "::Operation")
-
-      # if within_marker
-        line = line.sub("signal, (ctx, _) =", "result =")
-        if within_ctx_to_result
-          line = line.sub("ctx[", "result[")
-        end
-
-        if match = line.match(/(Trailblazer::Operation\.\(([\w:]+), ?)/)
-          activity = match[2]
-          line = line.sub(match[0], "#{activity}.(")
-        end
-
-        if match = line.match(/(\s+)puts signal.+(:\w+)>/)
-          semantic = match[2]
-          line = "#{match[1]}result.success? # => #{semantic == ":success" ?  true : false}\n"
-        end
-      # end
-
-      line = line.sub("assert_equal ctx", "assert_equal result")
-      line = line.sub("assert_equal signal", "assert_equal result.event")
-    end
-
-    line
-  end
-
-  File.write "test/docs/operation/" + File.basename(filepath), op_test.join("")
-end
-
-convert_operation_test("test/docs/model_test.rb")
-convert_operation_test("test/docs/each_test.rb")
+# require "trailblazer/core"
+# Trailblazer::Core.convert_operation_test("test/docs/model_test.rb")
+# Trailblazer::Core.convert_operation_test("test/docs/each_test.rb")

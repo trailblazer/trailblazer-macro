@@ -66,7 +66,7 @@ class DocsModelTest < Minitest::Spec
     puts signal #=> #<Trailblazer::Activity::End semantic=:success>
     #:update-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelTest::Song id=1, title=nil>}
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1, title=nil>}
     assert_equal signal.to_h[:semantic], :success
   end
 
@@ -107,7 +107,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
     ctx[:model] #=> #<struct Song id=2, title="Test">
     #:update-with-find-by-key-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelFindByTitleTest::Song id=2, title="Test">}
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=2, title="Test">}
   end
 
   it do
@@ -142,7 +142,7 @@ class DocsModelAccessorTest < Minitest::Spec
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:show-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelAccessorTest::Song id=100, title=nil>}
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=100, title=nil>}
   end
   #~ctx_to_result end
 end
@@ -169,7 +169,7 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
     #:di-model-class end
 
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelDependencyInjectionTest::Hit id=nil, title=nil>}
+    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
 
   # inject all variables
     #:di-all
@@ -181,7 +181,7 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     )
     #:di-all end
 
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelDependencyInjectionTest::Hit id=2, title="Olympia">}
+    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=2, title="Olympia">}
 end
 
   # use empty Model() and inject {model.class} and {model.action}
@@ -204,7 +204,7 @@ class DocsModelEmptyDITest < Minitest::Spec
 
   it do
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelDependencyInjectionTest::DocsModelEmptyDITest::Hit id=nil, title=nil>}
+    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
   end
 end
 
@@ -224,7 +224,7 @@ class DocsModelIOTest < Minitest::Spec
     #:in end
 
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
-    assert_equal ctx[:model].inspect, %{#<struct DocsModelDependencyInjectionTest::DocsModelIOTest::Hit id=1, title=nil>}
+    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
 =begin
 #:in-call
 result = Create.(my_id: 1)
