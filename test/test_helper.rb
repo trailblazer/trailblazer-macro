@@ -53,3 +53,23 @@ Minitest::Spec.class_eval do
     return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
   end
 end
+
+
+
+# signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create,
+#       params:               {title: "Olympia"}, # some random variable.
+#       "model.class":        Hit,
+#       "model.action":       :find_by,
+#       "model.find_by_key":  :title, seq: []
+#     )
+
+# #:update-ok
+#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
+#     ctx[:model] #=> #<Song id=1, ...>
+#     puts signal #=> #<Trailblazer::Activity::End semantic=:success>
+# #:update-ok end
+
+
+# require "trailblazer/core"
+# Trailblazer::Core.convert_operation_test("test/docs/model_test.rb")
+# Trailblazer::Core.convert_operation_test("test/docs/each_test.rb")

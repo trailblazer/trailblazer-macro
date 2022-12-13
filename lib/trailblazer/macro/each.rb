@@ -155,7 +155,7 @@ module Trailblazer
       return {} unless dataset_from
 
       {
-        Activity::Railway.Inject(:dataset) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
+        Activity::Railway.Inject(:dataset, override: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
       }
     end
   end
