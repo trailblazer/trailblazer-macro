@@ -17,12 +17,8 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 
-  spec.add_development_dependency "bundler"
   spec.add_development_dependency "minitest"
   spec.add_development_dependency "rake"
-
-  spec.add_development_dependency "multi_json"
-  spec.add_development_dependency "roar"
   spec.add_development_dependency "trailblazer-developer"
 
   spec.add_dependency "trailblazer-activity-dsl-linear", ">= 1.1.0", "< 1.2.0"
