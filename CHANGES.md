@@ -1,5 +1,10 @@
 # 2.1.12
 
+## Internals
+
+* Introduce `AssignVariable`.
+* Use trailblazer-activity-dsl-linear-1.1.0.
+
 ## Each()
 
 * Introducing the `Each()` macro to iterate over datasets while invoking a particular operation, as if
@@ -21,10 +26,6 @@
 
 * Remove `ctx[:"result.model"]`.
 * Don't set `ctx[:model]` unless `Builder` returns a model.
-
-## Internals
-
-* Introduce `AssignVariable`.
 
 # 2.1.11
 
