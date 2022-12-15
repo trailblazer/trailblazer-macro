@@ -52,6 +52,12 @@ module Trailblazer
         end
 
         return signal, [ctx, flow_options]
+      end #call
+
+      def self.to_h
+        container_activity = @state.get(:activity)
+        # FIXME: this is needed for a proper {find_path} introspect lookup.
+        container_activity.to_h.merge(activity: container_activity)
       end
 
       # This is basically Out() => {copy all mutable variables}
@@ -90,6 +96,7 @@ module Trailblazer
         block_activity,
         each:         true, # mark this activity for {compute_runtime_id}.
         nodes:        [Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
+        outputs: outputs_from_block_activity,
       ).merge(
         wrap_static: Hash.new(wrap_static_for_block_activity)
       )

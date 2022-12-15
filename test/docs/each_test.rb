@@ -616,18 +616,51 @@ class EachStrategyComplianceTest < Minitest::Spec
 
   it "find_path" do
     assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block", :notify_composers])[0].task.inspect,
+      ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
 
 =begin
 #:find_path
 node, _ = Trailblazer::Developer::Introspect.find_path(
   Song::Activity::Cover,
-  ["Each/composers_for_each", "Each.iterate.block", :notify_composers])
+  ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers])
 #=> #<Node ...>
 #:find_path end
 =end
 
+  end
+
+  it "{#find_path} for Each(Activity) with anonymous class" do
+    id = nil
+
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      sub_activity = Class.new(Trailblazer::Activity::Railway) do
+        step :notify_composers
+      end
+      id = sub_activity.to_s
+
+      step :model
+      step Each(sub_activity, dataset_from: :composers_for_each)
+      step :rearrange
+
+      def composers_for_each(ctx, model:, **)
+        model.composers
+      end
+      # include CoverMethods
+    end
+
+    node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
+      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity"])
+
+    assert_equal _activity.class.inspect, "Hash" # container_activity
+
+    #@ inside {invoke_block_activity}
+    node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
+      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity", :notify_composers])
+
+    assert_equal node.task.inspect,
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+    assert_equal _activity.class.inspect, "Trailblazer::Activity"
   end
 
 
@@ -731,7 +764,7 @@ class DocsEachUnitTest < Minitest::Spec
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", :compute_item])[0].task.inspect,
+      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 

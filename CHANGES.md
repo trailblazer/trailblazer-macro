@@ -1,3 +1,7 @@
+# 2.1.13
+
+* Fix an introspect bug in `Each()` where we couldn't look into `"invoke_block_activity"`.
+
 # 2.1.12
 
 ## Internals
