@@ -92,13 +92,13 @@ module Trailblazer
       )
 
       # This activity is passed into the {Runner} for each iteration of {block_activity}.
+      # This activity attempts to look like {Each}.
       container_activity = Activity::TaskWrap.container_activity_for(
         block_activity,
         each:         true, # mark this activity for {compute_runtime_id}.
         nodes:        [Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
-        outputs: outputs_from_block_activity,
-      ).merge(
-        wrap_static: Hash.new(wrap_static_for_block_activity)
+        outputs:      outputs_from_block_activity,
+        wrap_static:  Hash.new(wrap_static_for_block_activity),
       )
 
       # DISCUSS: move to Wrap.
@@ -118,9 +118,16 @@ module Trailblazer
         success_signal:   [termini_from_block_activity[-1][0], {}] # FIXME: when subclassing (e.g. patching) this must be recomputed.
       )
 
-      # {block_activity} looped. In the Stack, this will look as if {block_activity} is
-      # a child of {iterate_activity}, that's why we add {block_activity} as a Node in
-      # {iterate_activity}'s schema.
+      # |-- Each/composers_for_each
+      # |   |-- Start.default
+      # |   |-- Each.iterate.block            This is Class.new(Each), outputs_from_block_activity
+      # |   |   |-- invoke_block_activity.0      step :invoke_block_activity.0
+      # |   |   |   |-- Start.default
+      # |   |   |   |-- notify_composers
+      # |   |   |   `-- End.success
+      # |   |   `-- invoke_block_activity.1      step "invoke_block_activity.1"
+      # |   |       |-- Start.default
+      # |   |       |-- notify_composers
       iterate_strategy = Class.new(Each) do
         extend Macro::Strategy::State # now, the Wrap subclass can inherit its state and copy the {block_activity}.
         initialize!(state)
