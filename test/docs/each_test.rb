@@ -590,9 +590,10 @@ class EachStrategyComplianceTest < Minitest::Spec
     EachPureTest::Mailer.send_options = []
 
     #:patch
-    cover_patched = Trailblazer::Activity::DSL::Linear.Patch(
+    cover_patched = Trailblazer::Activity::DSL::Linear::Patch.(
       Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block"] => -> { step :log_email }
+      ["Each/composers_for_each", "Each.iterate.block"],
+      -> { step :log_email }
     )
     #:patch end
     cover_patched.include(T.def_steps(:log_email, :notify_composers))

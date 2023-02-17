@@ -650,9 +650,10 @@ class WrapUnitTest < Minitest::Spec
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=validate>}
 
     #@ Patch interface
-    patched_activity = Trailblazer::Activity::DSL::Linear.Patch(
+    patched_activity = Trailblazer::Activity::DSL::Linear::Patch.call(
       activity,
-      ["Wrap/WrapUnitTest::HandleUnsafeProcess"] => -> { step mock_validation, replace: :validation, id: :validation }
+      ["Wrap/WrapUnitTest::HandleUnsafeProcess"],
+      -> { step mock_validation, replace: :validation, id: :validation }
     )
 
     #@ the original activity with Wrap is unchanged.
@@ -668,9 +669,10 @@ class WrapStrategyComplianceTest < Minitest::Spec
 
   it do
     #:patch
-    upload_with_upsert = Trailblazer::Activity::DSL::Linear.Patch(
+    upload_with_upsert = Trailblazer::Activity::DSL::Linear::Patch.call(
       Song::Activity::Upload,
-      ["Wrap/MyTransaction"] => -> { step :upsert, replace: :update }
+      ["Wrap/MyTransaction"],
+      -> { step :upsert, replace: :update }
     )
     #:patch end
     upload_with_upsert.include(T.def_steps(:upsert))
