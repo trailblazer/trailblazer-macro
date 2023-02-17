@@ -127,7 +127,7 @@ module Trailblazer
       #       this will help when semantics overlap.
       #
       def self.Static(decider, id:, auto_wire:)
-        decider_outputs = auto_wire.collect do |activity|
+        decider_connectors = auto_wire.collect do |activity|
           [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
         end.to_h
 
@@ -136,7 +136,7 @@ module Trailblazer
             {
               task: Static.method(:return_route_signal),
               id:   :route_to_nested_activity, # returns the {nested_activity} signal
-            }.merge(decider_outputs)
+            }.merge(decider_connectors)
           )
 
           auto_wire.each do |activity|
