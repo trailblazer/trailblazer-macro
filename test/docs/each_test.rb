@@ -54,10 +54,11 @@ class EachTest < Minitest::Spec
         def composers_for_each(ctx, model:, **)
           model.composers
         end
-
+        #:iterated-value
         def notify_composers(ctx, index:, item:, **)
           ctx[:value] = [index, item.full_name]
         end
+        #:iterated-value end
 
         #~meths
         def model(ctx, params:, **)
