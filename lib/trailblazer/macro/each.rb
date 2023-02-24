@@ -68,7 +68,7 @@ module Trailblazer
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
       def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
         # activity is the host activity
-        return compile_id unless activity[:each] == true
+        return compile_id unless activity.to_h[:config][:each] == true
 
         index = captured_node.captured_input.data[:ctx_snapshot].fetch(:index)
 
@@ -94,15 +94,19 @@ module Trailblazer
       # This activity is passed into the {Runner} for each iteration of {block_activity}.
       container_activity = Activity::TaskWrap.container_activity_for(
         block_activity,
-        each:         true, # mark this activity for {compute_runtime_id}.
-        nodes:        [Activity::NodeAttributes.new("invoke_block_activity", nil, block_activity)], # TODO: use TaskMap::TaskAttributes
-        outputs: outputs_from_block_activity,
+        id:        "invoke_block_activity",
+        # merged into {:config}:
+          each:        true, # mark this activity for {compute_runtime_id}.
       ).merge(
-        # FIXME: we can't pass {wrap_static: wrap_static_for_block_activity} into {#container_activity_for}
-        #        because when patching, the container_activity is not recompiled, so we need the Hash here
-        #        with defaulting.
-        wrap_static: Hash.new(wrap_static_for_block_activity)
+        outputs: outputs_from_block_activity,
       )
+
+      # FIXME: we can't pass {wrap_static: wrap_static_for_block_activity} into {#container_activity_for}
+      #        because when patching, the container_activity is not recompiled, so we need the Hash here
+      #        with defaulting.
+      # FIXME: this "hack" is only here to satify patching.
+      config = container_activity[:config].merge(wrap_static: Hash.new(wrap_static_for_block_activity))
+      container_activity.merge!(config: config)
 
       # DISCUSS: move to Wrap.
       termini_from_block_activity =

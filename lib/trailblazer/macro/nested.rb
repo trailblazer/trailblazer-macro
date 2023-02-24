@@ -113,7 +113,7 @@ module Trailblazer
         def self.host_activity_for(activity:)
           Activity::TaskWrap.container_activity_for(
             activity,
-            nodes: [Trailblazer::Activity::NodeAttributes.new(activity.to_s, nil, activity)],
+            id: activity.to_s
           )
         end
 

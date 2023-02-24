@@ -709,7 +709,7 @@ class EachIDTest < Minitest::Spec
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
 
-    assert_match /Each\/\w+/, Trailblazer::Activity::Introspect::TaskMap(activity).values[1].id
+    assert_match /Each\/\w+/, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id # FIXME: this test sucks.
   end
 end
 
