@@ -1,7 +1,10 @@
+# 2.1.14
+
+* Use `trailblazer-activity-dsl-linear-1.2.0` and change internal API as required.
+
 # 2.1.13
 
 * Fix an introspect bug in `Each()` where we couldn't look into `"invoke_block_activity"`.
-* Use `trailblazer-activity-dsl-linear-1.2.0` and change internal API as required.
 
 # 2.1.12
 
