@@ -1,6 +1,5 @@
 require "forwardable"
 require "trailblazer/activity/dsl/linear"
-require "trailblazer/operation" # TODO: remove this dependency
 
 require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"

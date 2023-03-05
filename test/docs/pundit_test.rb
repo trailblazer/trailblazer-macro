@@ -36,10 +36,10 @@ class DocsPunditProcTest < Minitest::Spec
   it do
   #:pundit-result
   result = Create.(params: {}, current_user: Module)
-  result[:"result.policy.default"].success? #=> true
+  result[:"result.policy.default"][:result] #=> true
   result[:"result.policy.default"][:policy] #=> #<MyPolicy ...>
   #:pundit-result end
-    result[:"result.policy.default"].success?.must_equal true
+    result[:"result.policy.default"][:result].must_equal true
     result[:"result.policy.default"][:policy].is_a?(MyPolicy).must_equal true
   end
 
@@ -104,9 +104,9 @@ class PunditWithNameTest < Minitest::Spec
   it {
   #:name-call
   result = Create.(params: {}, current_user: Module)
-  result[:"result.policy.after_model"].success? #=> true
+  result[:"result.policy.after_model"][:result] #=> true
   #:name-call end
-    result[:"result.policy.after_model"].success?.must_equal true }
+  result[:"result.policy.after_model"][:result].must_equal true }
 end
 
 #---
@@ -131,3 +131,28 @@ end
 
 # TODO:
 #policy.default
+
+class PunditWithDepreciationsTest < Minitest::Spec
+  Song = Struct.new(:id)
+
+  class Create < Trailblazer::Operation
+    step Model( Song, :new )
+    step Policy::Pundit( MyPolicy, :create? )
+  end
+
+  it "warns about the `success?` deprecation" do
+    warning = /The `success\?` method is deprecated and will be removed in 3.0.0. Use `ctx\["result.policy.\#{name}"\]\[:result\]` instead./
+
+    assert_output("", warning) do
+      Create.(params: {}, current_user: Module)[:"result.policy.default"].success?
+    end
+  end
+
+  it "warns about the `failure?` deprecation" do
+    warning = /The `failure\?` method is deprecated and will be removed in 3.0.0. Use `!ctx\["result.policy.\#{name}"\]\[:result\]` instead./
+
+    assert_output("", warning) do
+      Create.(params: {}, current_user: Module)[:"result.policy.default"].failure?
+    end
+  end
+end

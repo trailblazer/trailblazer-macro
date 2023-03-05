@@ -20,9 +20,33 @@ module Trailblazer::Macro
         ctx[:"result.policy.#{@name}"] = result
 
         # flow control
-        signal = result.success? ? Trailblazer::Activity::Right : Trailblazer::Activity::Left
+        signal = result[:result] ? Trailblazer::Activity::Right : Trailblazer::Activity::Left
 
         return signal, [ctx, flow_options]
+      end
+    end
+
+    class Result < Hash
+      def initialize(result:, data: nil)
+        self[:result] = result
+
+        data.each { |k, v| self[k] = v } if data
+      end
+
+      def success?
+        Trailblazer::Activity::Deprecate.warn caller_locations[0],
+          "The `success?` method is deprecated and will be removed in 3.0.0. " \
+          "Use `ctx[\"result.policy.\#{name}\"][:result]` instead."
+
+        self[:result]
+      end
+
+      def failure?
+        Trailblazer::Activity::Deprecate.warn caller_locations[0],
+          "The `failure?` method is deprecated and will be removed in 3.0.0. " \
+          "Use `!ctx[\"result.policy.\#{name}\"][:result]` instead."
+
+        !self[:result]
       end
     end
 

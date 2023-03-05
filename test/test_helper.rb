@@ -1,9 +1,10 @@
 $LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
 require "minitest/autorun"
 
-require "trailblazer/macro"
 require "trailblazer/developer"
+require "trailblazer/operation"
 require "trailblazer/activity/testing"
+require "trailblazer/macro"
 
 T = Trailblazer::Activity::Testing
 

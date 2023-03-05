@@ -18,7 +18,7 @@ module Trailblazer
           # DISCUSS: should we deprecate this signature and rather apply the Task API here?
           handler.call(exception, ctx, **circuit_options) # FIXME: when there's an error here, it shows the wrong exception!
 
-          [Operation::Railway.fail!, [ctx, flow_options]]
+          [Activity::Left, [ctx, flow_options]]
         end
       end
 

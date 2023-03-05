@@ -20,8 +20,8 @@ class DocsGuardProcTest < Minitest::Spec
   it { Create.(pass: true)[:x].must_equal true }
 
   #- result object, guard
-  it { Create.(pass: true)[:"result.policy.default"].success?.must_equal true }
-  it { Create.(pass: false)[:"result.policy.default"].success?.must_equal false }
+  it { Create.(pass: true)[:"result.policy.default"][:result].must_equal true }
+  it { Create.(pass: false)[:"result.policy.default"][:result].must_equal false }
 
   #---
   #- Guard inheritance
@@ -97,13 +97,13 @@ class DocsGuardNamedTest < Minitest::Spec
   end
   #:name end
 
-  it { Create.(:current_user => nil   )[:"result.policy.user"].success?.must_equal false }
-  it { Create.(:current_user => Module)[:"result.policy.user"].success?.must_equal true }
+  it { Create.(:current_user => nil   )[:"result.policy.user"][:result].must_equal false }
+  it { Create.(:current_user => Module)[:"result.policy.user"][:result].must_equal true }
 
   it {
   #:name-result
   result = Create.(:current_user => true)
-  result[:"result.policy.user"].success? #=> true
+  result[:"result.policy.user"][:result] #=> true
   #:name-result end
   }
 end
