@@ -29,7 +29,7 @@ class PolicyTest < Minitest::Spec
     result = Create.(params: {}, current_user: Module)
     result[:process].must_equal true
     #- result object, policy
-    result[:"result.policy.default"].success?.must_equal true
+    result[:"result.policy.default"][:result].must_equal true
     result[:"result.policy.default"][:message].must_be_nil
     # result[:valid].must_be_nil
     result[:"policy.default"].inspect.must_equal %{<Auth: user:Module, model:nil>}
@@ -39,7 +39,7 @@ class PolicyTest < Minitest::Spec
     result = Create.(params: {}, current_user: nil)
     result[:process].must_be_nil
     #- result object, policy
-    result[:"result.policy.default"].success?.must_equal false
+    result[:"result.policy.default"][:result].must_equal false
     result[:"result.policy.default"][:message].must_equal "Breach"
   end
   # inject different policy.Condition  it { Create.(params: {}, current_user: Object, "policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))["process"].must_equal true }
@@ -88,7 +88,7 @@ class PolicyTest < Minitest::Spec
     result = Edit.(params: { id: 1 }, current_user: Module)
     result[:process].must_equal true
     result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=1>}
-    result[:"result.policy.default"].success?.must_equal true
+    result[:"result.policy.default"][:result].must_equal true
     result[:"result.policy.default"][:message].must_be_nil
     # result[:valid].must_be_nil
     result[:"policy.default"].inspect.must_equal %{<Auth: user:Module, model:#<struct PolicyTest::Song id=1>>}
@@ -99,7 +99,7 @@ class PolicyTest < Minitest::Spec
     result = Edit.(params: { id: 4 }, current_user: nil)
     result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=4>}
     result[:process].must_be_nil
-    result[:"result.policy.default"].success?.must_equal false
+    result[:"result.policy.default"][:result].must_equal false
     result[:"result.policy.default"][:message].must_equal "Breach"
   end
 end

@@ -9,7 +9,7 @@ module Trailblazer::Macro
         option = Trailblazer::Option(callable)
 
         ->((ctx, *), **circuit_args) do
-          Trailblazer::Operation::Result.new(!!option.call(ctx, keyword_arguments: ctx.to_hash, **circuit_args), {})
+          Policy::Result.new(result: !!option.call(ctx, keyword_arguments: ctx.to_hash, **circuit_args))
         end
       end
     end
