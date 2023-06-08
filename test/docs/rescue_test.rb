@@ -23,7 +23,7 @@ class NestedRescueTest < Minitest::Spec
     fail ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
-  it { Trailblazer::Developer.railway(NestedInsanity).must_match /\[>Rescue\(.{8}\),>nested/ } # FIXME: better introspect tests for all id-generating macros.
+  it { Trailblazer::Developer.railway(NestedInsanity).must_match /\[>Rescue\/.{1},>nested/ } # FIXME: better introspect tests for all id-generating macros.
   it { NestedInsanity.().inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:true [true, true, true, true, true, true, nil, nil] >} }
   it { NestedInsanity.( "raise-y" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:false [true, true, nil, nil, nil, nil, true, true] >} }
   it { NestedInsanity.( "raise-a" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:false [true, true, true, true, nil, nil, nil, true] >} }
@@ -175,5 +175,31 @@ Rescue(), fast_track: true {}
 
     it { Memo::Create.( { seq: [], } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
     it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update]] >} }
+  end
+
+  class ComplianceTest < Minitest::Spec
+    it "tracing" do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Rescue(id: "Rescue/1") {
+          step :validate
+        }
+
+        def validate(ctx, validate: false, seq:, **)
+          seq << :validate
+          raise unless validate
+          validate
+        end
+      end
+
+      ctx = {validate: false}
+
+      output, _ = trace activity, ctx
+      assert_equal output, %(TOP
+|-- Start.default
+|-- Rescue/1
+|   |-- Start.default
+|   `-- validate
+`-- End.failure)
+    end
   end
 end

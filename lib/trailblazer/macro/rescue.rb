@@ -4,7 +4,7 @@ module Trailblazer
   module Macro
     NoopHandler = lambda { |*| }
 
-    def self.Rescue(*exceptions, handler: NoopHandler, &block)
+    def self.Rescue(*exceptions, handler: NoopHandler, id: Macro.id_for(handler, macro: :Rescue), &block)
       exceptions = [StandardError] unless exceptions.any?
 
       handler    = Rescue.deprecate_positional_handler_signature(handler)
@@ -22,9 +22,7 @@ module Trailblazer
         end
       end
 
-      Wrap(rescue_block, id: "Rescue(#{SecureRandom.hex(4)})", &block)
-      # FIXME: name
-      # [ step, name: "Rescue:#{block.source_location.last}" ]
+      Wrap(rescue_block, id: id, &block)
     end
 
     # TODO: remove me in 2.2.
