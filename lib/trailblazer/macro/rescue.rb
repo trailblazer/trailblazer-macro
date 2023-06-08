@@ -1,5 +1,3 @@
-require "securerandom"
-
 module Trailblazer
   module Macro
     NoopHandler = lambda { |*| }

@@ -1,3 +1,8 @@
+# 2.1.15
+
+* Use `Macro.id_for` for `Rescue`, meaning IDs will now be consistent à la `Rescue/1` instead of `Rescue(1)`.
+* In `Each`'s tracing code, use `developer-0.1.0` API.
+
 # 2.1.14
 
 * Use `trailblazer-activity-dsl-linear-1.2.0` and change internal API as required.

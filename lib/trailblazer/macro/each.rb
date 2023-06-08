@@ -66,11 +66,16 @@ module Trailblazer
       ITERATION_INPUT_PIPE  = Activity::DSL::Linear::VariableMapping::DSL.pipe_for_composable_input()
 
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
-      def self.compute_runtime_id(ctx, captured_node:, activity:, compile_id:, **)
+      def self.compute_runtime_id(ctx, trace_node:, activity:, compile_id:, **)
         # activity is the host activity
         return compile_id unless activity.to_h[:config][:each] == true
 
-        index = captured_node.captured_input.data[:ctx_snapshot].fetch(:index)
+        # Developer::Trace::Snapshot::Ctx.ctx_snapshot_for(trace_node.snapshot_before, .data
+# FIXME: BETTER API, we need access to stack now
+
+
+        # index = trace_node.snapshot_before.data[:ctx_snapshot].fetch(:index)
+        index = trace_node.snapshot_before.data[:ctx_variable_changeset].find { |name, version, value| name == :index }[2]
 
         ctx[:runtime_id] = "#{compile_id}.#{index}"
       end
