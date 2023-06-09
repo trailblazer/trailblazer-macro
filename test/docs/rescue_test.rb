@@ -46,6 +46,7 @@ plain Rescue()
     Song = Class.new
     module Song::Activity; end
 
+    #:no-args
     class Song::Activity::Create < Trailblazer::Activity::Railway
       step :create_model
       step Rescue() {
@@ -59,9 +60,12 @@ plain Rescue()
       include Rehash
       #~methods end
     end
+    #:no-args end
 
     it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: true, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
+    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
+    it { assert_invoke Song::Activity::Create, rehash_raise: :bla, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: :bla }
+    it { assert_invoke Song::Activity::Create, rehash_raise: NoMethodError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: NoMethodError }
   end
 
 =begin
@@ -100,8 +104,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
     it do
       # Since we don't catch NoMethodError, execution stops.
       assert_raises NoMethodError do
-        ctx = {seq: {}, rehash_raise: NoMethodError}
-        Song::Activity::Create.invoke([ctx])
+        Song::Activity::Create.invoke([{seq: {}, rehash_raise: NoMethodError}])
       end
     end
   end
