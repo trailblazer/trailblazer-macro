@@ -23,7 +23,7 @@ class NestedRescueTest < Minitest::Spec
     fail ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
-  it { Trailblazer::Developer.railway(NestedInsanity).must_match /\[>Rescue\/.{1},>nested/ } # FIXME: better introspect tests for all id-generating macros.
+  it { Trailblazer::Developer.railway(NestedInsanity).must_match /\[>Rescue\/.{1,3},>nested/ } # FIXME: better introspect tests for all id-generating macros.
   it { NestedInsanity.().inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:true [true, true, true, true, true, true, nil, nil] >} }
   it { NestedInsanity.( "raise-y" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:false [true, true, nil, nil, nil, nil, true, true] >} }
   it { NestedInsanity.( "raise-a" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err").must_equal %{<Result:false [true, true, true, true, nil, nil, nil, true] >} }
@@ -175,6 +175,34 @@ Rescue(), fast_track: true {}
 
     it { Memo::Create.( { seq: [], } ).inspect(:seq).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
     it { Memo::Create.( { seq: [], update: false } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update]] >} }
+  end
+
+  class RescueIDTest < Minitest::Spec
+    class Validate
+      def self.call(*)
+
+      end
+    end
+
+    it "assigns ID via {Macro.id_for}" do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Rescue() {}
+        step Rescue(handler: Validate) {}
+        step Rescue(handler: :instance_method) {}
+        step Rescue() {}, id: "Rescue-1"
+        step Rescue(id: "Rescue-2") {}
+      end
+
+      # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id, "Each/EachIDTest::Validate"
+      # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
+      # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
+
+      assert_match /Rescue\/\d+/, id_1 = Trailblazer::Activity::Introspect::Nodes(activity).values[1].id
+      assert_match /Rescue\/\d+/, id_2 = Trailblazer::Activity::Introspect::Nodes(activity).values[2].id
+      assert_match /Rescue\/\d+/, id_3 = Trailblazer::Activity::Introspect::Nodes(activity).values[3].id
+      assert_match "Rescue-1", id_4 = Trailblazer::Activity::Introspect::Nodes(activity).values[4].id
+      assert_match "Rescue-2", id_5 = Trailblazer::Activity::Introspect::Nodes(activity).values[5].id
+    end
   end
 
   class ComplianceTest < Minitest::Spec

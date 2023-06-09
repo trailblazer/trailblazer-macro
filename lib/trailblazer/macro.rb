@@ -51,8 +51,14 @@ module Trailblazer
       return block_activity, block_activity.to_h[:outputs]
     end
 
-    def self.id_for(user_proc, macro:, hint: nil)
-      id =
+    module IdFor
+      module_function
+
+      def call(user_proc, macro:, hint: nil, id: from_callable(user_proc, hint: hint))
+        [macro, id].join("/")
+      end
+
+      def from_callable(user_proc, hint: nil)
         if user_proc.is_a?(Class)
           user_proc.to_s
         elsif user_proc.instance_of?(Method)
@@ -60,8 +66,11 @@ module Trailblazer
         else
           hint || rand(4)
         end
+      end
+    end
 
-      "#{macro}/#{id}"
+    def self.id_for(user_proc, **options)
+      IdFor.(user_proc, **options)
     end
   end # Macro
 
