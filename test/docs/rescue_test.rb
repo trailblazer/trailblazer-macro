@@ -43,31 +43,33 @@ class RescueTest < Minitest::Spec
 plain Rescue()
 =end
   class RescueWithoutHandlerTest < Minitest::Spec
-    Memo = Class.new
+    Song = Class.new
+    module Song::Activity; end
 
-    class Memo::Create < Trailblazer::Operation
-      step :find_model
+    class Song::Activity::Create < Trailblazer::Activity::Railway
+      step :create_model
       step Rescue() {
-        step :update
+        step :upload
         step :rehash
       }
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:create_model, :upload, :notify, :log_error)
       include Rehash
       #~methods end
     end
 
-    it { Memo::Create.( { seq: [] } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error]] >} }
+    it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
+    it { assert_invoke Song::Activity::Create, rehash_raise: true, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
   end
 
 =begin
-Rescue( handler: X )
+Rescue( SPECIFIC_EXCEPTION, handler: X )
 =end
   class RescueWithClassHandlerTest < Minitest::Spec
-    Memo = Class.new
+    Song = Class.new
+    module Song::Activity; end
 
     #:rescue-handler
     class MyHandler
@@ -78,23 +80,30 @@ Rescue( handler: X )
     #:rescue-handler end
 
     #:rescue
-    class Memo::Create < Trailblazer::Operation
-      step :find_model
-      step Rescue( RuntimeError, handler: MyHandler ) {
-        step :update
+    class Song::Activity::Create < Trailblazer::Activity::Railway
+      step :create_model
+      step Rescue(RuntimeError, handler: MyHandler) {
+        step :upload
         step :rehash
       }
       step :notify
       fail :log_error
       #~methods
-      include T.def_steps(:find_model, :update, :notify, :log_error)
+      include T.def_steps(:create_model, :upload, :notify, :log_error)
       include Rehash
       #~methods end
     end
     #:rescue end
 
-    it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+    it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
+    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
+    it do
+      # Since we don't catch NoMethodError, execution stops.
+      assert_raises NoMethodError do
+        ctx = {seq: {}, rehash_raise: NoMethodError}
+        Song::Activity::Create.invoke([ctx])
+      end
+    end
   end
 
   class RescueWithModuleHandlerTest < Minitest::Spec
@@ -119,7 +128,7 @@ Rescue( handler: X )
     end
 
     it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
   end
 
 =begin
@@ -149,7 +158,7 @@ Rescue( handler: :instance_method )
     #:rescue-method end
 
     it { Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class).must_equal %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq, :exception_class).must_equal %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
   end
 
 =begin

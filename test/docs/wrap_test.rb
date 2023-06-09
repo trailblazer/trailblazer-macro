@@ -169,9 +169,9 @@ When raise:   return {Railway.fail!}
   #@ happy days
     assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]"
   #@ rehash raises
-    assert_invoke Memo::Create, rehash_raise: true, seq: "[:model, :update, :rehash, :log_error]",
+    assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash, :log_error]",
       terminus: :failure,
-      expected_ctx_variables: {exception: "nope!"}
+      expected_ctx_variables: {exception: "RuntimeError"}
   end
 
 =begin
@@ -205,7 +205,7 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
     end
 
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
   end
 
 =begin
@@ -242,7 +242,7 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
     #:fail-fast end
 
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >} }
   end
 
 =begin
@@ -289,7 +289,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     end
 
     it do
-      result = Memo::Create.( { seq: [], rehash_raise: true } )
+      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
       result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::End semantic=:transaction_failed>}
     end
@@ -326,7 +326,7 @@ When raise:   return {Railway.pass!} and go "successful"
     end
 
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
   end
 
 =begin
@@ -361,7 +361,7 @@ You can return boolean true in wrap.
     end
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true } )
+      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
       result.inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
     end
@@ -399,7 +399,7 @@ You can return boolean false in wrap.
     end
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true } )
+      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
       result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
@@ -437,7 +437,7 @@ You can return nil in wrap.
     end
 
     it "translates nil returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: true } )
+      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
       result.inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       result.event.inspect.must_equal %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
@@ -484,7 +484,7 @@ This one is mostly to show how one could wrap steps in a transaction
     #:transaction end
 
     it { Memo::Create.( { seq: [] } ).inspect(:seq).must_equal %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { Memo::Create.( { seq: [], rehash_raise: true } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >} }
+    it { Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq).must_equal %{<Result:false [[:model, :update, :rehash, :log_error]] >} }
   end
 
 =begin

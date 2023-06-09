@@ -17,7 +17,7 @@ end
 module Rehash
   def rehash(ctx, seq:, rehash_raise: false, **)
     seq << :rehash
-    raise "nope!" if rehash_raise
+    raise rehash_raise if rehash_raise
     true
   end
 end
@@ -30,3 +30,5 @@ Minitest::Spec.class_eval do
     return Trailblazer::Developer::Trace::Present.(stack, node_options: {stack.to_a[0]=>{label: "TOP"}}).gsub(/:\d+/, ""), signal, ctx
   end
 end
+
+# Trailblazer::Core.convert_operation_test("test/docs/composable_variable_mapping_test.rb")
