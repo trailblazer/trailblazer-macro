@@ -2,8 +2,7 @@ module Trailblazer
   module Macro
     NoopHandler = lambda { |*| }
 
-    # TODO: for legacy reasons, we pass `:id` to {#id_for}. In 2.2, remove the id hint.
-    def self.Rescue(*exceptions, handler: NoopHandler, id: Macro.id_for(nil, macro: :Rescue, id: rand(100)), &block)
+    def self.Rescue(*exceptions, handler: NoopHandler, id: Rescue.random_id, &block)
       exceptions = [StandardError] unless exceptions.any?
 
       handler    = Rescue.deprecate_positional_handler_signature(handler)
@@ -34,6 +33,12 @@ module Trailblazer
           warn "[Trailblazer] Rescue handlers have a new signature: (exception, *, &block)"
           handler.(exception, ctx, &block)
         end
+      end
+
+      # TODO: for legacy reasons, we pass `:id` to {#id_for}. In 2.2, remove the id hint and use
+      # generic {Macro.id_for} behavior.
+      def self.random_id
+        Macro.id_for(nil, macro: :Rescue, id: rand(100))
       end
     end
   end
