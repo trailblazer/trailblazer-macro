@@ -203,17 +203,22 @@ Rescue(), fast_track: true {}
         step Rescue(handler: :instance_method) {}
         step Rescue() {}, id: "Rescue-1"
         step Rescue(id: "Rescue-2") {}
+        # test identical configuration.
+        step Rescue() {}
+        step Rescue(handler: Validate) {}
       end
 
       # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id, "Each/EachIDTest::Validate"
       # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
       # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
 
-      assert_match /Rescue\/\d+/, id_1 = Trailblazer::Activity::Introspect::Nodes(activity).values[1].id
-      assert_match /Rescue\/\d+/, id_2 = Trailblazer::Activity::Introspect::Nodes(activity).values[2].id
-      assert_match /Rescue\/\d+/, id_3 = Trailblazer::Activity::Introspect::Nodes(activity).values[3].id
-      assert_match "Rescue-1", id_4 = Trailblazer::Activity::Introspect::Nodes(activity).values[4].id
-      assert_match "Rescue-2", id_5 = Trailblazer::Activity::Introspect::Nodes(activity).values[5].id
+      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id
+      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[2].id
+      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[3].id
+      assert_match "Rescue-1", Trailblazer::Activity::Introspect::Nodes(activity).values[4].id
+      assert_match "Rescue-2", Trailblazer::Activity::Introspect::Nodes(activity).values[5].id
+      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[6].id
+      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[7].id
     end
   end
 
