@@ -740,8 +740,11 @@ class DocsEachUnitTest < Minitest::Spec
 
     stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
 
-    assert_equal Trailblazer::Developer::Trace::Present.(stack,
-      node_options: {stack.to_a[0] => {label: "<a-Each-b>"}}), %{<a-Each-b>
+    output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
+      {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
+    end
+
+    assert_equal output, %{<a-Each-b>
 |-- Start.default
 |-- a
 |-- Each/1
