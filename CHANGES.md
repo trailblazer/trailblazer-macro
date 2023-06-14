@@ -2,6 +2,7 @@
 
 * Use `Macro.id_for` for `Rescue`, meaning IDs will now be consistent à la `Rescue/1` instead of `Rescue(1)`.
 * In `Each`'s tracing code, use `developer-0.1.0` API.
+* Use `trailblazer-operation-0.10.1`.
 
 # 2.1.14
 
