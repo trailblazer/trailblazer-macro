@@ -118,7 +118,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
   #~ctx_to_result end
 end
 
-class DocsModelFindBy___Test < Minitest::Spec
+class DocsModelFindByColumnAndDifferentParamsKeyTest < Minitest::Spec
   Song = Struct.new(:id, :short_id) do
     def self.find_by(short_id:)
       return if short_id.nil?
@@ -126,10 +126,43 @@ class DocsModelFindBy___Test < Minitest::Spec
     end
   end
 
-  #:find_by_column
+  #:params_key
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
       step Model(Song, find_by: :short_id, params_key: :slug)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:params_key end
+
+  #~ctx_to_result
+  it do
+    #:params_key-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1f396"}, seq: [])
+    ctx[:model] #=> #<struct Song id=2, short_id="1f396">
+    #:params_key-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1, short_id="1f396">}
+  end
+
+  it do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+  #~ctx_to_result end
+end
+
+class DocsModelFindByColumnTest < Minitest::Spec
+  Song = Class.new(DocsModelFindByColumnAndDifferentParamsKeyTest::Song)
+
+  #:find_by_column
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model(Song, find_by: :short_id)
       step :validate
       step :save
       #~meths
@@ -142,15 +175,15 @@ class DocsModelFindBy___Test < Minitest::Spec
   #~ctx_to_result
   it do
     #:find_by_column-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1f396"}, seq: [])
-    ctx[:model] #=> #<struct Song id=2, slug="1f396">
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: "1f396"}, seq: [])
+    ctx[:model] #=> #<struct Song id=2, short_id="1f396">
     #:find_by_column-invoke end
 
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1, short_id="1f396">}
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
