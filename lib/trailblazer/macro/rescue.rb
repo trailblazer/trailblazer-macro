@@ -38,7 +38,7 @@ module Trailblazer
       # TODO: for legacy reasons, we pass `:id` to {#id_for}. In 2.2, remove the id hint and use
       # generic {Macro.id_for} behavior.
       def self.random_id
-        Macro.id_for(nil, macro: :Rescue, id: rand(100))
+        Macro.id_for(nil, macro: :Rescue, id: rand(1000))
       end
     end
   end
