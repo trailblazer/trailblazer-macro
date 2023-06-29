@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
 
       # TODO: deprecate find_by_key in favor of `find_by: :id`
-    def self.Model(model_class = nil, action = :new, find_by_key = :id, id: "model.build", not_found_terminus: false, params_key: nil, **options)
+    def self.Model(model_class = nil, action = :new, find_by_key = :id, id: "model.build", not_found_terminus: false, params_key: nil, id_from: nil, **options)
       # {find_by: :slug}
       if options.any?
         raise "unknown options #{options}" if options.size > 1
@@ -10,7 +10,12 @@ module Trailblazer
 
         params_key ||= find_by_key
 
-        id_from = ->(ctx, params:, **) { params[params_key] } # TODO: We can hand in other behavior here, Yogi!
+        id_from =
+          if id_from.nil?
+            ->(ctx, params:, **) { params[params_key] } # default id_from
+          else
+            id_from
+          end
 
         extract_id = Macro.task_adapter_for_decider(id_from, variable_name: :id)
 
@@ -26,7 +31,7 @@ module Trailblazer
         options = {task: task, id: id}
       end
 
-      injections = {
+      inject = {
         Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
 
         # defaulting as per Inject() API.
@@ -35,10 +40,15 @@ module Trailblazer
           :"model.action"         => ->(*) { action },
           :"model.find_by_key"    => ->(*) { find_by_key },
           :"model.id_from"        => ->(*) { id_from }, # TODO: test me.
-        }
+        },
       }
 
-      options = options.merge(injections)
+      out = { # TODO: use Outject once it is implemented.
+        Activity::Railway.Out() => ->(ctx, **) { ctx.key?(:model) ? {model: ctx[:model]} : {} }
+      }
+
+      options = options.merge(inject)
+      options = options.merge(out)
 
 
       options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
@@ -47,18 +57,18 @@ module Trailblazer
     end
 
     class Model
-      def call(ctx, params: {}, **)
-        builder = Builder.new
-        model   = builder.call(ctx, params) or return
-
-        ctx[:model] = model
-      end
-
       def self.produce(ctx, id:, **)
         model_class   = ctx[:"model.class"]
         find_by_key   = ctx[:"model.find_by_key"]
 
         ctx[:model] = model_class.find_by(find_by_key.to_sym => id)
+      end
+
+      def call(ctx, params: {}, **)
+        builder = Builder.new
+        model   = builder.call(ctx, params) or return
+
+        ctx[:model] = model
       end
 
       class Builder
