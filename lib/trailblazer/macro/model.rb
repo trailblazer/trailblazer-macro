@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
 
       # TODO: deprecate find_by_key in favor of `find_by: :id`
-    def self.Model(model_class = nil, action = :new, find_by_key = :id, id: "model.build", not_found_terminus: false, params_key: nil, id_from: nil, **options)
+    def self.Model(model_class = nil, action = :new, find_by_key = :id, id: "model.build", not_found_terminus: false, params_key: nil, id_from: nil, **options, &block)
       # {find_by: :slug}
       if options.any?
         raise "unknown options #{options}" if options.size > 1
@@ -11,10 +11,10 @@ module Trailblazer
         params_key ||= find_by_key
 
         id_from =
-          if id_from.nil?
-            ->(ctx, params:, **) { params[params_key] } # default id_from
+          if block
+            block
           else
-            id_from
+            ->(ctx, params:, **) { params[params_key] } # default id_from
           end
 
         extract_id = Macro.task_adapter_for_decider(id_from, variable_name: :id)
