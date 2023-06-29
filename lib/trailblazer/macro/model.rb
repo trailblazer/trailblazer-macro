@@ -59,9 +59,10 @@ module Trailblazer
     class Model
       def self.produce(ctx, id:, **)
         model_class   = ctx[:"model.class"]
+        action        = ctx[:"model.action"]
         find_by_key   = ctx[:"model.find_by_key"]
 
-        ctx[:model] = model_class.find_by(find_by_key.to_sym => id)
+        ctx[:model] = model_class.send(action, find_by_key.to_sym => id)
       end
 
       def call(ctx, params: {}, **)

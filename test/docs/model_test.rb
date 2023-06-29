@@ -195,6 +195,44 @@ class DocsModelFindByColumnTest < Minitest::Spec
   end
 end
 
+class DocsModelFindWithTest < Minitest::Spec
+  Song = Struct.new(:id) do
+    def self.find_with(id:)
+      return if id.nil?
+      new(id)
+    end
+  end
+
+  #:find_with
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model(Song, find_with: :id)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:find_with end
+
+  #~ctx_to_result
+  it do
+    #:find_with-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 2}, seq: [])
+    ctx[:model] #=> #<struct Song id=2>
+    #:find_with-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=2>}
+  end
+
+  it do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+  #~ctx_to_result end
+end
+
 class DocsModelIdFromProcTest < Minitest::Spec
   Song = Struct.new(:id) do
     def self.find_by(id:)
