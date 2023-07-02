@@ -69,14 +69,18 @@ module Trailblazer
 
       # New API for retrieving models by ID.
       # Only handles keyword argument style.
-      def self.Find(model_class, positional_method = nil, params_key: nil, id_from: nil, id: "model.build", not_found_terminus: false, **find_options, &block)
-        raise "unknown options #{find_options}" if find_options.size > 1
+      def self.Find(model_class, positional_method = nil, params_key: nil, id: "model.build", not_found_terminus: false, **keyword_options, &block)
+        raise "unknown options #{keyword_options}" if keyword_options.size > 1
 
         task =
           if positional_method
-
+            finder_activity_for(
+              params_key: params_key || :id,
+              finder:     Find::Positional.new(model_class: model_class, find_method: positional_method),
+              &block
+            )
           else
-            find_method_name, column_key = find_options.to_a[0]
+            find_method_name, column_key = keyword_options.to_a[0]
 
             params_key ||= column_key
 
@@ -87,7 +91,7 @@ module Trailblazer
             )
           end
 
-        options = Activity::Railway.Subprocess(task)
+        options = Activity::Railway.Subprocess(task).merge(id: id)
 
         inject = {
           Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
@@ -119,7 +123,7 @@ module Trailblazer
 
         Class.new(Activity::Railway) do
           step task: extract_id, id: :extract_id
-          step finder
+          step finder,           id: "finder.#{finder.class}" # FIXME: discuss ID.
         end
       end
 
@@ -131,26 +135,19 @@ module Trailblazer
         return activity, action
       end
 
-
-      def self.positional(action:, find_by_key:, params_key:, **options, &block)
-        activity = finder_for(
-          **options,
-          find_method:  Finder.method(:find),
-          params_key:   params_key || find_by_key,
-          &block
-        )
-
-        return activity, action, find_by_key
-      end
-
-      STRATEGIES = {
-        no_arg:     method(:no_arg),      # new
-        # kw_args:    method(:kw_args),     # method(id: 1)
-        positional: method(:positional),  # method(1)
-      }
-
       # Runtime code.
       module Find
+        class Positional
+          def initialize(model_class:, find_method:)
+            @model_class = model_class
+            @find_method = find_method
+          end
+
+          def call(ctx, id:, **)
+            ctx[:model] = @model_class.send(@find_method, id)
+          end
+        end
+
         class KeywordArguments
           def initialize(model_class:, find_method:, column_key:)
             @model_class = model_class
@@ -164,23 +161,14 @@ module Trailblazer
         end
 
 
+
         def self.new(ctx, **)
           model_class = ctx[:"model.class"]
           action      = ctx[:"model.action"]
 
           ctx[:model] = model_class.send(action)
         end
-
-
-
-
-        def self.find(ctx, id:, **)
-          model_class = ctx[:"model.class"]
-          action      = ctx[:"model.action"]
-
-          ctx[:model] = model_class.send(action, id)
-        end
-      end # Finder
+      end # Find
     end
   end # Macro
 end

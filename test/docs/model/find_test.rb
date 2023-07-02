@@ -121,3 +121,187 @@ class DocsModelFindByColumnAndDifferentParamsKeyTest < Minitest::Spec
   end
   #~ctx_to_result end
 end
+
+class DocsModelFindWithTest < Minitest::Spec
+  Song = Struct.new(:id) do
+    def self.find_with(id:)
+      return if id.nil?
+      new(id)
+    end
+  end
+
+  #:find_with
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, find_with: :id)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:find_with end
+
+  #~ctx_to_result
+  it do
+    #:find_with-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 2}, seq: [])
+    ctx[:model] #=> #<struct Song id=2>
+    #:find_with-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=2>}
+  end
+
+  it do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+  #~ctx_to_result end
+end
+
+class DocsModelIdFromProcTest < Minitest::Spec
+  Song = Struct.new(:id) do
+    def self.find_by(id:)
+      return if id.nil?
+      new(id)
+    end
+  end
+
+  #:id_from
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, find_by: :id) { |ctx, params:, **|
+        params[:song] && params[:song][:id]
+      }
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:id_from end
+
+  #~ctx_to_result
+  it do
+    #:id_from-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
+    ctx[:model] #=> #<struct Song id="1f396">
+    #:id_from-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id="1f396">}
+    assert_equal ctx[:seq].inspect, %([:validate, :save])
+  end
+
+  it do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
+
+    assert_equal ctx[:model].inspect, %{nil}
+    assert_equal ctx[:seq].inspect, %([])
+  end
+  #~ctx_to_result end
+end
+
+class DocsModelFindTest < Minitest::Spec
+  Song = Struct.new(:id) do
+    def self.find(id)
+      return if id.nil?
+      new(id)
+    end
+  end
+
+  #:find
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, :find)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:find end
+
+  #~ctx_to_result
+  it do
+    #:find-ok
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, {params: {id: 1}, seq: []})
+    ctx[:model] #=> #<struct Song id=1, title="Roxanne">
+    #:find-ok end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1>}
+  end
+  #~ctx_to_result end
+end
+
+class DocsModelAccessorTest < Minitest::Spec
+  Song = Struct.new(:id, :title) do
+    def self.[](id)
+      id.nil? ? nil : new(id+99)
+    end
+  end
+
+  #:show
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, :[])
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:show end
+
+  #~ctx_to_result
+  it do
+    #:show-ok
+    signal, (ctx, _) = Trailblazer::Developer.wtf?(Song::Activity::Update, [{params: {id: 1}, seq: []}])
+    ctx[:model] #=> #<struct Song id=1, title="Roxanne">
+    #:show-ok end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=100, title=nil>}
+  end
+  #~ctx_to_result end
+end
+
+# class DocsModelBlockTest < Minitest::Spec
+#   Song = Class.new(DocsModelIdFromProcTest::Song)
+
+#   #:block
+#   module Song::Activity
+#     class Update < Trailblazer::Activity::Railway
+#       step Model() do |ctx, params:, **|
+
+#       end
+#       step :validate
+#       step :save
+#       #~meths
+#       include T.def_steps(:validate, :save)
+#       #~meths end
+#     end
+#   end
+#   #:block end
+
+#   #~ctx_to_result
+#   it do
+#     #:block-invoke
+#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
+#     ctx[:model] #=> #<struct Song id="1f396">
+#     #:block-invoke end
+
+#     assert_equal ctx[:model].inspect, %{#<struct #{Song} id="1f396">}
+#     assert_equal ctx[:seq].inspect, %([:validate, :save])
+#   end
+
+#   it do
+#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
+
+#     assert_equal ctx[:model].inspect, %{nil}
+#     assert_equal ctx[:seq].inspect, %([])
+#   end
+#   #~ctx_to_result end
+# end
