@@ -1,35 +1,41 @@
 module Trailblazer
   module Macro
+    # Model(Song, :new)
+    # Model(Song, :build)
+    # Model(Song, find_by: :public_id, params_key: :id)
+    # Model(Song, find_by: :id) { |ctx, params:, **|
+    #   params[:song][:id]
+    # }
 
       # TODO: deprecate find_by_key in favor of `find_by: :id`
     def self.Model(model_class = nil, action = :new, find_by_key = :id, id: "model.build", not_found_terminus: false, params_key: nil, id_from: nil, **options, &block)
-      # {find_by: :slug}
-      if options.any?
-        raise "unknown options #{options}" if options.size > 1
-        action, find_by_key = options.to_a[0]
+      # convert "old" API to new:
+      options = options.merge(find_by: find_by_key) if action == :find_by
 
-        params_key ||= find_by_key
-
-        id_from =
-          if block
-            block
-          else
-            ->(ctx, params:, **) { params[params_key] } # default id_from
-          end
-
-        extract_id = Macro.task_adapter_for_decider(id_from, variable_name: :id)
-
-        task = Activity::Railway() do
-          step task: extract_id, id: :extract_id
-          step Model.method(:produce)
+      style =
+        # {find_by: :slug}
+        if options.any?
+          :kw_args
+        elsif action == :new # || no_arg
+          :no_arg
+        else
+          :positional
         end
 
-        options = Activity::Railway.Subprocess(task)
-      else # old style, deprecate
-        task = Activity::Circuit::TaskAdapter.for_step(Model.new)
+      raise "unknown options #{options}" if options.size > 1
 
-        options = {task: task, id: id}
-      end
+      builder       = Model::STRATEGIES.fetch(style) # Model.new, Model.find_by
+
+      task, action, find_by_key = builder.(
+        model_class:  model_class,
+        action:       action,
+        params_key:   params_key,
+        find_by_key: find_by_key,
+        **options,
+        &block
+      )
+
+      options = Activity::Railway.Subprocess(task)
 
       inject = {
         Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
@@ -57,46 +63,124 @@ module Trailblazer
     end
 
     class Model
-      def self.produce(ctx, id:, **)
-        model_class   = ctx[:"model.class"]
-        action        = ctx[:"model.action"]
-        find_by_key   = ctx[:"model.find_by_key"]
+      def self.for()
 
-        ctx[:model] = model_class.send(action, find_by_key.to_sym => id)
       end
 
-      def call(ctx, params: {}, **)
-        builder = Builder.new
-        model   = builder.call(ctx, params) or return
+      # New API for retrieving models by ID.
+      # Only handles keyword argument style.
+      def self.Find(model_class, positional_method = nil, params_key: nil, id_from: nil, id: "model.build", not_found_terminus: false, **find_options, &block)
+        raise "unknown options #{find_options}" if find_options.size > 1
 
-        ctx[:model] = model
+        task =
+          if positional_method
+
+          else
+            find_method_name, column_key = find_options.to_a[0]
+
+            params_key ||= column_key
+
+            finder_activity_for(
+              params_key: params_key,
+              finder:     Find::KeywordArguments.new(model_class: model_class, find_method: find_method_name, column_key: column_key),
+              &block
+            )
+          end
+
+        options = Activity::Railway.Subprocess(task)
+
+        inject = {
+          Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
+        }
+
+        out = { # TODO: use Outject once it is implemented.
+          Activity::Railway.Out() => ->(ctx, **) { ctx.key?(:model) ? {model: ctx[:model]} : {} }
+        }
+
+        options = options.merge(inject)
+        options = options.merge(out)
+
+        options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
+
+        options
       end
 
-      class Builder
-        def call(ctx, params)
-          action        = ctx[:"model.action"]
-          model_class   = ctx[:"model.class"]
-          find_by_key   = ctx[:"model.find_by_key"]
-          id_from       = ctx[:"model.id_from"]
-          action        = :pass_through unless %i[new find_by].include?(action)
+      # Finder activity consists of two steps:
+      # {extract_id}, and the finder code.
+      def self.finder_activity_for(params_key:, finder:, **, &block)
+        id_from =
+          if block
+            block
+          else
+            ->(ctx, params: {}, **) { params[params_key] } # default id_from
+          end
 
-          send("#{action}!", model_class, params, ctx[:"model.action"], find_by_key)
-        end
+        extract_id = Macro.task_adapter_for_decider(id_from, variable_name: :id)
 
-        def new!(model_class, params, *)
-          model_class.new
-        end
-
-        # Doesn't throw an exception and will return false to divert to Left.
-        def find_by!(model_class, params, action, find_by_key, *)
-          model_class.find_by(find_by_key.to_sym => params[find_by_key])
-        end
-
-        # Call any method on the model class and pass find_by_key, for example find(params[:id]).
-        def pass_through!(model_class, params, action, find_by_key, *)
-          model_class.send(action, params[find_by_key])
+        Class.new(Activity::Railway) do
+          step task: extract_id, id: :extract_id
+          step finder
         end
       end
+
+      def self.no_arg(action:, **)
+        activity = Class.new(Activity::Railway) do
+          step Finder.method(:new)
+        end
+
+        return activity, action
+      end
+
+
+      def self.positional(action:, find_by_key:, params_key:, **options, &block)
+        activity = finder_for(
+          **options,
+          find_method:  Finder.method(:find),
+          params_key:   params_key || find_by_key,
+          &block
+        )
+
+        return activity, action, find_by_key
+      end
+
+      STRATEGIES = {
+        no_arg:     method(:no_arg),      # new
+        # kw_args:    method(:kw_args),     # method(id: 1)
+        positional: method(:positional),  # method(1)
+      }
+
+      # Runtime code.
+      module Find
+        class KeywordArguments
+          def initialize(model_class:, find_method:, column_key:)
+            @model_class = model_class
+            @find_method = find_method
+            @column_key  = column_key.to_sym
+          end
+
+          def call(ctx, id:, **)
+            ctx[:model] = @model_class.send(@find_method, @column_key => id)
+          end
+        end
+
+
+        def self.new(ctx, **)
+          model_class = ctx[:"model.class"]
+          action      = ctx[:"model.action"]
+
+          ctx[:model] = model_class.send(action)
+        end
+
+
+
+
+        def self.find(ctx, id:, **)
+          model_class = ctx[:"model.class"]
+          action      = ctx[:"model.action"]
+
+          ctx[:model] = model_class.send(action, id)
+        end
+      end # Finder
     end
   end # Macro
 end

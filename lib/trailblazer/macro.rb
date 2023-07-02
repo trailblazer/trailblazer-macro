@@ -79,6 +79,7 @@ module Trailblazer
 
   module Activity::DSL::Linear::Helper
     Constants::Policy = Trailblazer::Macro::Policy
+    Constants::Model  = Trailblazer::Macro::Model
 
     # Extending the {Linear::Helper} namespace is the canonical way to import
     # macros into Railway, FastTrack, Operation, etc.
