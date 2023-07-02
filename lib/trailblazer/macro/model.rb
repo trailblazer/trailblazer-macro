@@ -63,13 +63,9 @@ module Trailblazer
     end
 
     class Model
-      def self.for()
-
-      end
-
       # New API for retrieving models by ID.
       # Only handles keyword argument style.
-      def self.Find(model_class, positional_method = nil, params_key: nil, id: "model.build", not_found_terminus: false, **keyword_options, &block)
+      def self.Find(model_class, positional_method = nil, params_key: nil, id: "model.find", not_found_terminus: false, **keyword_options, &block)
         raise "unknown options #{keyword_options}" if keyword_options.size > 1
 
         task =
@@ -91,6 +87,14 @@ module Trailblazer
             )
           end
 
+        options = options_for(task, id: id)
+
+        options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
+
+        options
+      end
+
+      def self.options_for(task, id:)
         options = Activity::Railway.Subprocess(task).merge(id: id)
 
         inject = {
@@ -103,14 +107,17 @@ module Trailblazer
 
         options = options.merge(inject)
         options = options.merge(out)
-
-        options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
-
-        options
       end
 
       # Finder activity consists of two steps:
       # {extract_id}, and the finder code.
+      #
+      #   |-- model.build
+      #   |   |-- Start.default
+      #   |   |-- extract_id
+      #   |   |-- finder.Trailblazer::Macro::Model::Find::Positional
+      #   |   `-- End.success
+      #   |-- validate
       def self.finder_activity_for(params_key:, finder:, **, &block)
         id_from =
           if block
@@ -125,14 +132,6 @@ module Trailblazer
           step task: extract_id, id: :extract_id
           step finder,           id: "finder.#{finder.class}" # FIXME: discuss ID.
         end
-      end
-
-      def self.no_arg(action:, **)
-        activity = Class.new(Activity::Railway) do
-          step Finder.method(:new)
-        end
-
-        return activity, action
       end
 
       # Runtime code.
@@ -160,15 +159,20 @@ module Trailblazer
           end
         end
 
-
-
-        def self.new(ctx, **)
-          model_class = ctx[:"model.class"]
-          action      = ctx[:"model.action"]
-
-          ctx[:model] = model_class.send(action)
+        class NoArgument < Positional
+          def call(ctx, **)
+            ctx[:model] = @model_class.send(@find_method)
+          end
         end
       end # Find
+
+      def self.Build(model_class, method = :new, id: "model.build")
+        activity = Class.new(Activity::Railway) do
+          step Find::NoArgument.new(model_class: model_class, find_method: method)
+        end
+
+        options_for(activity, id: id)
+      end
     end
   end # Macro
 end

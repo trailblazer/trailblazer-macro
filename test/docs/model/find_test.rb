@@ -305,3 +305,32 @@ end
 #   end
 #   #~ctx_to_result end
 # end
+
+# new
+class DocsModelNewTest < Minitest::Spec
+  Song = Class.new(DocsModelFindTest::Song)
+
+  #:new
+  module Song::Activity
+    class Create < Trailblazer::Activity::Railway
+      step Model::Build(Song, :new)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:new end
+
+  #~ctx_to_result
+  it do
+    #:new-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    ctx[:model] #=> #<struct Song id=1>
+    #:new-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=nil>}
+  end
+  #~ctx_to_result end
+end
