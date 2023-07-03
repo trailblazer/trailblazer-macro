@@ -8,6 +8,10 @@ class DocsModelTest < Minitest::Spec
       return new(value) if key == :id
       new(2, value) if key == :title
     end
+
+    def self.[](id)
+      id.nil? ? nil : new(id+99)
+    end
   end
 
   #:op
@@ -114,13 +118,33 @@ class DocsModelFindByTitleTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+class DocsModelAccessorTest < Minitest::Spec
+  Song = Class.new(DocsModelTest::Song)
 
+  #:show
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model(Song, :[])
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:show end
 
+  #~ctx_to_result
+  it do
+    #:show-ok
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
+    ctx[:model] #=> #<struct Song id=1, title="Roxanne">
+    #:show-ok end
 
-
-
-
-
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=100, title=nil>}
+  end
+  #~ctx_to_result end
+end
 
 class DocsModelDependencyInjectionTest < Minitest::Spec
   Song = Class.new(DocsModelTest::Song)
