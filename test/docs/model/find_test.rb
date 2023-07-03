@@ -334,3 +334,33 @@ class DocsModelNewTest < Minitest::Spec
   end
   #~ctx_to_result end
 end
+
+# build
+class DocsModelBuildTest < Minitest::Spec
+  Song = Struct.new(:id)
+  Song.singleton_class.alias_method :build, :new
+
+  #:build
+  module Song::Activity
+    class Create < Trailblazer::Activity::Railway
+      step Model::Build(Song, :build)
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+  #:build end
+
+  #~ctx_to_result
+  it do
+    #:build-invoke
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    ctx[:model] #=> #<struct Song id=1>
+    #:build-invoke end
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=nil>}
+  end
+  #~ctx_to_result end
+end
