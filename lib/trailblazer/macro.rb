@@ -4,6 +4,7 @@ require "trailblazer/operation" # TODO: remove this dependency
 
 require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"
+require "trailblazer/macro/model/find"
 require "trailblazer/macro/policy"
 require "trailblazer/macro/guard"
 require "trailblazer/macro/pundit"
