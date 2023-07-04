@@ -62,7 +62,7 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
   #:find_by_column
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      step Model::Find(Song, find_by: :short_id)
+      step Model::Find(Song, find_by: :short_id) # Song.find_by(short_id: params[:short_id])
       step :validate
       step :save
       #~meths
@@ -95,7 +95,7 @@ class DocsModelFindByColumnAndDifferentParamsKeyTest < Minitest::Spec
   #:params_key
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      step Model::Find(Song, find_by: :id, params_key: :slug)
+      step Model::Find(Song, find_by: :id, params_key: :slug) # Song.find_by(id: params[:slug])
       step :validate
       step :save
       #~meths
@@ -203,7 +203,7 @@ class DocsModelIdFromProcTest < Minitest::Spec
   #~ctx_to_result end
 end
 
-class DocsModelFindTest < Minitest::Spec
+class DocsModelFindPositionaTest < Minitest::Spec
   Song = Struct.new(:id) do
     def self.find(id)
       return if id.nil?
@@ -214,7 +214,7 @@ class DocsModelFindTest < Minitest::Spec
   #:find
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      step Model::Find(Song, :find)
+      step Model::Find(Song, :find) # Song.find(id)
       step :validate
       step :save
       #~meths
@@ -363,4 +363,34 @@ class DocsModelBuildTest < Minitest::Spec
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id=nil>}
   end
   #~ctx_to_result end
+end
+
+class ModelFind404TerminusTest < Minitest::Spec
+  Song = Class.new(DocsModelFindTest::Song)
+
+  #:not-found
+  class Song
+    module Activity
+      class Update < Trailblazer::Activity::Railway
+        step Model::Find(Song, find_by: :id, not_found_terminus: true)
+        step :validate
+        step :save
+        #~meths
+        include T.def_steps(:validate, :save)
+        #~meths end
+      end
+    end
+  end
+  #:not-found end
+
+  it do
+    assert_invoke Song::Activity::Update, params: {id: 1},
+      seq: "[:validate, :save]", expected_ctx_variables: {model: Song.find_by(id: 1)}
+    assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
+
+    #:not-found-invoke
+    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
+    puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
+    #:not-found-invoke end
+  end
 end
