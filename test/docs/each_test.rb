@@ -1,6 +1,5 @@
 require "test_helper"
 
-
 # step Macro::Each(:report_templates, key: :report_template) {
 #   step Subprocess(ReportTemplate::Update), input: :input_report_template
 #   fail :set_report_template_errors
@@ -10,8 +9,7 @@ require "test_helper"
 # end
 
 class EachTest < Minitest::Spec
-  class Composer < Struct.new(:full_name, :email)
-  end
+  Composer = Struct.new(:full_name, :email)
 
   class Mailer
     def self.send(**options)
@@ -23,17 +21,13 @@ class EachTest < Minitest::Spec
     end
   end
 
-#@ operation has {#composers_for_each}
+  #@ operation has {#composers_for_each}
   module B
-    class Song < Struct.new(:id, :title, :band, :composers)
+    Song = Struct.new(:id, :title, :band, :composers) do
       def self.find_by(id:)
-        if id == 2
-          return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe")])
-        end
+        return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe")]) if id == 2
 
-        if id == 3
-          return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe", "scammer@spam")])
-        end
+        return Song.new(id, nil, nil, [Composer.new("Fat Mike", "mike@fat.wreck"), Composer.new("El Hefe", "scammer@spam")]) if id == 3
 
         Song.new(id, nil, nil, [Composer.new("Fat Mike"), Composer.new("El Hefe")])
       end
@@ -51,9 +45,10 @@ class EachTest < Minitest::Spec
         step :rearrange
 
         # "decider interface"
-        def composers_for_each(ctx, model:, **)
+        def composers_for_each(_ctx, model:, **)
           model.composers
         end
+
         #:iterated-value
         def notify_composers(ctx, index:, item:, **)
           ctx[:value] = [index, item.full_name]
@@ -70,14 +65,14 @@ class EachTest < Minitest::Spec
       end
     end
     #:each end
-  end # B
+  end
 
   it "allows a dataset compute in the hosting activity" do
-  #@ {:dataset} is not part of the {ctx}.
+    #@ {:dataset} is not part of the {ctx}.
     assert_invoke B::Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
-        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"]]
       },
       seq: "[:rearrange]"
 
@@ -112,7 +107,7 @@ class EachTest < Minitest::Spec
     end
   end
 
-#@ operation has dedicated step {#find_composers}
+  #@ operation has dedicated step {#find_composers}
   module C
     class Song < B::Song; end
 
@@ -121,7 +116,7 @@ class EachTest < Minitest::Spec
         step :model
         step :find_composers
         step Each(collect: true) {
-            step :notify_composers
+          step :notify_composers
         }, In() => {:composers => :dataset}
         step :rearrange
 
@@ -135,7 +130,7 @@ class EachTest < Minitest::Spec
         #~meths end
       end
     end
-  end # C
+  end
 
   it "dataset can come from the hosting activity" do
 #@ {:dataset} is not part of the outgoing {ctx}.
@@ -152,11 +147,11 @@ class EachTest < Minitest::Spec
       expected_ctx_variables: {
         model: C::Song.find_by(id: 1),
         composers: [Composer.new("Fat Mike"), Composer.new("El Hefe")],
-        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"]]
       }, seq: "[:rearrange]"
   end
 
-#@ {:item_key}
+  #@ {:item_key}
   module E
     class Song < B::Song; end
 
@@ -174,7 +169,6 @@ class EachTest < Minitest::Spec
         #:item_key end
         step :rearrange
 
-
         # circuit-step interface! "decider interface"
         def composers_for_each(ctx, model:, **)
           model.composers
@@ -191,13 +185,14 @@ class EachTest < Minitest::Spec
 
   it "{item_key: :composer}" do
     E::Mailer.send_options = []
+
     assert_invoke E::Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
-        model: B::Song.find_by(id: 1),
+        model: B::Song.find_by(id: 1)
         # collected_from_each: ["Fat Mike", "El Hefe"]
       },
       seq: "[:rearrange]"
-    assert_equal E::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
+    assert_equal([{:to => nil, :message => "0) You, Fat Mike, have been warned about your song being copied."}, {:to => nil, :message => "1) You, El Hefe, have been warned about your song being copied."}], E::Mailer.send_options)
   end
 
 #@ failure in Each
@@ -207,6 +202,7 @@ class EachTest < Minitest::Spec
     class Notify
       def self.send_email(email)
         return if email.nil?
+
         true
       end
     end
@@ -220,17 +216,15 @@ class EachTest < Minitest::Spec
         step :rearrange
 
         def notify_composers(ctx, item:, **)
-          if Notify.send_email(item.email)
-            ctx[:value] = item.email # let's collect all emails that could be sent.
-            return true
-          else
-            return false
-          end
+          return false unless Notify.send_email(item.email)
+
+          ctx[:value] = item.email # let's collect all emails that could be sent.
+          return true
         end
         #~meths
 
         # circuit-step interface! "decider interface"
-        def composers_for_each(ctx, model:, **)
+        def composers_for_each(_ctx, model:, **)
           model.composers
         end
         include CoverMethods
@@ -243,7 +237,7 @@ class EachTest < Minitest::Spec
     assert_invoke F::Song::Activity::Cover, params: {id: 2},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 2),
-        collected_from_each: ["mike@fat.wreck", nil],
+        collected_from_each: ["mike@fat.wreck", nil]
       },
       seq: "[]",
       terminus: :failure
@@ -262,7 +256,7 @@ class EachTest < Minitest::Spec
       class Notify < Trailblazer::Activity::Railway
         step :send_email
 
-        def send_email(ctx, index:, item:, **)
+        def send_email(_ctx, index:, item:, **)
           Mailer.send(to: item.email, message: "#{index}) You, #{item.full_name}, have been warned about your song being copied.")
         end
       end
@@ -276,7 +270,7 @@ class EachTest < Minitest::Spec
         step Each(Notify, dataset_from: :composers_for_each)
         step :rearrange
         #~meths
-        def composers_for_each(ctx, model:, **)
+        def composers_for_each(_ctx, model:, **)
           model.composers
         end
         include CoverMethods
@@ -288,13 +282,14 @@ class EachTest < Minitest::Spec
 
   it "Each(Activity::Railway)" do
     D::Mailer.send_options = []
+
     assert_invoke D::Song::Activity::Cover, params: {id: 1},
       seq:                    "[:rearrange]",
       expected_ctx_variables: {
-        model:                D::Song.find_by(id: 1),
+        model:                D::Song.find_by(id: 1)
         # collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
       }
-    assert_equal D::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
+    assert_equal([{:to => nil, :message => "0) You, Fat Mike, have been warned about your song being copied."}, {:to => nil, :message => "1) You, El Hefe, have been warned about your song being copied."}], D::Mailer.send_options)
   end
 
 #@ Each with operation with three outcomes. Notify terminates on {End.spam_email},
@@ -312,6 +307,7 @@ class EachTest < Minitest::Spec
 
         def send_email(ctx, index:, item:, **)
           return false if item.email == "scammer@spam"
+
           ctx[:value] = [index, item.full_name]
         end
       end
@@ -323,10 +319,10 @@ class EachTest < Minitest::Spec
 
         step :model
         step Each(Notify, dataset_from: :composers_for_each, collect: true),
-          Output(:spam_email) => Track(:spam_alert)
+             Output(:spam_email) => Track(:spam_alert)
         step :rearrange
         #~meths
-        def composers_for_each(ctx, model:, **)
+        def composers_for_each(_ctx, model:, **)
           model.composers
         end
         include CoverMethods
@@ -343,7 +339,7 @@ class EachTest < Minitest::Spec
       seq:                    "[]",
       expected_ctx_variables: {
         model:                G::Song.find_by(id: 3),
-        collected_from_each:  [[0, "Fat Mike"], nil,]
+        collected_from_each:  [[0, "Fat Mike"], nil]
       }
   end
 end
@@ -353,7 +349,7 @@ class EachCtxDiscardedTest < Minitest::Spec
   Composer  = EachTest::Composer
   Song      = Class.new(EachTest::B::Song)
 
-#@ iterated steps write to ctx, gets discarded.
+  #@ iterated steps write to ctx, gets discarded.
   module Song::Activity
     class Cover < Trailblazer::Activity::Railway
       step :model
@@ -385,7 +381,7 @@ class EachCtxDiscardedTest < Minitest::Spec
   it "discards {ctx[:variable]}" do
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
-        model: Song.find_by(id: 1),
+        model: Song.find_by(id: 1)
         # collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
       },
       seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
@@ -400,18 +396,16 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
   module Song::Activity
     class Cover < Trailblazer::Activity::Railway
       step :model
-      step Each(dataset_from: :composers_for_each,
+      step Each(
+        dataset_from: :composers_for_each,
 
         # all filters called before/after each iteration!
-        Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
-
-
-
+        Inject(:collected_from_each) => ->(_ctx, **) { [] }, # this is called only once.
+        Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each + [ctx[:value]]} }
       ) {
-        step :notify_composers
-        step :write_to_ctx
-      }
+             step :notify_composers
+             step :write_to_ctx
+           }
       step :rearrange
 
       def write_to_ctx(ctx, index:, seq:, item:, **)
@@ -431,7 +425,7 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
-        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"]]
       },
       seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
   end
@@ -446,24 +440,20 @@ class EachCtxInOutTest < Minitest::Spec
   module Song::Activity
     class Cover < Trailblazer::Activity::Railway
       step :model
-      step Each(dataset_from: :composers_for_each,
+      step Each(
+        dataset_from: :composers_for_each,
         # Inject(always: true) => {
-        Inject(:composer_index) => ->(ctx, index:, **) { index },
+        Inject(:composer_index) => ->(_ctx, index:, **) { index },
         # all filters called before/after each iteration!
-        Out() => ->(ctx, index:, variable:, **) { {:"composer-#{index}-value" => variable} }
-
-
-
-
-
+        Out() => ->(_ctx, index:, variable:, **) { {:"composer-#{index}-value" => variable} }
       ) {
-        step :notify_composers
-        step :write_to_ctx
-      }
+             step :notify_composers
+             step :write_to_ctx
+           }
       step :rearrange
 
       def write_to_ctx(ctx, composer_index:, model:, **)
-        ctx[:variable] = "#{composer_index} + #{model.class.name.split('::').last}"
+        ctx[:variable] = "#{composer_index} + #{model.class.name.split("::").last}"
       end
 
       #~meths
@@ -478,16 +468,14 @@ class EachCtxInOutTest < Minitest::Spec
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
         :"composer-0-value" => "0 + Song",
-        :"composer-1-value" => "1 + Song",
+        :"composer-1-value" => "1 + Song"
       },
       seq: "[:rearrange]"
   end
 end
 
 class EachOuterCtxTest < Minitest::Spec
-
 end
-
 
 #@ {:errors} is first initialized with a default injection,
 #@ then passed across iterations.
@@ -499,14 +487,15 @@ class EachSharedIterationVariableTest < Minitest::Spec
   module Song::Activity
     class Cover < Trailblazer::Activity::Railway
       step :model
-      step Each(dataset_from: :composers_for_each,
+      step Each(
+        dataset_from: :composers_for_each,
         Inject(:messages) => ->(*) { {} },
 
         # all filters called before/after each iteration!
         Out() => [:messages]
       ) {
-        step :write_to_ctx
-      }
+             step :write_to_ctx
+           }
       step :rearrange
 
       def write_to_ctx(ctx, item:, messages:, index:, **)
@@ -524,10 +513,10 @@ class EachSharedIterationVariableTest < Minitest::Spec
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
-        messages: {0=>"Fat Mike", 1=>"El Hefe"}},
+        messages: {0 => "Fat Mike", 1 => "El Hefe"}
+      },
       seq: "[:rearrange]"
   end
-
 end
 
 #@ Each without any option
@@ -549,15 +538,16 @@ class EachPureTest < Minitest::Spec
 
       # "decider interface"
       #:dataset_from
-      def composers_for_each(ctx, model:, **)
+      def composers_for_each(_ctx, model:, **)
         model.composers
       end
       #:dataset_from end
 
       #:iterated
-      def notify_composers(ctx, index:, item:, **)
+      def notify_composers(_ctx, index:, item:, **)
         Mailer.send(to: item.email, message: "#{index}) You, #{item.full_name}, have been warned about your song being copied.")
       end
+
       #:iterated end
       #~meths
       def model(ctx, params:, **)
@@ -575,11 +565,11 @@ class EachPureTest < Minitest::Spec
   #@ {:dataset} is not part of the {ctx}.
     assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
-        model: Song.find_by(id: 1),
+        model: Song.find_by(id: 1)
       },
       seq: "[:rearrange]"
 
-    assert_equal Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
+    assert_equal([{:to => nil, :message => "0) You, Fat Mike, have been warned about your song being copied."}, {:to => nil, :message => "1) You, El Hefe, have been warned about your song being copied."}], Mailer.send_options)
   end
 end
 
@@ -602,24 +592,26 @@ class EachStrategyComplianceTest < Minitest::Spec
   #@ Original class isn't changed.
     assert_invoke Song::Activity::Cover, params: {id: 1}, seq: [],
       expected_ctx_variables: {
-          model: Song.find_by(id: 1),
-        },
+        model: Song.find_by(id: 1)
+      },
       seq: "[:rearrange]"
 
   #@ Patched class runs
   # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
     assert_invoke cover_patched, params: {id: 1}, seq: [],
       expected_ctx_variables: {
-          model: Song.find_by(id: 1),
-        },
+        model: Song.find_by(id: 1)
+      },
       seq: "[:notify_composers, :log_email, :notify_composers, :log_email, :rearrange]"
   end
 
-
   it "find_path" do
-    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+    assert_equal(
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}, Trailblazer::Developer::Introspect.find_path(
+        Song::Activity::Cover,
+        ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers]
+      )[0].task.inspect
+    )
 
 =begin
 #:find_path
@@ -645,48 +637,55 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
       step Each(sub_activity, dataset_from: :composers_for_each)
       step :rearrange
 
-      def composers_for_each(ctx, model:, **)
+      def composers_for_each(_ctx, model:, **)
         model.composers
       end
       # include CoverMethods
     end
 
-    node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
-      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity"])
+    _, _activity = Trailblazer::Developer::Introspect.find_path(
+      activity,
+      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity"]
+    )
 
-    assert_equal _activity.class.inspect, "Hash" # container_activity
+    assert_equal("Hash", _activity.class.inspect) # container_activity
 
     #@ inside {invoke_block_activity}
-    node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
-      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity", :notify_composers])
+    node, _activity = Trailblazer::Developer::Introspect.find_path(
+      activity,
+      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity", :notify_composers]
+    )
 
-    assert_equal node.task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
-    assert_equal _activity.class.inspect, "Trailblazer::Activity"
+    assert_equal(%{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}, node.task.inspect)
+    assert_equal("Trailblazer::Activity", _activity.class.inspect)
   end
-
 
   it "tracing" do
     EachPureTest::Mailer.send_options = []
     #:wtf
-    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{
-      params: {id: 1},
-      #~meths
-      seq: []
-      #~meths end
-    }])
+    Trailblazer::Developer.wtf?(
+      Song::Activity::Cover, [
+        {
+          params: {id: 1},
+              #~meths
+              seq: []
+          #~meths end
+        }
+      ]
+    )
     #:wtf end
   end
 end
-
 
 #@ dataset: []
 class EachEmptyDatasetTest < Minitest::Spec
   it do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each() {
-        step :raise
-      }
+      step(
+        Each() do
+          step :raise
+        end
+      )
     end
 
     assert_invoke activity, dataset: []
@@ -699,17 +698,17 @@ class EachIDTest < Minitest::Spec
 
   it "assigns IDs via {Macro.id_for}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Each() {}
+      step(Each() {})
       step Each(Validate)
       step Each() {}, id: "Each-1"
       step Each(dataset_from: :composers_for_each) {}
     end
 
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id, "Each/EachIDTest::Validate"
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
+    assert_equal("Each/EachIDTest::Validate", Trailblazer::Developer::Introspect.find_path(activity, ["Each/EachIDTest::Validate"])[0].id)
+    assert_equal("Each-1", Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id)
+    assert_equal("Each/composers_for_each", Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id)
 
-    assert_match /Each\/\w+/, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id # FIXME: this test sucks.
+    assert_match(%r{Each/\w+}, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id) # FIXME: this test sucks.
   end
 end
 
@@ -721,7 +720,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   def self.block
-    -> (*){
+    ->(*) {
       step :compute_item
     }
   end
@@ -736,15 +735,16 @@ class DocsEachUnitTest < Minitest::Spec
       step :b
     end
 
-    ctx = {seq: [], dataset: [3,2,1]}
+    ctx = {seq: [], dataset: [3, 2, 1]}
 
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    stack, = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
 
     output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
       {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
     end
 
-    assert_equal output, %{<a-Each-b>
+    assert_equal(
+      %{<a-Each-b>
 |-- Start.default
 |-- a
 |-- Each/1
@@ -764,34 +764,38 @@ class DocsEachUnitTest < Minitest::Spec
 |   |       `-- End.success
 |   `-- End.success
 |-- b
-`-- End.success}
+`-- End.success}, output
+    )
 
-  #@ compile time
-  #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    #@ compile time
+    #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
+    assert_equal(
+      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}, Trailblazer::Developer::Introspect.find_path(
+        activity,
+        ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item]
+      )[0].task.inspect
+    )
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
-  # TODO: grab runtime ctx for iteration 134
+    # TODO: grab runtime ctx for iteration 134
   end
 
   it "Each::Circuit" do
     activity = Trailblazer::Macro.Each(collect: true, &DocsEachUnitTest.block)[:task]
 
-    my_exec_context = Class.new do
+    my_exec_context = Class.new {
       include ComputeItem
-    end.new
+    }.new
 
     ctx = {
-      dataset: [1,2,3]
+      dataset: [1, 2, 3]
     }
 
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
-    assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
-  end
+    _, (_ctx,_) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
 
+    assert_equal(%w[1-0 2-1 3-2], _ctx[:collected_from_each])
+  end
 
   it "accepts iterated {block}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
@@ -802,9 +806,9 @@ class DocsEachUnitTest < Minitest::Spec
       }
     end
 
-    Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
+    Trailblazer::Developer.wtf?(activity, [{dataset: %w[one two three]}, {}])
 
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+    assert_invoke activity, dataset: %w[one two three], expected_ctx_variables: {collected_from_each: %w[one-0 two-1 three-2]}
   end
 
   it "can see the entire ctx" do
@@ -820,19 +824,22 @@ class DocsEachUnitTest < Minitest::Spec
 
     Trailblazer::Developer.wtf?(
       activity,
-      [{
-          dataset:      ["one", "two", "three"],
-          current_user: Object,
+      [
+        {
+          dataset:      %w[one two three],
+                  current_user: Object
         },
-      {}]
+        {}
+      ]
     )
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
+
+    assert_invoke activity, dataset: %w[one two three], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
   end
 
   it "allows taskWrap in Each" do
     activity = Class.new(Trailblazer::Activity::Railway) do
       step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
-        step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
+        step :compute_item, In() => {:current_user => :user}, In() => %i[item index]
       }
 
       def compute_item(ctx, item:, index:, user:, **)
@@ -840,7 +847,7 @@ class DocsEachUnitTest < Minitest::Spec
       end
     end
 
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
+    assert_invoke activity, dataset: %w[one two three], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
   end
 
   it "accepts operation" do
@@ -857,11 +864,11 @@ class DocsEachUnitTest < Minitest::Spec
     end
     # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
 
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+    assert_invoke activity, dataset: %w[one two three], expected_ctx_variables: {collected_from_each: %w[one-0 two-1 three-2]}
   end
 
   it "doesn't override an existing ctx[:index]" do
-   activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Activity::Railway) do
       include T.def_steps(:a, :b)
       include ComputeItem
 
@@ -870,11 +877,10 @@ class DocsEachUnitTest < Minitest::Spec
       def b(ctx, seq:, index:, **)
         ctx[:seq] = seq + [index]
       end
-
     end
 
-    assert_invoke activity, dataset: [1,2,3], index: 9,
-      expected_ctx_variables: {collected_from_each: ["1-0", "2-1", "3-2"]},
+    assert_invoke activity, dataset: [1, 2, 3], index: 9,
+      expected_ctx_variables: {collected_from_each: %w[1-0 2-1 3-2]},
       seq: "[9]"
   end
 
@@ -890,30 +896,31 @@ class DocsEachUnitTest < Minitest::Spec
         ctx[:value] = item.to_s #@ always collect the value, even in failure case.
 
         return false if item >= 3
+
         true
       end
     end
 
     #@ all works
-    assert_invoke activity, dataset: [1,2],
-      expected_ctx_variables: {collected_from_each: ["1", "2"]},
+    assert_invoke activity, dataset: [1, 2],
+      expected_ctx_variables: {collected_from_each: %w[1 2]},
       seq: "[:a]"
 
     #@ fail at 3 but still collect 3rd iteration!
-    Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
-    assert_invoke activity, dataset: [1,2,3],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+    Trailblazer::Developer.wtf?(activity, [{dataset: [1, 2, 3]}, {}])
+
+    assert_invoke activity, dataset: [1, 2, 3],
+      expected_ctx_variables: {collected_from_each: %w[1 2 3]},
       seq: "[]",
       terminus: :failure
 
     #@ fail at 3, skip 4
-    assert_invoke activity, dataset: [1,2,3,4],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
+    assert_invoke activity, dataset: [1, 2, 3, 4],
+      expected_ctx_variables: {collected_from_each: %w[1 2 3]},
       seq: "[]",
       terminus: :failure
   end
 end
-
 
 class EachInEachTest < Minitest::Spec
   it "what" do
@@ -934,12 +941,12 @@ class EachInEachTest < Minitest::Spec
         ctx[:seq] << inner
       end
 
-      def inner_dataset(ctx, outer:, **)
+      def inner_dataset(_ctx, outer:, **)
         outer.collect { |i| i * 10 }
       end
     end
 
-    assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
+    assert_invoke activity, dataset: [[1, 2], [3, 4], [5, 6]],
       seq: %{[[1, 2], 10, 20, [3, 4], 30, 40, [5, 6], 50, 60]}
   end
 end

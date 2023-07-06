@@ -29,9 +29,9 @@ class DocsPunditProcTest < Minitest::Spec
   end
   #:pundit end
 
-  it { Trailblazer::Developer.railway(Create).must_equal %{[>model.build,>policy.default.eval]} }
-  it { Create.(params: {}, current_user: Module).inspect(:model).must_equal %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
-  it { Create.(params: {}                          ).inspect(:model).must_equal %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
+  it { assert_equal Trailblazer::Developer.railway(Create), %{[>model.build,>policy.default.eval]} }
+  it { assert_equal Create.(params: {}, current_user: Module).inspect(:model), %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
+  it { assert_equal Create.(params: {}                          ).inspect(:model), %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
 
   it do
   #:pundit-result
@@ -39,8 +39,8 @@ class DocsPunditProcTest < Minitest::Spec
   result[:"result.policy.default"].success? #=> true
   result[:"result.policy.default"][:policy] #=> #<MyPolicy ...>
   #:pundit-result end
-    result[:"result.policy.default"].success?.must_equal true
-    result[:"result.policy.default"][:policy].is_a?(MyPolicy).must_equal true
+  assert result[:"result.policy.default"].success?
+  assert result[:"result.policy.default"][:policy].is_a?(MyPolicy)
   end
 
   #---
@@ -49,9 +49,11 @@ class DocsPunditProcTest < Minitest::Spec
     step Policy::Pundit( MyPolicy, :new? ), override: true
   end
 
-  it { Trailblazer::Developer.railway(New).must_equal %{[>model.build,>policy.default.eval]} }
-  it { New.(params: {}, current_user: Class ).inspect(:model).must_equal %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
-  it { New.(params: {}, current_user: nil ).inspect(:model).must_equal %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
+  it { assert_equal "[>model.build,>policy.default.eval]", Trailblazer::Developer.railway(New) }
+
+  it { assert_equal "<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >", New.(params: {}, current_user: Class).inspect(:model) }
+
+  it { assert_equal "<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >", New.(params: {}, current_user: nil).inspect(:model) }
 
   #---
   #- override with :name
@@ -64,10 +66,10 @@ class DocsPunditProcTest < Minitest::Spec
     step Policy::Pundit( MyPolicy, :new?, name: "first" ), override: true
   end
 
-  it { Trailblazer::Developer.railway(Edit).must_equal %{[>policy.first.eval,>policy.second.eval]} }
-  it { Edit.(params: {}, current_user: Class).inspect(:model).must_equal %{<Result:false [nil] >} }
-  it { Trailblazer::Developer.railway(Update).must_equal %{[>policy.first.eval,>policy.second.eval]} }
-  it { Update.(params: {}, current_user: Class).inspect(:model).must_equal %{<Result:true [nil] >} }
+  it { assert_equal "[>policy.first.eval,>policy.second.eval]", Trailblazer::Developer.railway(Edit) }
+  it { assert_equal "<Result:false [nil] >", Edit.(params: {}, current_user: Class).inspect(:model) }
+  it { assert_equal "[>policy.first.eval,>policy.second.eval]", Trailblazer::Developer.railway(Update) }
+  it { assert_equal "<Result:true [nil] >", Update.(params: {}, current_user: Class).inspect(:model) }
 
   #---
   # dependency injection
@@ -85,7 +87,8 @@ class DocsPunditProcTest < Minitest::Spec
     :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit.build(AnotherPolicy, :create?)
   )
   #:di-call end
-    result.inspect("").must_equal %{<Result:true [nil] >} }
+    assert_equal "<Result:true [nil] >", result.inspect("")
+  }
 end
 
 #-
@@ -106,7 +109,7 @@ class PunditWithNameTest < Minitest::Spec
   result = Create.(params: {}, current_user: Module)
   result[:"result.policy.after_model"].success? #=> true
   #:name-call end
-    result[:"result.policy.after_model"].success?.must_equal true }
+  assert result[:"result.policy.after_model"].success? }
 end
 
 #---
@@ -123,7 +126,7 @@ end
 #   #:class-level end
 
 #   it { Create.(); Create["result.policy"].must_be_nil }
-#   it { Create.(params: {}, current_user: Module)["x"].must_equal true }
+#   it { assert Create.(params: {}, current_user: Module)["x"] }
 #   it { Create.(params: {}                          )["x"].must_be_nil }
 # end
 
