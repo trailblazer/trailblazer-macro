@@ -28,7 +28,7 @@ class DocsMacroTest < Minitest::Spec
   end
 =end
 
-  it { Trailblazer::Developer.railway(Create).must_equal %{[>my_policy.manager]} }
+  it { assert_equal Trailblazer::Developer.railway(Create), %{[>my_policy.manager]} }
 end
 
 

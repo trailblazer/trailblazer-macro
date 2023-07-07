@@ -35,7 +35,7 @@ class IntegrationTest < Minitest::Spec
   end
 
   it "create Artist and Song" do
-    result = SongSpecialCreate.trace(
+    result = SongSpecialCreate.wtf?(
       params: {
         artist: {
           name: "My Artist"
@@ -46,10 +46,10 @@ class IntegrationTest < Minitest::Spec
       }
     )
 
-    puts result.wtf?
+    puts result
 
     # this should return song
-    result[:model].name.must_match "My Song"
-    result[:model].artist_name.must_match "My Artist"
+    assert_match "My Song", result[:model].name
+    assert_match "My Artist", result[:model].artist_name
   end
 end

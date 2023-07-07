@@ -4,13 +4,15 @@ class DocsModelTest < Minitest::Spec
   Song = Struct.new(:id, :title) do
     def self.find_by(args)
       key, value = args.flatten
-      return nil if value.nil?
+      return if value.nil?
       return new(value) if key == :id
+
       new(2, value) if key == :title
     end
 
+    undef :[]
     def self.[](id)
-      id.nil? ? nil : new(id+99)
+      id.nil? ? nil : new(id + 99)
     end
   end
 
@@ -67,7 +69,7 @@ class DocsModelTest < Minitest::Spec
     #:update-ok end
 
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1, title=nil>}
-    assert_equal signal.to_h[:semantic], :success
+    assert_equal(:success, signal.to_h[:semantic])
   end
 
   it do
@@ -77,8 +79,8 @@ class DocsModelTest < Minitest::Spec
     puts signal #=> #<Trailblazer::Activity::End semantic=:failure>
     #:update-fail end
 
-    assert_equal ctx[:model].inspect, %{nil}
-    assert_equal signal.to_h[:semantic], :failure
+    assert_equal(%{nil}, ctx[:model].inspect)
+    assert_equal(:failure, signal.to_h[:semantic])
   end
   #~ctx_to_result end
 end
@@ -112,7 +114,8 @@ class DocsModelFindByTitleTest < Minitest::Spec
   it do
     #:key-title-fail
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: nil}, seq: [])
-    assert_equal ctx[:model].inspect, %{nil}
+
+    assert_equal(%{nil}, ctx[:model].inspect)
     #:key-title-fail end
   end
   #~ctx_to_result end
@@ -165,14 +168,15 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     end
 
     #:di-model-class
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+    _signal, (ctx,) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
     #:di-model-class end
 
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
 
-  # inject all variables
+    # inject all variables
     #:di-all
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create,
+    signal, (ctx, _) = Trailblazer::Activity.(
+      Song::Activity::Create,
       params:               {title: "Olympia"}, # some random variable.
       "model.class":        Hit,
       "model.action":       :find_by,
@@ -181,54 +185,54 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     #:di-all end
 
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=2, title="Olympia">}
-end
+  end
 
   # use empty Model() and inject {model.class} and {model.action}
-class DocsModelEmptyDITest < Minitest::Spec
-  Song = Class.new(DocsModelTest::Song)
-  Hit  = Class.new(Song)
+  class DocsModelEmptyDITest < Minitest::Spec
+    Song = Class.new(DocsModelTest::Song)
+    Hit  = Class.new(Song)
 
-  #:op-model-empty
-  module Song::Activity
-    class Create < Trailblazer::Activity::Railway
-      step Model()
-      step :validate
-      step :save
-      #~meths
-      include T.def_steps(:validate, :save)
-      #~meths end
-    end
-    #:op-model-empty end
-  end
-
-  it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
-  end
-end
-
-class DocsModelIOTest < Minitest::Spec
-  Song = Class.new(DocsModelTest::Song)
-  Hit  = Class.new(Song)
-
-  it "allows to use composable I/O with macros" do
-    #:in
+    #:op-model-empty
     module Song::Activity
-      class Create < Trailblazer::Operation
-        step Model(Song, :find_by),
-          In() => ->(ctx, my_id:, **) { ctx.merge(params: {id: my_id}) } # Model() needs {params[:id]}.
-        # ...
+      class Create < Trailblazer::Activity::Railway
+        step Model()
+        step :validate
+        step :save
+        #~meths
+        include T.def_steps(:validate, :save)
+        #~meths end
       end
+      #:op-model-empty end
     end
-    #:in end
 
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
-=begin
-#:in-call
-result = Create.(my_id: 1)
-#:in-call end
-=end
+    it do
+      signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+
+      assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
+    end
+  end
+
+  class DocsModelIOTest < Minitest::Spec
+    Song = Class.new(DocsModelTest::Song)
+    Hit  = Class.new(Song)
+
+    it "allows to use composable I/O with macros" do
+      #:in
+      module Song::Activity
+        class Create < Trailblazer::Operation
+          step Model(Song, :find_by),
+               In() => ->(ctx, my_id:, **) { ctx.merge(params: {id: my_id}) } # Model() needs {params[:id]}.
+          # ...
+        end
+      end
+      #:in end
+
+      signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
+
+      assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
+      # #:in-call
+      # result = Create.(my_id: 1)
+      #:in-call end
     end
   end
 end
