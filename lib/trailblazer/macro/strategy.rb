@@ -4,7 +4,7 @@ module Trailblazer
     class Strategy # We want to look like a real {Linear::Strategy}.
       class << self
         extend Forwardable
-        def_delegators :block_activity, :step, :pass, :fail # TODO: add all DSL::Helper
+        def_delegators :block_activity, :step, :pass, :fail, :Subprocess # TODO: add all DSL::Helper
       end
 
       # This makes {Wrap} look like {block_activity}.

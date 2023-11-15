@@ -661,6 +661,19 @@ class WrapUnitTest < Minitest::Spec
 
     #@ the patched version only runs {mock_validation}.
     assert_invoke patched_activity, seq: %{[:mock_validation]}
+
+    # Patch Wrap/Subprocess/step, put step after {validate}
+    patched_activity = Trailblazer::Activity::DSL::Linear::Patch.call(
+      activity,
+      ["Wrap/WrapUnitTest::HandleUnsafeProcess", :validation],
+      -> { step mock_validation }
+    )
+
+    #@ the original activity with Wrap is unchanged.
+    assert_invoke activity, seq: %{[:validate]}
+
+    #@ the patched version only runs {mock_validation}.
+    assert_invoke patched_activity, seq: %{[:validate, :mock_validation]}
   end
 end
 
