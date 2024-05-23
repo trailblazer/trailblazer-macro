@@ -49,7 +49,7 @@ class IntegrationTest < Minitest::Spec
     puts result.wtf?
 
     # this should return song
-    result[:model].name.must_match "My Song"
-    result[:model].artist_name.must_match "My Artist"
+    assert_equal result[:model].name, "My Song"
+    assert_equal result[:model].artist_name, "My Artist"
   end
 end
