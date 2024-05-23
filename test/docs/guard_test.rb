@@ -17,11 +17,12 @@ class DocsGuardProcTest < Minitest::Spec
   #:proc end
 
   it { Create.(pass: false)[:x].must_be_nil }
-  it { Create.(pass: true)[:x].must_equal true }
+
+  it { assert_equal Create.(pass: true)[:x], true }
 
   #- result object, guard
-  it { Create.(pass: true)[:"result.policy.default"].success?.must_equal true }
-  it { Create.(pass: false)[:"result.policy.default"].success?.must_equal false }
+  it { assert_equal Create.(pass: true)[:"result.policy.default"].success?, true }
+  it { assert_equal Create.(pass: false)[:"result.policy.default"].success?, false }
 
   #---
   #- Guard inheritance
@@ -29,7 +30,7 @@ class DocsGuardProcTest < Minitest::Spec
     step Policy::Guard( ->(options, current_user:, **) { current_user } ), override: true
   end
 
-  it { Trailblazer::Developer.railway(New).must_equal %{[>policy.default.eval,>process]} }
+  it { assert_equal Trailblazer::Developer.railway(New), %{[>policy.default.eval,>process]} }
 end
 
 #---
@@ -59,7 +60,8 @@ class DocsGuardTest < Minitest::Spec
   #:callable-op end
 
   it { Create.(pass: false)[:x].must_be_nil }
-  it { Create.(pass: true)[:x].must_equal true }
+
+  it { assert_equal Create.(pass: true)[:x], true }
 end
 
 #---
@@ -83,8 +85,8 @@ class DocsGuardMethodTest < Minitest::Spec
   end
   #:method end
 
-  it { Create.(pass: false).inspect(:x).must_equal %{<Result:false [nil] >} }
-  it { Create.(pass: true).inspect(:x).must_equal %{<Result:true [true] >} }
+  it { assert_equal Create.(pass: false).inspect(:x), %{<Result:false [nil] >} }
+  it { assert_equal Create.(pass: true).inspect(:x), %{<Result:true [true] >} }
 end
 
 #---
@@ -97,8 +99,8 @@ class DocsGuardNamedTest < Minitest::Spec
   end
   #:name end
 
-  it { Create.(:current_user => nil   )[:"result.policy.user"].success?.must_equal false }
-  it { Create.(:current_user => Module)[:"result.policy.user"].success?.must_equal true }
+  it { assert_equal Create.(:current_user => nil   )[:"result.policy.user"].success?, false }
+  it { assert_equal Create.(:current_user => Module)[:"result.policy.user"].success?, true }
 
   it {
   #:name-result
@@ -117,7 +119,7 @@ class DocsGuardInjectionTest < Minitest::Spec
   end
   #:di-op end
 
-  it { Create.(:current_user => Module).inspect("").must_equal %{<Result:true [nil] >} }
+  it { assert_equal Create.(:current_user => Module).inspect(""), %{<Result:true [nil] >} }
   it {
     result =
   #:di-call
@@ -126,7 +128,7 @@ class DocsGuardInjectionTest < Minitest::Spec
     :"policy.default.eval"  => Trailblazer::Operation::Policy::Guard.build(->(options, **) { false })
   )
   #:di-call end
-    result.inspect("").must_equal %{<Result:false [nil] >} }
+    assert_equal result.inspect(""), %{<Result:false [nil] >} }
 end
 
 #---
@@ -137,7 +139,7 @@ class DocsGuardMissingKeywordTest < Minitest::Spec
   end
 
   it { assert_raises(ArgumentError) { Create.() } }
-  it { Create.(:current_user => Module).success?.must_equal true }
+  it { assert_equal Create.(:current_user => Module).success?, true }
 end
 
 #---
@@ -151,7 +153,7 @@ class DocsGuardPositionTest < Minitest::Spec
   end
   #:before end
 
-  it { Trailblazer::Developer.railway(Create).must_equal %{[>policy.default.eval,>model!]} }
+  it { assert_equal Trailblazer::Developer.railway(Create), %{[>policy.default.eval,>model!]} }
   it do
     #:before-pipe
       Trailblazer::Developer.railway(Create, style: :rows) #=>

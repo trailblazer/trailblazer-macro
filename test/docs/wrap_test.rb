@@ -284,12 +284,14 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
 
     it do
       result = Memo::Create.( { seq: [] } )
+
       assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >}
       assert_equal result.event.inspect, %{#<Trailblazer::Activity::End semantic=:transaction_worked>}
     end
 
     it do
       result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
+
       assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >}
       assert_equal result.event.inspect, %{#<Trailblazer::Activity::End semantic=:transaction_failed>}
     end
@@ -362,6 +364,7 @@ You can return boolean true in wrap.
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
+
       assert_equal result.inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >}
       assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
     end
@@ -400,6 +403,7 @@ You can return boolean false in wrap.
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
+
       assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end
@@ -438,6 +442,7 @@ You can return nil in wrap.
 
     it "translates nil returned form a wrap to a signal with a `failure` semantic" do
       result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
+
       assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash, :log_error]] >}
       assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
     end

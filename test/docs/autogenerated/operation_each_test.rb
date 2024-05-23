@@ -190,6 +190,7 @@ class EachTest < Minitest::Spec
 
   it "{item_key: :composer}" do
     E::Mailer.send_options = []
+
     assert_invoke E::Song::Operation::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
@@ -287,6 +288,7 @@ class EachTest < Minitest::Spec
 
   it "Each(Activity::Railway)" do
     D::Mailer.send_options = []
+
     assert_invoke D::Song::Operation::Cover, params: {id: 1},
       seq:                    "[:rearrange]",
       expected_ctx_variables: {

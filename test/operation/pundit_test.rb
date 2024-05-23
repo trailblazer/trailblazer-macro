@@ -27,22 +27,23 @@ class PolicyTest < Minitest::Spec
   # successful.
   it do
     result = Create.(params: {}, current_user: Module)
-    result[:process].must_equal true
+
+    assert_equal result[:process], true
     #- result object, policy
-    result[:"result.policy.default"].success?.must_equal true
+    assert_equal result[:"result.policy.default"].success?, true
     result[:"result.policy.default"][:message].must_be_nil
     # result[:valid].must_be_nil
-    result[:"policy.default"].inspect.must_equal %{<Auth: user:Module, model:nil>}
+    assert_equal result[:"policy.default"].inspect, %{<Auth: user:Module, model:nil>}
   end
   # breach.
   it do
     result = Create.(params: {}, current_user: nil)
     result[:process].must_be_nil
     #- result object, policy
-    result[:"result.policy.default"].success?.must_equal false
-    result[:"result.policy.default"][:message].must_equal "Breach"
+    assert_equal result[:"result.policy.default"].success?, false
+    assert_equal result[:"result.policy.default"][:message], "Breach"
   end
-  # inject different policy.Condition  it { Create.(params: {}, current_user: Object, "policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))["process"].must_equal true }
+  # inject different policy.Condition  it { Create.(params: {}, current_user: Object, "policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))["process"], true }
   it { Create.(params: {}, current_user: Module, :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))[:process].must_be_nil }
 
 
@@ -52,23 +53,25 @@ class PolicyTest < Minitest::Spec
     step Model( Song, :new ), before: :"policy.default.eval"
   end
 
-  it { Trailblazer::Developer.railway(Show).must_equal %{[>model.build,>policy.default.eval,>process]} }
+  it { assert_equal Trailblazer::Developer.railway(Show), %{[>model.build,>policy.default.eval,>process]} }
 
   # invalid because user AND model.
   it do
     result = Show.(params: {}, current_user: Module)
     result[:process].must_be_nil
-    result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=nil>}
-    # result["policy"].inspect.must_equal %{#<struct PolicyTest::Song id=nil>}
+
+    assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=nil>}
+    # result["policy"].inspect, %{#<struct PolicyTest::Song id=nil>}
   end
 
   # valid because new policy.
   it do
     # puts Show["pipetree"].inspect
     result = Show.(params: {}, current_user: Module, :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_and_model?))
-    result[:process].must_equal true
-    result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=nil>}
-    result[:"policy.default"].inspect.must_equal %{<Auth: user:Module, model:#<struct PolicyTest::Song id=nil>>}
+
+    assert_equal result[:process], true
+    assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=nil>}
+    assert_equal result[:"policy.default"].inspect, %{<Auth: user:Module, model:#<struct PolicyTest::Song id=nil>>}
   end
 
   ##--
@@ -86,20 +89,23 @@ class PolicyTest < Minitest::Spec
   # successful.
   it do
     result = Edit.(params: { id: 1 }, current_user: Module)
-    result[:process].must_equal true
-    result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=1>}
-    result[:"result.policy.default"].success?.must_equal true
+
+    assert_equal result[:process], true
+    assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=1>}
+    assert_equal result[:"result.policy.default"].success?, true
     result[:"result.policy.default"][:message].must_be_nil
     # result[:valid].must_be_nil
-    result[:"policy.default"].inspect.must_equal %{<Auth: user:Module, model:#<struct PolicyTest::Song id=1>>}
+    assert_equal result[:"policy.default"].inspect, %{<Auth: user:Module, model:#<struct PolicyTest::Song id=1>>}
   end
 
   # breach.
   it do
     result = Edit.(params: { id: 4 }, current_user: nil)
-    result[:model].inspect.must_equal %{#<struct PolicyTest::Song id=4>}
+
+    assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=4>}
     result[:process].must_be_nil
-    result[:"result.policy.default"].success?.must_equal false
-    result[:"result.policy.default"][:message].must_equal "Breach"
+
+    assert_equal result[:"result.policy.default"].success?, false
+    assert_equal result[:"result.policy.default"][:message], "Breach"
   end
 end

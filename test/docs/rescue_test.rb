@@ -239,6 +239,7 @@ Rescue(), fast_track: true {}
       ctx = {validate: false}
 
       output, _ = trace activity, ctx
+
       assert_equal output, %(TOP
 |-- Start.default
 |-- Rescue/1

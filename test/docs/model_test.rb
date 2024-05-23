@@ -112,6 +112,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
   it do
     #:key-title-fail
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: nil}, seq: [])
+
     assert_equal ctx[:model].inspect, %{nil}
     #:key-title-fail end
   end
@@ -203,6 +204,7 @@ class DocsModelEmptyDITest < Minitest::Spec
 
   it do
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
   end
 end
@@ -223,6 +225,7 @@ class DocsModelIOTest < Minitest::Spec
     #:in end
 
     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
+
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
 =begin
 #:in-call
