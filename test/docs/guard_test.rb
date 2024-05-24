@@ -16,7 +16,7 @@ class DocsGuardProcTest < Minitest::Spec
   end
   #:proc end
 
-  it { Create.(pass: false)[:x].must_be_nil }
+  it { assert_nil Create.(pass: false)[:x] }
 
   it { assert_equal Create.(pass: true)[:x], true }
 
@@ -59,7 +59,7 @@ class DocsGuardTest < Minitest::Spec
   end
   #:callable-op end
 
-  it { Create.(pass: false)[:x].must_be_nil }
+  it { assert_nil Create.(pass: false)[:x] }
 
   it { assert_equal Create.(pass: true)[:x], true }
 end
