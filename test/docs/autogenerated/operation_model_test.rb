@@ -113,6 +113,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
   it do
     #:key-title-fail
     result = Song::Operation::Update.(params: {title: nil}, seq: [])
+
     assert_equal result[:model].inspect, %{nil}
     #:key-title-fail end
   end
@@ -204,6 +205,7 @@ class DocsModelEmptyDITest < Minitest::Spec
 
   it do
     result = Song::Operation::Create.(params: {}, :"model.class" => Hit, seq: [])
+
     assert_equal result[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
   end
 end
@@ -224,14 +226,15 @@ class DocsModelIOTest < Minitest::Spec
     #:in end
 
     result = Song::Operation::Create.(params: {}, my_id: 1, :"model.class" => Hit)
+
     assert_equal result[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
 =begin
 #:in-call
 result = Create.(my_id: 1)
 #:in-call end
 =end
-    end
   end
+end
 end
 
 class Model404TerminusTest < Minitest::Spec

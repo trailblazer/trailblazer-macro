@@ -191,6 +191,7 @@ class EachTest < Minitest::Spec
 
   it "{item_key: :composer}" do
     E::Mailer.send_options = []
+
     assert_invoke E::Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 1),
@@ -288,6 +289,7 @@ class EachTest < Minitest::Spec
 
   it "Each(Activity::Railway)" do
     D::Mailer.send_options = []
+
     assert_invoke D::Song::Activity::Cover, params: {id: 1},
       seq:                    "[:rearrange]",
       expected_ctx_variables: {
@@ -789,6 +791,7 @@ class DocsEachUnitTest < Minitest::Spec
 
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
     signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
+
     assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
   end
 
@@ -826,6 +829,7 @@ class DocsEachUnitTest < Minitest::Spec
         },
       {}]
     )
+
     assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
   end
 
@@ -901,6 +905,7 @@ class DocsEachUnitTest < Minitest::Spec
 
     #@ fail at 3 but still collect 3rd iteration!
     Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
+
     assert_invoke activity, dataset: [1,2,3],
       expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
       seq: "[]",

@@ -663,9 +663,11 @@ Song::Activity::Create
 Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, seq: []}])
 
     output, _ = trace Song::Activity::Create, params: {type: "vorbis"}, seq: []
+
     assert_equal output, trace.split("\n")[2..-2].join("\n").sub("Song::Activity::Create", "TOP")
 
     output, _ = trace Song::Activity::Create, params: {type: "mp3"}, seq: []
+
     assert_equal output, %{TOP
 |-- Start.default
 |-- model
