@@ -31,20 +31,20 @@ class PolicyTest < Minitest::Spec
     assert_equal result[:process], true
     #- result object, policy
     assert_equal result[:"result.policy.default"].success?, true
-    result[:"result.policy.default"][:message].must_be_nil
+    assert_nil result[:"result.policy.default"][:message]
     # result[:valid].must_be_nil
     assert_equal result[:"policy.default"].inspect, %{<Auth: user:Module, model:nil>}
   end
   # breach.
   it do
     result = Create.(params: {}, current_user: nil)
-    result[:process].must_be_nil
+    assert_nil result[:process]
     #- result object, policy
     assert_equal result[:"result.policy.default"].success?, false
     assert_equal result[:"result.policy.default"][:message], "Breach"
   end
   # inject different policy.Condition  it { Create.(params: {}, current_user: Object, "policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))["process"], true }
-  it { Create.(params: {}, current_user: Module, :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))[:process].must_be_nil }
+  it { assert_nil Create.(params: {}, current_user: Module, :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit::Condition.new(Auth, :user_object?))[:process] }
 
 
   #---
@@ -58,7 +58,7 @@ class PolicyTest < Minitest::Spec
   # invalid because user AND model.
   it do
     result = Show.(params: {}, current_user: Module)
-    result[:process].must_be_nil
+    assert_nil result[:process]
 
     assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=nil>}
     # result["policy"].inspect, %{#<struct PolicyTest::Song id=nil>}
@@ -93,7 +93,7 @@ class PolicyTest < Minitest::Spec
     assert_equal result[:process], true
     assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=1>}
     assert_equal result[:"result.policy.default"].success?, true
-    result[:"result.policy.default"][:message].must_be_nil
+    assert_nil result[:"result.policy.default"][:message]
     # result[:valid].must_be_nil
     assert_equal result[:"policy.default"].inspect, %{<Auth: user:Module, model:#<struct PolicyTest::Song id=1>>}
   end
@@ -103,7 +103,7 @@ class PolicyTest < Minitest::Spec
     result = Edit.(params: { id: 4 }, current_user: nil)
 
     assert_equal result[:model].inspect, %{#<struct PolicyTest::Song id=4>}
-    result[:process].must_be_nil
+    assert_nil result[:process]
 
     assert_equal result[:"result.policy.default"].success?, false
     assert_equal result[:"result.policy.default"][:message], "Breach"
