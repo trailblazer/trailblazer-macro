@@ -30,12 +30,12 @@ class IntegrationTest < Minitest::Spec
   end
 
   class SongSpecialCreate < Trailblazer::Operation
-    step Nested(ArtistCreate)
-    step Nested(SongCreate)
+    step Subprocess(ArtistCreate)
+    step Subprocess(SongCreate)
   end
 
   it "create Artist and Song" do
-    result = SongSpecialCreate.trace(
+    result = SongSpecialCreate.wtf?(
       params: {
         artist: {
           name: "My Artist"
@@ -45,8 +45,6 @@ class IntegrationTest < Minitest::Spec
         }
       }
     )
-
-    puts result.wtf?
 
     # this should return song
     assert_equal result[:model].name, "My Song"

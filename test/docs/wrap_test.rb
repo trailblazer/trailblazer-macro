@@ -458,7 +458,7 @@ This one is mostly to show how one could wrap steps in a transaction
 
     module Sequel
       def self.transaction
-        end_event, (ctx, flow_options) = yield
+        _end_event, (_ctx, _flow_options) = yield
       end
     end
 

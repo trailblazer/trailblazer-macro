@@ -370,7 +370,7 @@ class DocsNestedDynamicTest < Minitest::Spec
             end
           end
           #:dynamic-output end
-        end
+      end
     end # B
 
     assert_equal exception.message[0..34], %{No `unsupported_file_format` output}

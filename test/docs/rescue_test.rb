@@ -212,13 +212,13 @@ Rescue(), fast_track: true {}
       # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
       # assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
 
-      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id
-      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[2].id
-      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[3].id
-      assert_match "Rescue-1", Trailblazer::Activity::Introspect::Nodes(activity).values[4].id
-      assert_match "Rescue-2", Trailblazer::Activity::Introspect::Nodes(activity).values[5].id
-      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[6].id
-      assert_match /Rescue\/\d+/, Trailblazer::Activity::Introspect::Nodes(activity).values[7].id
+      assert_match (/Rescue\/\d+/), Trailblazer::Activity::Introspect::Nodes(activity).values[1].id
+      assert_match (/Rescue\/\d+/), Trailblazer::Activity::Introspect::Nodes(activity).values[2].id
+      assert_match (/Rescue\/\d+/), Trailblazer::Activity::Introspect::Nodes(activity).values[3].id
+      assert_equal "Rescue-1", Trailblazer::Activity::Introspect::Nodes(activity).values[4].id
+      assert_equal "Rescue-2", Trailblazer::Activity::Introspect::Nodes(activity).values[5].id
+      assert_match (/Rescue\/\d+/), Trailblazer::Activity::Introspect::Nodes(activity).values[6].id
+      assert_match (/Rescue\/\d+/), Trailblazer::Activity::Introspect::Nodes(activity).values[7].id
     end
   end
 
