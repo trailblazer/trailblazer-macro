@@ -61,7 +61,7 @@ class DocsPunditProcTest < Minitest::Spec
   end
 
   class Update < Edit
-    step Policy::Pundit( MyPolicy, :new?, name: "first" ), override: true
+    step Policy::Pundit( MyPolicy, :new?, name: "first" ), replace: :"policy.first.eval"
   end
 
   it { assert_equal Trailblazer::Developer.railway(Edit), %{[>policy.first.eval,>policy.second.eval]} }

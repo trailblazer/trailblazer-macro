@@ -711,7 +711,7 @@ class EachIDTest < Minitest::Spec
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each-1"])[0].id,                    "Each-1"
     assert_equal Trailblazer::Developer::Introspect.find_path(activity, ["Each/composers_for_each"])[0].id,   "Each/composers_for_each"
 
-    assert_match /Each\/\w+/, Trailblazer::Activity::Introspect::Nodes(activity).values[1].id # FIXME: this test sucks.
+    assert_match (/Each\/\w+/), Trailblazer::Activity::Introspect::Nodes(activity).values[1].id # FIXME: this test sucks.
   end
 end
 
@@ -740,7 +740,7 @@ class DocsEachUnitTest < Minitest::Spec
 
     ctx = {seq: [], dataset: [3,2,1]}
 
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    stack, _signal, (_ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
 
     output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
       {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
@@ -790,7 +790,7 @@ class DocsEachUnitTest < Minitest::Spec
     }
 
     # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
+    _signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
 
     assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
   end
