@@ -27,7 +27,7 @@ class DocsGuardProcTest < Minitest::Spec
   #---
   #- Guard inheritance
   class New < Create
-    step Policy::Guard( ->(options, current_user:, **) { current_user } ), override: true
+    step Policy::Guard( ->(options, current_user:, **) { current_user } ), replace: :"policy.default.eval"
   end
 
   it { assert_equal Trailblazer::Developer.railway(New), %{[>policy.default.eval,>process]} }

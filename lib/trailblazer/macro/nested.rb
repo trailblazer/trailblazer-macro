@@ -104,7 +104,7 @@ module Trailblazer
 
         def self.compute_legacy_return_signal(return_signal)
           actual_semantic  = return_signal.to_h[:semantic]
-          applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
+          _applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
         end
 
         # This is used in Nested and Each where some tasks don't have a corresponding, hard-wired

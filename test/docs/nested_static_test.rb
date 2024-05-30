@@ -699,7 +699,7 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, [{params: {type: "vorbis"}, 
       ]
     )
     #:create-introspect end
-    assert_match /user_proc=encode_id3>/, output
+    assert_match (/user_proc=encode_id3>/), output
   end
 
   # TODO: test more options.

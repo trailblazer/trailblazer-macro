@@ -51,7 +51,7 @@ class DocsModelTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:create
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
     puts ctx[:model] #=> #<struct Song id=nil, title=nil>
     #:create end
 
@@ -102,7 +102,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:update-with-find-by-key-ok
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: "Test"}, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: "Test"}, seq: [])
     ctx[:model] #=> #<struct Song id=2, title="Test">
     #:update-with-find-by-key-ok end
 
@@ -111,7 +111,7 @@ class DocsModelFindByTitleTest < Minitest::Spec
 
   it do
     #:key-title-fail
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: nil}, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {title: nil}, seq: [])
 
     assert_equal ctx[:model].inspect, %{nil}
     #:key-title-fail end
@@ -138,7 +138,7 @@ class DocsModelAccessorTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:show-ok
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:show-ok end
 
@@ -166,14 +166,14 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     end
 
     #:di-model-class
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
     #:di-model-class end
 
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
 
   # inject all variables
     #:di-all
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create,
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create,
       params:               {title: "Olympia"}, # some random variable.
       "model.class":        Hit,
       "model.action":       :find_by,
@@ -203,7 +203,7 @@ class DocsModelEmptyDITest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
 
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
   end
@@ -224,7 +224,7 @@ class DocsModelIOTest < Minitest::Spec
     end
     #:in end
 
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
+    _signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
 
     assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
 =begin
@@ -233,7 +233,7 @@ result = Create.(my_id: 1)
 #:in-call end
 =end
     end
-  end
+end
 end
 
 class Model404TerminusTest < Minitest::Spec
@@ -257,7 +257,7 @@ class Model404TerminusTest < Minitest::Spec
     assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
 
     #:not_found
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil})
+    signal, (_ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil})
     puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
     #:not_found end
   end
@@ -286,7 +286,7 @@ class Model404TerminusTest < Minitest::Spec
     assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
 
     #:not_found
-    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
+    signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
     puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
     #:not_found end
   end
