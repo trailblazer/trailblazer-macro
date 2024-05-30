@@ -602,7 +602,7 @@ class EachStrategyComplianceTest < Minitest::Spec
     cover_patched.include(T.def_steps(:log_email, :notify_composers))
 
   #@ Original class isn't changed.
-    assert_invoke Song::Activity::Cover, params: {id: 1}, seq: [],
+    assert_invoke Song::Activity::Cover, params: {id: 1},
       expected_ctx_variables: {
           model: Song.find_by(id: 1),
         },
@@ -610,7 +610,7 @@ class EachStrategyComplianceTest < Minitest::Spec
 
   #@ Patched class runs
   # Trailblazer::Developer.wtf?(cover_patched, [params: {id: 1}, seq: []])
-    assert_invoke cover_patched, params: {id: 1}, seq: [],
+    assert_invoke cover_patched, params: {id: 1},
       expected_ctx_variables: {
           model: Song.find_by(id: 1),
         },
