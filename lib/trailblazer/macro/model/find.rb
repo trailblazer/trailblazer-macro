@@ -3,33 +3,83 @@ module Trailblazer
     class Model
       # New API for retrieving models by ID.
       # Only handles keyword argument style.
-      def self.Find(model_class, positional_method = nil, params_key: nil, id: "model.find", not_found_terminus: false, **keyword_options, &block)
-        raise "unknown options #{keyword_options}" if keyword_options.size > 1
+      #
+      #
+      # DESIGN NOTES
+      #   * params[:id] extraction and the actual query are two separate components in the final finder activity.
+      def self.Find(model_class, positional_method = nil, find_method: nil, id: "model.find", not_found_terminus: false, query: nil, **keyword_options, &block)
+      # 1. optional: translate kws/positionals into local kws
+      # 2. build :query
+      # 3. build find activity
 
-        task =
+        # raise "unknown options #{keyword_options}" if keyword_options.size > 1
+
+        params_key, block, finder_step_options =
           if positional_method
-            finder_activity_for(
-              params_key: params_key || :id,
-              finder:     Find::Positional.new(model_class: model_class, find_method: positional_method),
-              &block
-            )
-          else
-            find_method_name, column_key = keyword_options.to_a[0]
+            bla_explicit_positional(model_class, positional_method, **keyword_options, &block) # FIXME: test block
+          elsif find_method.nil? && query.nil? # translate_from_shorthand
+            bla_shorthand(model_class, **keyword_options, &block)
+          else # options passed explicitly, kws. this still means we need to translate find_method to query, or use user's query.
+            # TODO: sort out query: default it or take user's
 
-            params_key ||= column_key
-
-            finder_activity_for(
-              params_key: params_key,
-              finder:     Find::KeywordArguments.new(model_class: model_class, find_method: find_method_name, column_key: column_key),
-              &block
-            )
+            if query.nil?
+              blubb_bla_keywords(model_class, find_method: find_method, **keyword_options, &block)# FIXME: test block
+            else
+              # raise "IMPLEMENT ME"
+              blubb_bla_query(model_class, query, **keyword_options, &block)
+            end
           end
+
+        task = finder_activity_for(
+          params_key: params_key,
+          finder:     finder_step_options,
+          &block
+        )
 
         options = options_for(task, id: id)
 
         options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
 
         options
+      end
+
+      def self.bla_shorthand(model_class, **keyword_options, &block)
+        # translate shorthand form.
+        find_method_name, column_key = keyword_options.to_a[0]
+
+        params_key = keyword_options.key?(:params_key) ? keyword_options[:params_key] : column_key # TODO: use method for this.
+
+        [
+          params_key,
+          block,
+          Find::KeywordArguments.new(model_class: model_class, find_method: find_method_name, column_key: column_key),
+        ]
+      end
+
+      def self.bla_explicit_positional(model_class, positional_method, column_key: :id, params_key: column_key, **, &block)
+        [
+          params_key,
+          block,
+          Find::Positional.new(model_class: model_class, find_method: positional_method), # query
+        ]
+      end
+
+      def self.blubb_bla_keywords(model_class, find_method:, column_key: :id, params_key: column_key, **keyword_options, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
+        finder = Find::KeywordArguments.new(model_class: model_class, find_method: find_method, column_key: column_key, **keyword_options)
+
+        [params_key, block, finder]
+      end
+
+      def self.blubb_bla_query(model_class, query, column_key: :id, params_key: column_key, **, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
+        query_on_model_class = ->(ctx, **kws) { model_class.instance_exec(ctx, **kws, &query) } # FIXME: we can only use procs here. what about methods, classes etc?
+
+        finder = Macro.task_adapter_for_decider(query_on_model_class, variable_name: :model) # FIXME: {:model} is hard-coded.
+
+        [
+          params_key,
+          block,
+          {task: finder} # circuit interface for the Task::Adapter.
+        ]
       end
 
       def self.options_for(task, id:)
