@@ -43,11 +43,16 @@ module Trailblazer
         options
       end
 
-      def self.bla_shorthand(model_class, **keyword_options, &block)
-        # translate shorthand form.
-        find_method_name, column_key = keyword_options.to_a[0]
+      # Defaulting happening.
+      def self.normalize_keys(column_key: :id, params_key: column_key, **)
+        return params_key, column_key
+      end
 
-        params_key = keyword_options.key?(:params_key) ? keyword_options[:params_key] : column_key # TODO: use method for this.
+      def self.bla_shorthand(model_class, **options, &block)
+        # translate shorthand form.
+        find_method_name, column_key = options.to_a[0]
+
+        params_key = options.key?(:params_key) ? options[:params_key] : column_key # TODO: use method for this.
 
         [
           params_key,
@@ -56,7 +61,9 @@ module Trailblazer
         ]
       end
 
-      def self.bla_explicit_positional(model_class, positional_method, column_key: :id, params_key: column_key, **, &block)
+      def self.bla_explicit_positional(model_class, positional_method, **options, &block)
+        params_key, _ = normalize_keys(**options)
+
         [
           params_key,
           block,
@@ -64,8 +71,10 @@ module Trailblazer
         ]
       end
 
-      def self.blubb_bla_keywords(model_class, find_method:, column_key: :id, params_key: column_key, **keyword_options, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
-        finder = Find::KeywordArguments.new(model_class: model_class, find_method: find_method, column_key: column_key, **keyword_options)
+      def self.blubb_bla_keywords(model_class, find_method:, **options, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
+        params_key, column_key = normalize_keys(**options)
+
+        finder = Find::KeywordArguments.new(model_class: model_class, find_method: find_method, column_key: column_key)
 
         [params_key, block, finder]
       end
