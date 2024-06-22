@@ -454,6 +454,39 @@ class DocsModelFindPositionaTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Positional with params_key block
+#
+# step Model::Find(Song, :find) { ... }
+#
+class DocsModelFindPositionalWithParamsBlockTest < Minitest::Spec
+  Song = Class.new(DocsModelFindPositionaTest::Song)
+
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, :find) { |ctx, params:, **| params[:params_slug] }
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+
+  #~ctx_to_result
+  it do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, {params: {params_slug: 1}, seq: []})
+    ctx[:model] #=> #<struct Song id=1, title="Roxanne">
+
+    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1>}
+  end
+  #~ctx_to_result end
+
+  it "fails" do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+end
+
 # Positional with #[]
 #
 # step Model::Find(Song, :[])

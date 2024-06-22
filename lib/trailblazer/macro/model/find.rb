@@ -16,7 +16,7 @@ module Trailblazer
 
         params_key, block, finder_step_options =
           if positional_method
-            bla_explicit_positional(model_class, positional_method, **keyword_options, &block) # FIXME: test block
+            bla_explicit_positional(model_class, positional_method, **keyword_options, &block)
           elsif find_method.nil? && query.nil? # translate_from_shorthand
             bla_shorthand(model_class, **keyword_options, &block)
           else # options passed explicitly, kws. this still means we need to translate find_method to query, or use user's query.
