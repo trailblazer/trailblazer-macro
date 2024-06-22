@@ -23,7 +23,7 @@ module Trailblazer
             # TODO: sort out query: default it or take user's
 
             if query.nil?
-              blubb_bla_keywords(model_class, find_method: find_method, **keyword_options, &block)# FIXME: test block
+              blubb_bla_keywords(model_class, find_method: find_method, **keyword_options, &block)
             else
               # raise "IMPLEMENT ME"
               blubb_bla_query(model_class, query, **keyword_options, &block)

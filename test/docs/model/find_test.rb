@@ -17,7 +17,9 @@ class DocsModelFindTest < Minitest::Spec
 end
 
 # Explicit options
-# find_method: :id
+#
+# step Model::Find(Song, find_method: :find_method)
+#
 class Unit_ExplicitOptionsTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song) do
     def self.find_method(id:)
@@ -31,7 +33,6 @@ class Unit_ExplicitOptionsTest < Minitest::Spec
     class Update < Trailblazer::Activity::Railway
       # explicit style:
       step Model::Find(Song, find_method: :find_method) # if it's _really_ Song.find_method(...)
-      # step Model::Find(Song, find_method: :find_by)
 
       step :validate
       step :save
@@ -57,17 +58,13 @@ class Unit_ExplicitOptionsTest < Minitest::Spec
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
-
-# TODO: put this test somewhere else
-  it "doesn't leak anything but {:model} to the outer world" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
-
-    assert_equal ctx.keys.inspect, %([:params, :seq, :model])
-  end
 end
 
 # NOTE: unit test
-class FindByExplicitColumnKeyTest < Minitest::Spec
+#
+# step Model::Find(Song, find_method: :find_by, column_key: :slug, params_key: :params_slug)
+#
+class ExplicitColumnKeyAndParamsKeyTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song) do
     def self.find_by(slug:)
       return if slug.nil?
@@ -100,6 +97,9 @@ class FindByExplicitColumnKeyTest < Minitest::Spec
   end
 end
 
+#
+# step Model::Find(Song, query: ...)
+#
 class FindByQueryTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song) do
     def self.where(id:, user:)
@@ -134,7 +134,80 @@ class FindByQueryTest < Minitest::Spec
   end
 end
 
-# find_by: :id
+#
+# step Model::Find(Song, query: ..., params_key: :slug)
+#
+class FindByQueryWithParamsKeyTest < Minitest::Spec
+  Song = Class.new(FindByQueryTest::Song)
+
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song,
+        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) },
+        params_key: :slug
+      )
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+
+  it do
+    current_user = Module
+
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1"}, current_user: current_user, seq: [])
+    ctx[:model] #=> #<struct Song id=1>
+
+    assert_equal ctx[:model].inspect, %(#<struct FindByQueryWithParamsKeyTest::Song id=[\"1\", Module]>)
+  end
+
+  it "fails" do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+end
+
+#
+# step Model::Find(Song, query: ..., ) do ... end
+#
+# FIXME: allow Model::Find() do ... end as well as { ... }
+class FindByQueryWithParamsBlockTest < Minitest::Spec
+  Song = Class.new(FindByQueryTest::Song)
+
+  module Song::Activity
+    class Update < Trailblazer::Activity::Railway
+      step Model::Find(Song, query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) }) { |ctx, params:, **|
+        params[:slug_from_params]
+      }
+      step :validate
+      step :save
+      #~meths
+      include T.def_steps(:validate, :save)
+      #~meths end
+    end
+  end
+
+  it do
+    current_user = Module
+
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug_from_params: "1"}, current_user: current_user, seq: [])
+    ctx[:model] #=> #<struct Song id=1>
+
+    assert_equal ctx[:model].inspect, %(#<struct FindByQueryWithParamsBlockTest::Song id=[\"1\", Module]>)
+  end
+
+  it "fails" do
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    assert_equal ctx[:model].inspect, %{nil}
+  end
+end
+
+# Shorthand
+#
+# step Model::Find(Song, find_by: :id)
+#
 class DocsModelFindByColumnTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song)
 
@@ -175,7 +248,10 @@ class DocsModelFindByColumnTest < Minitest::Spec
   end
 end
 
-# find_by: :short_id
+# Shorthand
+#
+# step Model::Find(Song, find_by: :short_id)
+#
 class DocsModelFindByDifferentColumnTest < Minitest::Spec
   Song = Struct.new(:short_id) do
     def self.find_by(short_id:)
@@ -215,6 +291,10 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Shorthand with options
+#
+# step Model::Find(Song, find_by: :id, params_key: :slug)
+#
 class DocsModelFindByDifferentParamsKeyTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song)
 
@@ -248,6 +328,10 @@ class DocsModelFindByDifferentParamsKeyTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Shorthand with different finder method
+#
+# step Model::Find(Song, find_with: :id)
+#
 class DocsModelFindWithTest < Minitest::Spec
   Song = Struct.new(:id) do
     def self.find_with(id:)
@@ -286,6 +370,10 @@ class DocsModelFindWithTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Shorthand with params_key block
+#
+# step Model::Find(Song, find_by: :id) { }
+#
 class DocsModelIdFromProcTest < Minitest::Spec
   Song = Struct.new(:id) do
     def self.find_by(id:)
@@ -329,6 +417,10 @@ class DocsModelIdFromProcTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Positional
+#
+# step Model::Find(Song, :find)
+#
 class DocsModelFindPositionaTest < Minitest::Spec
   Song = Struct.new(:id) do
     def self.find(id)
@@ -362,6 +454,10 @@ class DocsModelFindPositionaTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Positional with #[]
+#
+# step Model::Find(Song, :[])
+#
 class DocsModelAccessorTest < Minitest::Spec
   Song = Struct.new(:id, :title) do
     def self.[](id)
@@ -433,6 +529,9 @@ end
 # end
 
 # new
+#
+#
+#
 class DocsModelNewTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song)
 
@@ -462,6 +561,9 @@ class DocsModelNewTest < Minitest::Spec
 end
 
 # build
+#
+#
+#
 class DocsModelBuildTest < Minitest::Spec
   Song = Struct.new(:id)
   Song.singleton_class.alias_method :build, :new
@@ -491,6 +593,10 @@ class DocsModelBuildTest < Minitest::Spec
   #~ctx_to_result end
 end
 
+# Explicit terminus
+#
+# step Model::Find(Song, find_by: :id, not_found_terminus: true)
+#
 class ModelFind404TerminusTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song)
 
