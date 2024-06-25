@@ -108,9 +108,13 @@ class FindByQueryTest < Minitest::Spec
     end
   end
 
+  #:query
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      step Model::Find(Song, query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) })
+      step Model::Find(
+        Song,
+        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) }
+      )
       step :validate
       step :save
       #~meths
@@ -118,6 +122,7 @@ class FindByQueryTest < Minitest::Spec
       #~meths end
     end
   end
+  #:query end
 
   it do
     current_user = Module
@@ -631,7 +636,13 @@ end
 # step Model::Find(Song, find_by: :id, not_found_terminus: true)
 #
 class ModelFind404TerminusTest < Minitest::Spec
-  Song = Class.new(DocsModelFindTest::Song)
+  Song = Struct.new(:id) do
+    def self.find_by(id:)
+      return if id.nil?
+      return if id == 2
+      new(id)
+    end
+  end
 
   #:not-found
   class Song
@@ -648,10 +659,17 @@ class ModelFind404TerminusTest < Minitest::Spec
   end
   #:not-found end
 
-  it do
+  it "terminates on {not_found} for missing ID in {params}" do
     assert_invoke Song::Activity::Update, params: {id: 1},
       seq: "[:validate, :save]", expected_ctx_variables: {model: Song.find_by(id: 1)}
     assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
+
+    # no {params} at all.
+    assert_invoke Song::Activity::Update, terminus: :not_found
+
+    # no model matching ID.
+    # NOTE: we assign {model: nil} - do we want that?
+    assert_invoke Song::Activity::Update, params: {id: 2}, terminus: :not_found, expected_ctx_variables: {model: nil}
 
     #:not-found-invoke
     signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
