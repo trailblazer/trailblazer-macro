@@ -103,8 +103,8 @@ end
 class FindByQueryTest < Minitest::Spec
   Song = Class.new(DocsModelFindTest::Song) do
     def self.where(id:, user:)
-      return if id.nil?
-      new([id, user])
+      return [] if id.nil?
+      [new([id, user])]
     end
   end
 
@@ -113,7 +113,7 @@ class FindByQueryTest < Minitest::Spec
     class Update < Trailblazer::Activity::Railway
       step Model::Find(
         Song,
-        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) }
+        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first }
       )
       step :validate
       step :save
@@ -148,7 +148,7 @@ class FindByQueryWithParamsKeyTest < Minitest::Spec
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
       step Model::Find(Song,
-        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) },
+        query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first },
         params_key: :slug
       )
       step :validate
@@ -183,7 +183,7 @@ class FindByQueryWithParamsBlockTest < Minitest::Spec
 
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      step Model::Find(Song, query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user) }) { |ctx, params:, **|
+      step Model::Find(Song, query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first }) { |ctx, params:, **|
         params[:slug_from_params]
       }
       step :validate
