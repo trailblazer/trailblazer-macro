@@ -16,17 +16,17 @@ module Trailblazer
 
         params_key, block, finder_step_options =
           if positional_method
-            bla_explicit_positional(model_class, positional_method, **keyword_options, &block)
+            for_explicit_positional(model_class, positional_method, **keyword_options, &block)
           elsif find_method.nil? && query.nil? # translate_from_shorthand
-            bla_shorthand(model_class, **keyword_options, &block)
+            for_shorthand(model_class, **keyword_options, &block)
           else # options passed explicitly, kws. this still means we need to translate find_method to query, or use user's query.
             # TODO: sort out query: default it or take user's
 
             if query.nil?
-              blubb_bla_keywords(model_class, find_method: find_method, **keyword_options, &block)
+              for_keywords(model_class, find_method: find_method, **keyword_options, &block)
             else
               # raise "IMPLEMENT ME"
-              blubb_bla_query(model_class, query, **keyword_options, &block)
+              for_query(model_class, query, **keyword_options, &block)
             end
           end
 
@@ -48,7 +48,7 @@ module Trailblazer
         return params_key, column_key
       end
 
-      def self.bla_shorthand(model_class, **options, &block)
+      def self.for_shorthand(model_class, **options, &block)
         # translate shorthand form.
         find_method_name, column_key = options.to_a[0]
 
@@ -61,7 +61,7 @@ module Trailblazer
         ]
       end
 
-      def self.bla_explicit_positional(model_class, positional_method, **options, &block)
+      def self.for_explicit_positional(model_class, positional_method, **options, &block)
         params_key, _ = normalize_keys(**options)
 
         [
@@ -71,7 +71,7 @@ module Trailblazer
         ]
       end
 
-      def self.blubb_bla_keywords(model_class, find_method:, **options, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
+      def self.for_keywords(model_class, find_method:, **options, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
         params_key, column_key = normalize_keys(**options)
 
         finder = Find::KeywordArguments.new(model_class: model_class, find_method: find_method, column_key: column_key)
@@ -79,7 +79,7 @@ module Trailblazer
         [params_key, block, finder]
       end
 
-      def self.blubb_bla_query(model_class, query, column_key: :id, params_key: column_key, **, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
+      def self.for_query(model_class, query, column_key: :id, params_key: column_key, **, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
         query_on_model_class = ->(ctx, **kws) { model_class.instance_exec(ctx, **kws, &query) } # FIXME: we can only use procs here. what about methods, classes etc?
 
         finder = Macro.task_adapter_for_decider(query_on_model_class, variable_name: :model) # FIXME: {:model} is hard-coded.

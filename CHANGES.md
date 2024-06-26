@@ -1,3 +1,9 @@
+# 2.1.16
+
+* Fix a bug in `patch` where `Subprocess()` was missing in `Macro::Strategy`.
+* Introduce `Model::Build` and `Model::Find` macros, which are a replacement for the less
+  customizable `Model()`. See https://trailblazer.to/2.1/docs/macro/#macro-model-model-find
+
 # 2.1.15
 
 * Use `Macro.id_for` for `Rescue`, meaning IDs will now be consistent à la `Rescue/1` instead of `Rescue(1)`.
