@@ -268,7 +268,6 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
   #:find_by_column
   module Song::Activity
     class Update < Trailblazer::Activity::Railway
-      puts "yoo"
       step Model::Find(Song, find_by: :short_id) # Song.find_by(short_id: params[:short_id])
       step :validate
       step :save
