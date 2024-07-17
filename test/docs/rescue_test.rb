@@ -23,7 +23,7 @@ class NestedRescueTest < Minitest::Spec
     fail ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
-  it { assert_match /\[>Rescue\/.{1,3},>nested/, Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
+  it { assert_match (/\[>Rescue\/.{1,3},>nested/), Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
   it { assert_equal NestedInsanity.().inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:true [true, true, true, true, true, true, nil, nil] >} }
   it { assert_equal NestedInsanity.( "raise-y" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:false [true, true, nil, nil, nil, nil, true, true] >} }
   it { assert_equal NestedInsanity.( "raise-a" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:false [true, true, true, true, nil, nil, nil, true] >} }
