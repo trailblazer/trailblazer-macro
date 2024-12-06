@@ -26,7 +26,7 @@ class WrapSimpleHandlerTest < Minitest::Spec
         step :transfer # this might even break!
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~meths
       include T.def_steps(:model, :update, :transfer, :notify, :log_error)
       #~meths end
@@ -63,7 +63,7 @@ class WrapSimpleHandlerRoutesCustomTerminsTest < Minitest::Spec
         Output(:timeout) => Track(:fail_fast) # any wiring is possible here.
       #:out end
       step :notify
-      fail :log_error
+      left :log_error
       #~meths
       include T.def_steps(:model, :update, :transfer, :notify, :log_error)
       #~meths end
@@ -109,7 +109,7 @@ class WrapMyRescueTest < Minitest::Spec
         step :transfer # might raise an exception.
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~meths
       include T.def_steps(:model, :update, :transfer, :notify, :log_error)
       def transfer(ctx, seq:, transfer: true, **)
@@ -157,7 +157,7 @@ When raise:   return {Railway.fail!}
       step :rehash
     }
     step :notify
-    fail :log_error
+    left :log_error
     #~methods
     include T.def_steps(:model, :update, :notify, :log_error)
     include Rehash
@@ -196,7 +196,7 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
         step :rehash
       }, fail_fast: true
       step :notify
-      fail :log_error
+      left :log_error
 
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
@@ -233,7 +233,7 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
         step :rehash
       }, fast_track: true
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
@@ -274,7 +274,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
         Output(:success) => End(:transaction_worked),
         Output(MyTransaction::MyFailSignal, :failure) => End(:transaction_failed)
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
@@ -319,7 +319,7 @@ When raise:   return {Railway.pass!} and go "successful"
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
 
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
@@ -354,7 +354,7 @@ You can return boolean true in wrap.
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
 
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
@@ -393,7 +393,7 @@ You can return boolean false in wrap.
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
 
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
@@ -432,7 +432,7 @@ You can return nil in wrap.
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
 
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
@@ -480,7 +480,7 @@ This one is mostly to show how one could wrap steps in a transaction
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
       include Rehash
@@ -521,7 +521,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
         step :update
       }, fast_track: true # because Wrap can return pass_fast! now
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:model, :update, :notify, :log_error)
       #~methods end
@@ -554,7 +554,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
         },
           Output(:timeout__) => Track(:fail_fast)
         step :upload
-        fail :log_error
+        left :log_error
         #~methods
         include T.def_steps(:model, :send_request, :upload, :log_error)
         #~methods end
