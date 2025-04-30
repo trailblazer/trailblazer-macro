@@ -17,10 +17,10 @@ class NestedRescueTest < Minitest::Spec
       step ->(options, **) { options["b"] = true }
       pass ->(options, **) { raise A if options["raise-a"] }
       step ->(options, **) { options["c"] = true }
-      fail ->(options, **) { options["inner-err"] = true }
+      left ->(options, **) { options["inner-err"] = true }
     }
     step ->(options, **) { options["e"] = true }, id: "nested/e"
-    fail ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
+    left ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
   end
 
   it { assert_match /\[>Rescue\/.{1,3},>nested/, Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
@@ -54,7 +54,7 @@ plain Rescue()
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:create_model, :upload, :notify, :log_error)
       include Rehash
@@ -91,7 +91,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:create_model, :upload, :notify, :log_error)
       include Rehash
@@ -125,7 +125,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
       include T.def_steps(:find_model, :update, :notify, :log_error)
       include Rehash
     end
@@ -148,7 +148,7 @@ Rescue( handler: :instance_method )
         step :rehash
       }
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:find_model, :update, :notify, :log_error)
       include Rehash
@@ -180,7 +180,7 @@ Rescue(), fast_track: true {}
       step :find_model
       step Rescue(&rescue_block), fail_fast: true
       step :notify
-      fail :log_error
+      left :log_error
       #~methods
       include T.def_steps(:find_model, :update, :notify, :log_error, :rehash)
     end

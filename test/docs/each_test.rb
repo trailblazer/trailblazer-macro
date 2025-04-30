@@ -3,7 +3,7 @@ require "test_helper"
 
 # step Macro::Each(:report_templates, key: :report_template) {
 #   step Subprocess(ReportTemplate::Update), input: :input_report_template
-#   fail :set_report_template_errors
+#   left :set_report_template_errors
 # }
 
 # def report_templates(ctx, **)      ctx["result.contract.default"].report_templates
