@@ -29,7 +29,8 @@ module Trailblazer
         [Nested::Decider.new(callable), id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
       ]
 
-      task_wrap_extension = Activity::TaskWrap::Extension::WrapStatic.new(extension: Activity::TaskWrap::Extension(*merge))
+      # DISCUSS: we could use fields{task_wrap_extensions} from the Nested activity here?
+      task_wrap_extension = Activity::TaskWrap.Extension(*merge)
 
       Activity::Railway.Subprocess(task).merge( # FIXME: allow this directly in Subprocess
         id:         id,
