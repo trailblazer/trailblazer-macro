@@ -1,9 +1,10 @@
 module Trailblazer
   module Macro
+    DEFAULT_EXCEPTIONS = [StandardError].freeze
     NoopHandler = lambda { |*| }
 
     def self.Rescue(*exceptions, handler: NoopHandler, id: Rescue.random_id, &block)
-      exceptions = [StandardError] unless exceptions.any?
+      exceptions = DEFAULT_EXCEPTIONS unless exceptions.any?
 
       handler    = Rescue.deprecate_positional_handler_signature(handler)
       handler    = Trailblazer::Option(handler)
