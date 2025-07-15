@@ -19,11 +19,11 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "minitest"
   spec.add_development_dependency "rake"
-  spec.add_development_dependency "trailblazer-developer", ">= 0.1.0", "< 0.2.0"
-  spec.add_dependency "trailblazer-operation", ">= 0.10.1" # TODO: this dependency will be removed. currently needed for tests and for Guard::Result
+  # spec.add_development_dependency "trailblazer-developer", ">= 0.1.0", "< 0.2.0"
+  # spec.add_dependency "trailblazer-operation", ">= 0.11.0" # TODO: this dependency will be removed. currently needed for tests and for Guard::Result
   spec.add_development_dependency "trailblazer-core-utils"
 
-  spec.add_dependency "trailblazer-activity-dsl-linear", ">= 1.2.0", "< 1.3.0"
+  spec.add_dependency "trailblazer-activity-dsl-linear", ">= 1.3.0", "< 1.4.0"
 
   spec.required_ruby_version = ">= 2.5.0"
 end
