@@ -56,7 +56,7 @@ module Trailblazer
 
       def self.to_h
         container_activity = @state.get(:activity)
-pp container_activity
+
         # FIXME: this is needed for a proper {find_path} introspect lookup.
         container_activity.to_h.merge(activity: container_activity)
       end
