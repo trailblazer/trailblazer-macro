@@ -56,6 +56,7 @@ module Trailblazer
 
       def self.to_h
         container_activity = @state.get(:activity)
+pp container_activity
         # FIXME: this is needed for a proper {find_path} introspect lookup.
         container_activity.to_h.merge(activity: container_activity)
       end
@@ -101,9 +102,10 @@ module Trailblazer
         block_activity,
         id:        "invoke_block_activity",
         # merged into {:config}:
-          each:        true, # mark this activity for {compute_runtime_id}.
+          each:   true, # mark this activity for {compute_runtime_id}.
       ).merge(
         outputs: outputs_from_block_activity,
+        fields: {task_wrap_extensions: Activity::DSL::Linear::Strategy::INITIAL_TASK_WRAP_EXTENSIONS} # DISCUSS: shouldn't this be part of {:config}? # FIXME: too much knowledge about internals.
       )
 
       # FIXME: we can't pass {wrap_static: wrap_static_for_block_activity} into {#container_activity_for}
