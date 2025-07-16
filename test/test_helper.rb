@@ -3,10 +3,11 @@ require "minitest/autorun"
 
 require "trailblazer/macro"
 require "trailblazer/developer"
-require "trailblazer/activity/testing"
 require "trailblazer/core"
 
-T = Trailblazer::Activity::Testing
+T = Trailblazer::Core
+
+require "trailblazer/invoke/activity" # adds {Railway.__}.
 
 Memo = Struct.new(:id, :body) do
   def self.find(id)
@@ -23,11 +24,13 @@ module Rehash
   end
 end
 
-Minitest::Spec.include Trailblazer::Activity::Testing::Assertions
+Minitest::Spec.include Trailblazer::Core::Utils::Assertions
 
 Minitest::Spec.class_eval do
   def trace(activity, ctx)
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    signal, (ctx, flow_options) = Trailblazer::Activity::Railway.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
+
+    stack = flow_options[:stack]
 
     output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
       {node_options: {trace_nodes[0] => {label: "TOP"}}}
