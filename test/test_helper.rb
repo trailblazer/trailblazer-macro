@@ -38,6 +38,10 @@ Minitest::Spec.class_eval do
 
     return output, signal, ctx
   end
+
+  def assert_equal(asserted, expected, *args)
+    super(expected, asserted, *args)
+  end
 end
 
 # Uncomment me when changing tests!
