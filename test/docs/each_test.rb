@@ -249,7 +249,7 @@ class EachTest < Minitest::Spec
       seq: "[]",
       terminus: :failure
 
-    Trailblazer::Developer.wtf?(F::Song::Activity::Cover, [{params: {id: 2}, seq: []}])
+    Trailblazer::Developer.wtf?(F::Song::Activity::Cover, {params: {id: 2}, seq: []})
   end
 
 
@@ -338,7 +338,7 @@ class EachTest < Minitest::Spec
   end
 
   it "Each(Activity::Railway) with End.spam_email" do
-    Trailblazer::Developer.wtf?(G::Song::Activity::Cover, [{params: {id: 3}}, {}])
+    Trailblazer::Developer.wtf?(G::Song::Activity::Cover, {params: {id: 3}})
 
     assert_invoke G::Song::Activity::Cover, params: {id: 3},
       terminus:                :spam_alert,
@@ -671,12 +671,12 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
   it "tracing" do
     EachPureTest::Mailer.send_options = []
     #:wtf
-    Trailblazer::Developer.wtf?(Song::Activity::Cover, [{
+    Trailblazer::Developer.wtf?(Song::Activity::Cover, {
       params: {id: 1},
       #~meths
       seq: []
       #~meths end
-    }])
+    })
     #:wtf end
   end
 end
@@ -740,7 +740,7 @@ class DocsEachUnitTest < Minitest::Spec
 
     ctx = {seq: [], dataset: [3,2,1]}
 
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, [ctx, {}])
+    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, ctx)
 
     output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
       {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
@@ -805,7 +805,7 @@ class DocsEachUnitTest < Minitest::Spec
       }
     end
 
-    Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
+    Trailblazer::Developer.wtf?(activity, {dataset: ["one", "two", "three"]})
 
     assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
   end
@@ -823,11 +823,10 @@ class DocsEachUnitTest < Minitest::Spec
 
     Trailblazer::Developer.wtf?(
       activity,
-      [{
+      {
           dataset:      ["one", "two", "three"],
           current_user: Object,
         },
-      {}]
     )
 
     assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
@@ -904,7 +903,7 @@ class DocsEachUnitTest < Minitest::Spec
       seq: "[:a]"
 
     #@ fail at 3 but still collect 3rd iteration!
-    Trailblazer::Developer.wtf?(activity, [{dataset: [1,2,3]}, {}])
+    Trailblazer::Developer.wtf?(activity, {dataset: [1,2,3]})
 
     assert_invoke activity, dataset: [1,2,3],
       expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},

@@ -1,7 +1,78 @@
 module Trailblazer
   module Macro
+    # TODO: explain termini routing, Inject usage for "block activity", Out() => []
+
+    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
+      # TODO: 2.5. fix
+      iterated_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, &block)
+      iterated_activity.extend(Trailblazer::Macro::Each::Transitive)
+
+      # filter to set ctx[:index]
+      # The interesting part here is that we read dynamic values from the {circuit_options}, to not
+      # pollute the business ctx.
+      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { index }
+      my_filter_builder = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME", filter: my_lowlevel_inject_filter, write_name: :index, user_filter: nil) }
+      # filter to set ctx[item_key]
+      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { item }
+      my_filter_builder_item = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME.item_key", filter: my_lowlevel_inject_filter_item, write_name: item_key, user_filter: nil) }
+
+      # DISCUSS: move to Wrap.
+      # TODO: if a patched step in the iterated activity would add another teminus, this would be inconsistent.
+      #       we'd have to recompute this via `inherited`.
+        termini_from_block_activity =
+          outputs_from_block_activity.
+            # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
+            sort { |a,b| a.semantic == :success ? 1 : -1 }.
+            collect { |output|
+              [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
+            }
+
+      each_activity = Trailblazer::Activity::Railway(termini: termini_from_block_activity) do
+
+        step Subprocess(iterated_activity, strict: true),
+            id: "ITERATED FIXME",
+            Inject(:index, filter_builder: my_filter_builder) => my_lowlevel_inject_filter,
+            Inject(:item, filter_builder: my_filter_builder_item) => my_lowlevel_inject_filter_item,
+            Out() => [], # per default, don't let anything out.
+            **Each.options_for_collect(collect: collect)
+      end
+
+      each_activity.class_eval do
+        def self.call((ctx, flow_options), runner:, **circuit_options)
+          # We don't really need to override/replace {circuit} as we only want to change the way it's run.
+          iterated_railway = to_h[:circuit].to_h[:map].keys[1] # DISCUSS: maybe find by id?
+
+          dataset           = ctx.fetch(:dataset)
+          signal = nil
+
+          dataset.each_with_index do |item, index|
+
+            each_options_for_iterated = {
+              index: index,
+              item: item,
+            }
+
+            # we "inject" item_key and index via Runner.(..., item_key => ..) and then the input filter grabs that.
+            signal, (ctx, flow_options) = runner.(iterated_railway, [ctx, flow_options], runner: runner, **circuit_options, activity: self, **each_options_for_iterated)
+          end
+
+          return signal, [ctx, flow_options]
+        end
+      end
+
+      options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
+
+      {
+        **Trailblazer::Activity::Railway.Subprocess(each_activity),
+        id: id,
+        **options_for_dataset_from,
+      }
+    end
+
+
+
     class Each < Macro::Strategy
-      # FIXME: for Strategy that wants to pass-through the exec_context, so it
+      # FIXME: for Strategy that wants to pass-through the {:exec_context}, so it
       # looks "invisible" for steps.
       module Transitive
         def call(args, exec_context:, **circuit_options)
@@ -10,7 +81,29 @@ module Trailblazer
         end
       end
 
-      def self.call((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
+       # DSL options added to {block_activity} to implement {collect: true}.
+      def self.options_for_collect(collect:)
+        return {} unless collect
+
+        {
+          Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
+          Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+        }
+      end
+
+      def self.options_for_dataset_from(dataset_from:)
+        return {} unless dataset_from
+
+        {
+          Activity::Railway.Inject(:dataset, override: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
+        }
+      end
+
+
+
+
+
+      def self.call__FIXME((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
         dataset           = ctx.fetch(:dataset)
         signal            = @state.get(:success_signal)
         item_key          = @state.get(:item_key)
@@ -83,7 +176,7 @@ module Trailblazer
     end
 
     # @api private The internals here are considered private and might change in the near future.
-    def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
+    def self.Each__FIXME(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
       dsl_options_for_iterated = block_activity if block_activity.is_a?(Hash) # Ruby 2.5 and 2.6
 
       block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
@@ -169,23 +262,7 @@ module Trailblazer
       activity.to_h[:config][:wrap_static]["iterated"]
     end
 
-    # DSL options added to {block_activity} to implement {collect: true}.
-    def self.options_for_collect(collect:)
-      return {} unless collect
 
-      {
-        Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
-      }
-    end
-
-    def self.options_for_dataset_from(dataset_from:)
-      return {} unless dataset_from
-
-      {
-        Activity::Railway.Inject(:dataset, override: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
-      }
-    end
   end
 
   if const_defined?(:Developer) # FIXME: how do you properly check for a gem?
