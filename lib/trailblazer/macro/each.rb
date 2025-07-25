@@ -1,7 +1,9 @@
 module Trailblazer
   module Macro
     # TODO: explain termini routing, Inject usage for "block activity", Out() => []
+    #       BLOG: Each() is a perfect example of how versatile the TRB mechanics are
 
+    # @api private The internals here are considered private and might change at some point.
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
       # TODO: 2.5. fix
       iterated_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, &block)
@@ -29,6 +31,11 @@ module Trailblazer
 
       each_activity = Trailblazer::Activity::Railway(termini: termini_from_block_activity) do
 
+        # TODO: make publicly configurable.
+        @state.update!(:fields) do |fields|
+          fields.merge(failing_semantics: [:failure, :fail_fast])
+        end
+
         step Subprocess(iterated_activity, strict: true),
             id: "ITERATED FIXME",
             Inject(:index, filter_builder: my_filter_builder) => my_lowlevel_inject_filter,
@@ -42,6 +49,8 @@ module Trailblazer
           # We don't really need to override/replace {circuit} as we only want to change the way it's run.
           iterated_railway = to_h[:circuit].to_h[:map].keys[1] # DISCUSS: maybe find by id?
 
+          failing_semantics = @state.get(:fields).fetch(:failing_semantics)
+
           dataset           = ctx.fetch(:dataset)
           signal = nil
 
@@ -54,6 +63,9 @@ module Trailblazer
 
             # we "inject" item_key and index via Runner.(..., item_key => ..) and then the input filter grabs that.
             signal, (ctx, flow_options) = runner.(iterated_railway, [ctx, flow_options], runner: runner, **circuit_options, activity: self, **each_options_for_iterated)
+
+            # Break the loop if {iterated_activity} emits a failure signal.
+            break if failing_semantics.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
           end
 
           return signal, [ctx, flow_options]

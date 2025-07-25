@@ -241,10 +241,20 @@ class EachTest < Minitest::Spec
   end # F
 
   it "failure in Each" do
+    # last iteration fails:
     assert_invoke F::Song::Activity::Cover, params: {id: 2},
       expected_ctx_variables: {
         model: B::Song.find_by(id: 2),
         collected_from_each: ["mike@fat.wreck", nil],
+      },
+      seq: "[]",
+      terminus: :failure
+
+    # first iteration fails:
+    assert_invoke F::Song::Activity::Cover, params: {id: 999},
+      expected_ctx_variables: {
+        model: B::Song.find_by(id: 999),
+        collected_from_each: [nil],
       },
       seq: "[]",
       terminus: :failure
