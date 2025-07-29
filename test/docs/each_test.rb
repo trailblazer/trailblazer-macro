@@ -605,7 +605,7 @@ class EachStrategyComplianceTest < Minitest::Spec
     #:patch
     cover_patched = Trailblazer::Activity::DSL::Linear::Patch.(
       Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block"],
+      ["Each/composers_for_each", "iterated_block"],
       -> { step :log_email }
     )
     #:patch end
@@ -630,14 +630,14 @@ class EachStrategyComplianceTest < Minitest::Spec
 
   it "find_path" do
     assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers])[0].task.inspect,
+      ["Each/composers_for_each", "iterated_block", :notify_composers])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
 
 =begin
 #:find_path
 node, _ = Trailblazer::Developer::Introspect.find_path(
   Song::Activity::Cover,
-  ["Each/composers_for_each", "Each.iterate.block", "invoke_block_activity", :notify_composers])
+  ["Each/composers_for_each", "iterated_block", :notify_composers])
 #=> #<Node ...>
 #:find_path end
 =end
@@ -664,13 +664,13 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
     end
 
     node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
-      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity"])
+      [%{Each/#{id}}, "iterated_block"])
 
-    assert_equal _activity.class.inspect, "Hash" # container_activity
+    assert_equal _activity.class.inspect, "Trailblazer::Activity"
 
     #@ inside {invoke_block_activity}
     node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
-      [%{Each/#{id}}, "Each.iterate.#{id}", "invoke_block_activity", :notify_composers])
+      [%{Each/#{id}}, "iterated_block", :notify_composers])
 
     assert_equal node.task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
