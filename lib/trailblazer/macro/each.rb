@@ -6,16 +6,18 @@ module Trailblazer
     # @api private The internals here are considered private and might change at some point.
     def self.Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
       # TODO: 2.5. fix
+      dsl_options_for_iterated = block_activity if block_activity.is_a?(Hash) # Ruby 2.5 and 2.6
+
       iterated_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, &block)
-      iterated_activity.extend(Trailblazer::Macro::Each::Transitive)
+      iterated_activity.extend(Trailblazer::Macro::Each::Transitive) unless block_activity # DISCUSS: do this in {#block_activity_for}?
 
       # filter to set ctx[:index]
       # The interesting part here is that we read dynamic values from the {circuit_options}, to not
       # pollute the business ctx.
-      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { index }
+      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { [index, ctx] }
       my_filter_builder = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME", filter: my_lowlevel_inject_filter, write_name: :index, user_filter: nil) }
       # filter to set ctx[item_key]
-      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { item }
+      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { [item, ctx] }
       my_filter_builder_item = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME.item_key", filter: my_lowlevel_inject_filter_item, write_name: item_key, user_filter: nil) }
 
       # DISCUSS: move to Wrap.
@@ -33,15 +35,19 @@ module Trailblazer
 
         # TODO: make publicly configurable.
         @state.update!(:fields) do |fields|
-          fields.merge(failing_semantics: [:failure, :fail_fast])
+          fields.merge(
+            failing_semantics: [:failure, :fail_fast],
+            each: true, # mark this activity for {compute_runtime_id}.
+          )
         end
 
         step Subprocess(iterated_activity, strict: true),
-            id: "ITERATED FIXME",
+            id: "iterated_block",
             Inject(:index, filter_builder: my_filter_builder) => my_lowlevel_inject_filter,
             Inject(:item, filter_builder: my_filter_builder_item) => my_lowlevel_inject_filter_item,
             Out() => [], # per default, don't let anything out.
-            **Each.options_for_collect(collect: collect)
+            **Each.options_for_collect(collect: collect),
+            **dsl_options_for_iterated
       end
 
       each_activity.class_eval do
@@ -51,8 +57,8 @@ module Trailblazer
 
           failing_semantics = @state.get(:fields).fetch(:failing_semantics)
 
-          dataset           = ctx.fetch(:dataset)
-          signal = nil
+          dataset = ctx.fetch(:dataset)
+          signal  = iterated_railway.to_h[:outputs].find { |output| output.semantic == :success }.signal # FIXME: !!! do this at compile time and recompute when patched via {#inherited}.
 
           dataset.each_with_index do |item, index|
 
@@ -113,68 +119,11 @@ module Trailblazer
 
 
 
-
-
-      def self.call__FIXME((ctx, flow_options), runner:, **circuit_options) # DISCUSS: do we need {start_task}?
-        dataset           = ctx.fetch(:dataset)
-        signal            = @state.get(:success_signal)
-        item_key          = @state.get(:item_key)
-        failing_semantic  = @state.get(:failing_semantic)
-        activity          = @state.get(:activity)
-
-        # I'd like to use {collect} but we can't {break} without losing the last iteration's result.
-        dataset.each_with_index do |element, index|
-          # This new {inner_ctx} will be disposed of after invoking the item activity.
-          inner_ctx = ctx.merge(
-            item_key => element, # defaults to {:item}
-            :index   => index,
-          )
-
-          # TODO: test aliasing
-          wrap_ctx, _ = ITERATION_INPUT_PIPE.({aggregate: {}, original_ctx: inner_ctx}, [[ctx, flow_options], circuit_options])
-          inner_ctx   = wrap_ctx[:input_ctx]
-
-          # using this runner will make it look as if block_activity is being run consequetively within {Each.iterate} as if they were steps
-          # Use TaskWrap::Runner to run the each block. This doesn't create the container_activity
-          # and literally simply invokes {block_activity.call}, which will set its own {wrap_static}.
-          signal, (returned_ctx, flow_options) = runner.(
-            block_activity,
-            [inner_ctx, flow_options],
-            runner:   runner,
-            **circuit_options,
-            activity: activity,
-          )
-
-          # {returned_ctx} at this point has Each(..., In => Out =>) applied!
-          #   Without configuration, this means {returned_ctx} is empty.
-          # DISCUSS: this is what usually happens in Out().
-          # merge all mutable parts into the original_ctx.
-          wrap_ctx, _ = ITERATION_OUTPUT_PIPE.({returned_ctx: returned_ctx, aggregate: {}, original_ctx: ctx}, [])
-          ctx         = wrap_ctx[:aggregate]
-
-          # Break the loop if {block_activity} emits failure signal
-          break if failing_semantic.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
-        end
-
-        return signal, [ctx, flow_options]
-      end #call
-
-      def self.to_h
-        container_activity = @state.get(:activity)
-
-        # FIXME: this is needed for a proper {find_path} introspect lookup.
-        container_activity.to_h.merge(activity: container_activity)
-      end
-
-      # This is basically Out() => {copy all mutable variables}
-      ITERATION_OUTPUT_PIPE = Activity::DSL::Linear::VariableMapping::DSL.pipe_for_composable_output()
-      # and this In() => {copy everything}
-      ITERATION_INPUT_PIPE  = Activity::DSL::Linear::VariableMapping::DSL.pipe_for_composable_input()
-
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
       def self.compute_runtime_id(ctx, trace_node:, activity:, compile_id:, **)
-        # activity is the host activity
-        return compile_id unless activity.to_h[:config][:each] == true
+        # activity is the iterated activity
+        fields = activity.to_h[:fields]
+        return compile_id unless fields && fields[:each] == true
 
         # Developer::Trace::Snapshot::Ctx.ctx_snapshot_for(trace_node.snapshot_before, .data
 # FIXME: BETTER API, we need access to stack now

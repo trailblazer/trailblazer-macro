@@ -750,7 +750,9 @@ class DocsEachUnitTest < Minitest::Spec
 
     ctx = {seq: [], dataset: [3,2,1]}
 
-    stack, signal, (ctx, _) = Trailblazer::Developer::Trace.invoke(activity, ctx)
+    signal, (ctx, flow_options) = activity.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
+
+    stack = flow_options[:stack]
 
     output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
       {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
@@ -760,28 +762,25 @@ class DocsEachUnitTest < Minitest::Spec
 |-- Start.default
 |-- a
 |-- Each/1
-|   |-- Start.default
-|   |-- Each.iterate.block
-|   |   |-- invoke_block_activity.0
-|   |   |   |-- Start.default
-|   |   |   |-- compute_item
-|   |   |   `-- End.success
-|   |   |-- invoke_block_activity.1
-|   |   |   |-- Start.default
-|   |   |   |-- compute_item
-|   |   |   `-- End.success
-|   |   `-- invoke_block_activity.2
-|   |       |-- Start.default
-|   |       |-- compute_item
-|   |       `-- End.success
-|   `-- End.success
+|   |-- iterated_block.0
+|   |   |-- Start.default
+|   |   |-- compute_item
+|   |   `-- End.success
+|   |-- iterated_block.1
+|   |   |-- Start.default
+|   |   |-- compute_item
+|   |   `-- End.success
+|   `-- iterated_block.2
+|       |-- Start.default
+|       |-- compute_item
+|       `-- End.success
 |-- b
 `-- End.success}
 
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])[0].task.inspect,
+      ["Each/1", "iterated_block", :compute_item])[0].task.inspect,
       %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
@@ -799,8 +798,8 @@ class DocsEachUnitTest < Minitest::Spec
       dataset: [1,2,3]
     }
 
-    # signal, (_ctx, _) = Trailblazer::Activity::TaskWrap.invoke(activity, [ctx])
-    signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx], exec_context: my_exec_context)
+    signal, (_ctx, _) = activity.__(activity, ctx, circuit_options: {exec_context: my_exec_context})
+    # signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, ctx, exec_context: my_exec_context)
 
     assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
   end
@@ -955,5 +954,22 @@ class EachInEachTest < Minitest::Spec
 
     assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
       seq: %{[[1, 2], 10, 20, [3, 4], 30, 40, [5, 6], 50, 60]}
+  end
+end
+
+class EachWithArrayBugTest < Minitest::Spec
+  it "what" do
+    activity = Class.new(Trailblazer::Activity::Railway) do
+      step Each(item_key: :outer) {
+        step :capture_outer
+      }
+
+      def capture_outer(ctx, outer:, **)
+        ctx[:seq] << outer
+      end
+    end
+
+    assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
+      seq: %{[[1, 2], [3, 4], [5, 6]]}
   end
 end
