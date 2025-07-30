@@ -87,8 +87,6 @@ module Trailblazer
       }
     end
 
-
-
     class Each < Macro::Strategy
       # FIXME: for Strategy that wants to pass-through the {:exec_context}, so it
       # looks "invisible" for steps.
@@ -135,95 +133,6 @@ module Trailblazer
         ctx[:runtime_id] = "#{compile_id}.#{index}"
       end
     end
-
-    # @api private The internals here are considered private and might change in the near future.
-    def self.Each__FIXME(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
-      dsl_options_for_iterated = block_activity if block_activity.is_a?(Hash) # Ruby 2.5 and 2.6
-
-      block_activity, outputs_from_block_activity = Macro.block_activity_for(block_activity, &block)
-
-      collect_options       = options_for_collect(collect: collect)
-      dataset_from_options  = options_for_dataset_from(dataset_from: dataset_from)
-
-      wrap_static_for_block_activity = task_wrap_for_iterated(
-        {Activity::Railway.Out() => []}. # per default, don't let anything out.
-        merge(collect_options).
-        merge(dsl_options_for_iterated)
-      )
-
-      # This activity is passed into the {Runner} for each iteration of {block_activity}.
-      container_activity = Activity::TaskWrap.container_activity_for(
-        block_activity,
-        id:        "invoke_block_activity",
-        # merged into {:config}:
-          each:   true, # mark this activity for {compute_runtime_id}.
-      ).merge(
-        outputs: outputs_from_block_activity,
-        fields: {task_wrap_extensions: Activity::DSL::Linear::Strategy::INITIAL_TASK_WRAP_EXTENSIONS} # DISCUSS: shouldn't this be part of {:config}? # FIXME: too much knowledge about internals.
-      )
-
-      # FIXME: we can't pass {wrap_static: wrap_static_for_block_activity} into {#container_activity_for}
-      #        because when patching, the container_activity is not recompiled, so we need the Hash here
-      #        with defaulting.
-      # FIXME: this "hack" is only here to satify patching.
-      config = container_activity[:config].merge(wrap_static: Hash.new(wrap_static_for_block_activity))
-      container_activity.merge!(config: config)
-
-      # DISCUSS: move to Wrap.
-      termini_from_block_activity =
-        outputs_from_block_activity.
-          # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
-          sort { |a,b| a.semantic == :success ? 1 : -1 }.
-          collect { |output|
-            [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
-          }
-
-      state = Declarative::State(
-        block_activity:   [block_activity, {copy: Trailblazer::Declarative::State.method(:subclass)}], # DISCUSS: move to Macro::Strategy.
-        item_key:         [item_key, {}], # DISCUSS: we could even allow the wrap_handler to be patchable.
-        failing_semantic: [[:failure, :fail_fast], {}],
-        activity:         [container_activity, {}],
-        success_signal:   [termini_from_block_activity[-1][0], {}] # FIXME: when subclassing (e.g. patching) this must be recomputed.
-      )
-
-      # |-- Each/composers_for_each
-      # |   |-- Start.default
-      # |   |-- Each.iterate.block            This is Class.new(Each), outputs_from_block_activity
-      # |   |   |-- invoke_block_activity.0      step :invoke_block_activity.0
-      # |   |   |   |-- Start.default
-      # |   |   |   |-- notify_composers
-      # |   |   |   `-- End.success
-      # |   |   `-- invoke_block_activity.1      step "invoke_block_activity.1"
-      # |   |       |-- Start.default
-      # |   |       |-- notify_composers
-      iterate_strategy = Class.new(Each) do
-        extend Macro::Strategy::State # now, the Wrap subclass can inherit its state and copy the {block_activity}.
-        initialize!(state)
-      end
-
-      each_activity = Activity::FastTrack(termini: termini_from_block_activity) # DISCUSS: what base class should we be using?
-      each_activity.extend Each::Transitive
-
-      # {Subprocess} with {strict: true} will automatically wire all {block_activity}'s termini to the corresponding termini
-      # of {each_activity} as they have the same semantics (both termini sets are identical).
-      each_activity.step Activity::Railway.Subprocess(iterate_strategy, strict: true),
-        id: "Each.iterate.#{block ? :block : block_activity}" # FIXME: test :id.
-
-      Activity::Railway.Subprocess(each_activity).
-        merge(id: id).
-        merge(dataset_from_options) # FIXME: provide that service via Subprocess.
-    end
-
-    def self.task_wrap_for_iterated(dsl_options)
-      # TODO: maybe the DSL API could be more "open" here? I bet it is, but I'm too lazy.
-      activity = Class.new(Activity::Railway) do
-        step({task: "iterated"}.merge(dsl_options))
-      end
-
-      activity.to_h[:config][:wrap_static]["iterated"]
-    end
-
-
   end
 
   if const_defined?(:Developer) # FIXME: how do you properly check for a gem?
