@@ -204,8 +204,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       #~methods end
     end
 
-    it { assert_equal Memo::Create.( { seq: [] } ).inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >} }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
   end
 
 =begin
@@ -241,8 +241,8 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
     end
     #:fail-fast end
 
-    it { assert_equal Memo::Create.( { seq: [] } ).inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >} }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
   end
 
 =begin
@@ -282,19 +282,8 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     end
     #:custom end
 
-    it do
-      result = Memo::Create.( { seq: [] } )
-
-      assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >}
-      assert_equal result.event.inspect, %{#<Trailblazer::Activity::End semantic=:transaction_worked>}
-    end
-
-    it do
-      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
-
-      assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash]] >}
-      assert_equal result.event.inspect, %{#<Trailblazer::Activity::End semantic=:transaction_failed>}
-    end
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", terminus: :transaction_worked }
+    it { assert_call Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash]", terminus: :transaction_failed }
   end
 
 =begin
@@ -327,8 +316,8 @@ When raise:   return {Railway.pass!} and go "successful"
       #~methods end
     end
 
-    it { assert_equal Memo::Create.( { seq: [] } ).inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >} }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError }
   end
 
 =begin
@@ -363,10 +352,7 @@ You can return boolean true in wrap.
     end
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
-
-      assert_equal result.inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >}
-      assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Success semantic=:success>}
+      assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError
     end
   end
 
@@ -402,10 +388,7 @@ You can return boolean false in wrap.
     end
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
-
-      assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash, :log_error]] >}
-      assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
+      assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
     end
   end
 
@@ -441,10 +424,7 @@ You can return nil in wrap.
     end
 
     it "translates nil returned form a wrap to a signal with a `failure` semantic" do
-      result = Memo::Create.( { seq: [], rehash_raise: RuntimeError } )
-
-      assert_equal result.inspect(:seq), %{<Result:false [[:model, :update, :rehash, :log_error]] >}
-      assert_equal result.event.inspect, %{#<Trailblazer::Activity::Railway::End::Failure semantic=:failure>}
+      assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
     end
   end
 
@@ -488,8 +468,8 @@ This one is mostly to show how one could wrap steps in a transaction
     end
     #:transaction end
 
-    it { assert_equal Memo::Create.( { seq: [] } ).inspect(:seq), %{<Result:true [[:model, :update, :rehash, :notify]] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq), %{<Result:false [[:model, :update, :rehash, :log_error]] >} }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure }
   end
 
 =begin
@@ -528,8 +508,8 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     end
     #:transaction end
 
-    it { assert_equal Memo::Create.( { seq: [] } ).inspect(:seq), %{<Result:true [[:model, :update]] >} }
-    it { assert_equal Memo::Create.( { seq: [], update: false } ).inspect(:seq), %{<Result:false [[:model, :update, :log_error]] >} }
+    it { assert_call Memo::Create, seq: "[:model, :update]", terminus: :pass_fast }
+    it { assert_call Memo::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
   end
 
 
