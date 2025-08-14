@@ -109,7 +109,7 @@ class DocsPunditProcTest < Minitest::Spec
     :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit.build(AnotherPolicy, :create?)
   )
   #:di-call end
-    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil)
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil>)
     assert result.success?
   }
 end
