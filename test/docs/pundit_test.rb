@@ -30,8 +30,16 @@ class DocsPunditProcTest < Minitest::Spec
   #:pundit end
 
   it { assert_equal Trailblazer::Developer.railway(Create), %{[>model.build,>policy.default.eval]} }
-  it { assert_equal Create.(params: {}, current_user: Module).inspect(:model), %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
-  it { assert_equal Create.(params: {}).inspect(:model), %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
+  it {
+    result = Create.(params: {}, current_user: Module)
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil>)
+    assert result.success?
+  }
+  it {
+    result = Create.(params: {})
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil>)
+    assert result.failure?
+  }
 
   it do
   #:pundit-result
@@ -50,8 +58,16 @@ class DocsPunditProcTest < Minitest::Spec
   end
 
   it { assert_equal Trailblazer::Developer.railway(New), %{[>model.build,>policy.default.eval]} }
-  it { assert_equal New.(params: {}, current_user: Class ).inspect(:model), %{<Result:true [#<struct DocsPunditProcTest::Song id=nil>] >} }
-  it { assert_equal New.(params: {}, current_user: nil ).inspect(:model), %{<Result:false [#<struct DocsPunditProcTest::Song id=nil>] >} }
+  it {
+    result = New.(params: {}, current_user: Class )
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil>)
+    assert result.success?
+  }
+  it {
+    result = New.(params: {}, current_user: nil )
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil>)
+    assert result.failure?
+  }
 
   #---
   #- override with :name
@@ -65,9 +81,17 @@ class DocsPunditProcTest < Minitest::Spec
   end
 
   it { assert_equal Trailblazer::Developer.railway(Edit), %{[>policy.first.eval,>policy.second.eval]} }
-  it { assert_equal Edit.(params: {}, current_user: Class).inspect(:model), %{<Result:false [nil] >} }
+  it {
+    result = Edit.(params: {}, current_user: Class)
+    assert_equal result[:model].inspect, %(nil)
+    assert result.failure?
+  }
   it { assert_equal Trailblazer::Developer.railway(Update), %{[>policy.first.eval,>policy.second.eval]} }
-  it { assert_equal Update.(params: {}, current_user: Class).inspect(:model), %{<Result:true [nil] >} }
+  it {
+    result = Update.(params: {}, current_user: Class)
+    assert_equal result[:model].inspect, %(nil)
+    assert result.success?
+  }
 
   #---
   # dependency injection
@@ -85,7 +109,9 @@ class DocsPunditProcTest < Minitest::Spec
     :"policy.default.eval" => Trailblazer::Operation::Policy::Pundit.build(AnotherPolicy, :create?)
   )
   #:di-call end
-  assert_equal result.inspect(""), %{<Result:true [nil] >} }
+    assert_equal result[:model].inspect, %(#<struct DocsPunditProcTest::Song id=nil)
+    assert result.success?
+  }
 end
 
 #-

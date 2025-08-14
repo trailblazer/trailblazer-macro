@@ -449,7 +449,7 @@ class DocsModelFindPositionaTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find-ok
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, {params: {id: 1}, seq: []})
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:find-ok end
 
@@ -478,7 +478,7 @@ class DocsModelFindPositionalWithParamsBlockTest < Minitest::Spec
 
   #~ctx_to_result
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, {params: {params_slug: 1}, seq: []})
+    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: 1}, seq: [])
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
 
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1>}
@@ -518,7 +518,7 @@ class DocsModelAccessorTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:show-ok
-    signal, (ctx, _) = Trailblazer::Developer.wtf?(Song::Activity::Update, [{params: {id: 1}, seq: []}])
+    signal, (ctx, _) = Trailblazer::Developer.wtf?(Song::Activity::Update, {params: {id: 1}, seq: []})
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:show-ok end
 
