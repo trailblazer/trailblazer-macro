@@ -7,55 +7,36 @@ class NestedRescueTest < Minitest::Spec
   Y = Class.new(RuntimeError)
 
   class NestedInsanity < Trailblazer::Operation
+    include T.def_steps(:a, :y, :outer_err, :z, :e, :b, :c, :inner_err)
+
     step Rescue {
-      step ->(options, **) { options["a"] = true }
+      step :a
       step Rescue {
-        step ->(options, **) { options["y"] = true }
+        step :y
         pass ->(options, **) { raise Y if options["raise-y"] }
-        step ->(options, **) { options["z"] = true }
+        step :z
       }
-      step ->(options, **) { options["b"] = true }
+      step :b
       pass ->(options, **) { raise A if options["raise-a"] }
-      step ->(options, **) { options["c"] = true }
-      left ->(options, **) { options["inner-err"] = true }
+      step :c
+      left :inner_err
     }
-    step ->(options, **) { options["e"] = true }, id: "nested/e"
-    left ->(options, **) { options["outer-err"] = true }, id: "nested/failure"
+    step :e, id: "nested/e"
+    left :outer_err, id: "nested/failure"
   end
 
   it { assert_match /\[>Rescue\/.{1,3},>nested/, Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
-  it {
-    result = NestedInsanity.()
-    assert_equal result.to_h, {:a=>true, :y=>true, :z=>true, :b=>true, :c=>true, :e=>true}
-    #("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:true [true, true, true, true, true, true, nil, nil] >}
-    assert result.success?
-  }
-  it {
-    result = NestedInsanity.("raise-y" => true)
-    assert_equal result.to_h, {:a=>true, :y=>true, :"raise-y"=>true, :"inner-err"=>true, :"outer-err"=>true}
-    assert result.failure?
-  }
-  it {
-    result = NestedInsanity.("raise-a" => true)
-    assert_equal result.to_h, {:"raise-a"=>true, :a=>true, :y=>true, :z=>true, :b=>true, :"outer-err"=>true}
-    assert result.failure?
-  }
+  it { assert_invoke NestedInsanity, seq: "[:a, :y, :z, :b, :c, :e]" }
+  it { assert_invoke NestedInsanity, "raise-y" => true, seq: "[:a, :y, :inner_err, :outer_err]", terminus: :failure }
+  it { assert_invoke NestedInsanity, "raise-a" => true, seq: "[:a, :y, :z, :b, :outer_err]", terminus: :failure }
 
   #-
   # inheritance
   class UbernestedInsanity < NestedInsanity
   end
 
-  it {
-    result = UbernestedInsanity.()
-    assert_equal result.to_h, {:a=>true, :y=>true, :z=>true, :b=>true, :c=>true, :e=>true}
-    assert result.success?
-  }
-  it {
-    result = UbernestedInsanity.("raise-a" => true)
-    assert_equal result.to_h, {:"raise-a"=>true, :a=>true, :y=>true, :z=>true, :b=>true, :"outer-err"=>true}
-    assert result.failure?
-  }
+  it { assert_invoke UbernestedInsanity, seq: "[:a, :y, :z, :b, :c, :e]" }
+  it { assert_invoke UbernestedInsanity, "raise-y" => true, seq: "[:a, :y, :inner_err, :outer_err]", terminus: :failure }
 end
 
 class RescueTest < Minitest::Spec
