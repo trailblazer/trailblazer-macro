@@ -85,8 +85,16 @@ class DocsGuardMethodTest < Minitest::Spec
   end
   #:method end
 
-  it { assert_equal Create.(pass: false).inspect(:x), %{<Result:false [nil] >} }
-  it { assert_equal Create.(pass: true).inspect(:x), %{<Result:true [true] >} }
+  it {
+    result = Create.(pass: false)
+    assert_equal result[:x], nil
+    assert result.failure?
+  }
+  it {
+    result = Create.(pass: true)
+    assert_equal result[:x], true
+    assert result.success?
+  }
 end
 
 #---
@@ -119,7 +127,11 @@ class DocsGuardInjectionTest < Minitest::Spec
   end
   #:di-op end
 
-  it { assert_equal Create.(:current_user => Module).inspect(""), %{<Result:true [nil] >} }
+  it {
+    result = Create.(:current_user => Module)
+    assert_equal result[""], nil
+    assert result.success?
+  }
   it {
     result =
   #:di-call
@@ -128,7 +140,9 @@ class DocsGuardInjectionTest < Minitest::Spec
     :"policy.default.eval"  => Trailblazer::Operation::Policy::Guard.build(->(options, **) { false })
   )
   #:di-call end
-    assert_equal result.inspect(""), %{<Result:false [nil] >} }
+    assert_equal result[""], nil
+    assert result.failure?
+  }
 end
 
 #---
