@@ -460,7 +460,7 @@ class EachCtxInOutTest < Minitest::Spec
       step :model
       step Each(dataset_from: :composers_for_each,
         # Inject(always: true) => {
-        Inject(:composer_index) => ->(ctx, index:, **) { index },
+        Inject(:composer_index, pass_aggregate: true) => ->(ctx, aggregate:, **) { aggregate[:index] },
         # all filters called before/after each iteration!
         Out() => ->(ctx, index:, variable:, **) { {:"composer-#{index}-value" => variable} }
 
