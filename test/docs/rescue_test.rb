@@ -24,17 +24,38 @@ class NestedRescueTest < Minitest::Spec
   end
 
   it { assert_match /\[>Rescue\/.{1,3},>nested/, Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
-  it { assert_equal NestedInsanity.().inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:true [true, true, true, true, true, true, nil, nil] >} }
-  it { assert_equal NestedInsanity.( "raise-y" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:false [true, true, nil, nil, nil, nil, true, true] >} }
-  it { assert_equal NestedInsanity.( "raise-a" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:false [true, true, true, true, nil, nil, nil, true] >} }
+  it {
+    result = NestedInsanity.()
+    assert_equal result.to_h, {:a=>true, :y=>true, :z=>true, :b=>true, :c=>true, :e=>true}
+    #("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:true [true, true, true, true, true, true, nil, nil] >}
+    assert result.success?
+  }
+  it {
+    result = NestedInsanity.("raise-y" => true)
+    assert_equal result.to_h, {:a=>true, :y=>true, :"raise-y"=>true, :"inner-err"=>true, :"outer-err"=>true}
+    assert result.failure?
+  }
+  it {
+    result = NestedInsanity.("raise-a" => true)
+    assert_equal result.to_h, {:"raise-a"=>true, :a=>true, :y=>true, :z=>true, :b=>true, :"outer-err"=>true}
+    assert result.failure?
+  }
 
   #-
   # inheritance
   class UbernestedInsanity < NestedInsanity
   end
 
-  it { assert_equal UbernestedInsanity.().inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:true [true, true, true, true, true, true, nil, nil] >} }
-  it { assert_equal UbernestedInsanity.( "raise-a" => true).inspect("a", "y", "z", "b", "c", "e", "inner-err", "outer-err"), %{<Result:false [true, true, true, true, nil, nil, nil, true] >} }
+  it {
+    result = UbernestedInsanity.()
+    assert_equal result.to_h, {:a=>true, :y=>true, :z=>true, :b=>true, :c=>true, :e=>true}
+    assert result.success?
+  }
+  it {
+    result = UbernestedInsanity.("raise-a" => true)
+    assert_equal result.to_h, {:"raise-a"=>true, :a=>true, :y=>true, :z=>true, :b=>true, :"outer-err"=>true}
+    assert result.failure?
+  }
 end
 
 class RescueTest < Minitest::Spec
@@ -130,8 +151,8 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
       include Rehash
     end
 
-    it { assert_equal Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class), %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq, :exception_class), %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:find_model, :update, :rehash, :log_error]", expected_ctx_variables: {exception_class: RuntimeError}, terminus: :failure }
   end
 
 =begin
@@ -160,8 +181,8 @@ Rescue( handler: :instance_method )
     end
     #:rescue-method end
 
-    it { assert_equal Memo::Create.( { seq: [], } ).inspect(:seq, :exception_class), %{<Result:true [[:find_model, :update, :rehash, :notify], nil] >} }
-    it { assert_equal Memo::Create.( { seq: [], rehash_raise: RuntimeError } ).inspect(:seq, :exception_class), %{<Result:false [[:find_model, :update, :rehash, :log_error], RuntimeError] >} }
+    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:find_model, :update, :rehash, :log_error]", expected_ctx_variables: {exception_class: RuntimeError}, terminus: :failure }
   end
 
 =begin
@@ -185,8 +206,8 @@ Rescue(), fast_track: true {}
       include T.def_steps(:find_model, :update, :notify, :log_error, :rehash)
     end
 
-    it { assert_equal Memo::Create.( { seq: [], } ).inspect(:seq), %{<Result:true [[:find_model, :update, :rehash, :notify]] >} }
-    it { assert_equal Memo::Create.( { seq: [], update: false } ).inspect(:seq), %{<Result:false [[:find_model, :update]] >} }
+    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, update: false, seq: "[:find_model, :update]", terminus: :fail_fast }
   end
 
   class RescueIDTest < Minitest::Spec
