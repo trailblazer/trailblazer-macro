@@ -1,3 +1,13 @@
+# 2.2.0
+
+* "Each/composers_for_each", "Each.iterate.block", "invoke_block_activity" is now `"Each/composers_for_each", "iterated_block"`
+
+````
+Inject(:composer_index) => ->(ctx, index:, **) { index },
+   ===>     Inject(:composer_index, pass_aggregate: true) => ->(ctx, aggregate:, **) { aggregate[:index] },
+```
+* Remove deprecation for `Nested(Memo::Operation::Create)`. Without a dynamic decider, use `Subprocess()`.
+
 # 2.1.16
 
 * Fix a bug in `patch` where `Subprocess()` was missing in `Macro::Strategy`.

@@ -1,4 +1,4 @@
-require "test_helper"
+  require "test_helper"
 
 # Use {ComputeNested.method(:compute_nested)}
 # Use #trace
@@ -455,26 +455,27 @@ class GenericNestedUnitTest < Minitest::Spec
     end
   end
 
-  it "shows warning if `Nested()` is being used instead of `Subprocess()`" do
-    activity_classes = [Trailblazer::Activity::Path, Trailblazer::Activity::Railway, Trailblazer::Activity::FastTrack, Trailblazer::Operation]
+# TODO: rename :auto_wire to :static
+#   it "shows warning if `Nested()` is being used instead of `Subprocess()`" do
+#     activity_classes = [Trailblazer::Activity::Path, Trailblazer::Activity::Railway, Trailblazer::Activity::FastTrack, Trailblazer::Operation]
 
-    activity_classes.each do |activity_class|
-      activity = Class.new(activity_class) # the "nested" activity.
+#     activity_classes.each do |activity_class|
+#       activity = Class.new(activity_class) # the "nested" activity.
 
-      _, warnings = capture_io do
-        Class.new(Trailblazer::Activity::Railway) do
-          step Nested(activity)
-        end
-      end
-      line_number_for_nested = __LINE__ - 3
-      puts _
+#       _, warnings = capture_io do
+#         Class.new(Trailblazer::Activity::Railway) do
+#           step Nested(activity)
+#         end
+#       end
+#       line_number_for_nested = __LINE__ - 3
+#       puts _
 
-      assert_equal warnings, %{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} Using the `Nested()` macro without a dynamic decider is deprecated.
-To simply nest an activity or operation, replace `Nested(#{activity})` with `Subprocess(#{activity})`.
-Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess
-}
-    end
-  end
+#       assert_equal warnings, %{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} Using the `Nested()` macro without a dynamic decider is deprecated.
+# To simply nest an activity or operation, replace `Nested(#{activity})` with `Subprocess(#{activity})`.
+# Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess
+# }
+#     end
+#   end
 
   it "allows using multiple Nested() per operation" do
     activity = Class.new(Trailblazer::Activity::Railway) do
@@ -492,20 +493,6 @@ Check the Subprocess API docs to learn more about nesting: https://trailblazer.t
     end
 
     assert_invoke activity, seq: %{[:a, :model, :parse, :encode_id3, :save, :model, :parse, :encode_id3, :save, :b]}, params: {type: "mp3"}
-  end
-
-  it "allows I/O when using Nested(Activity) in Subprocess mode" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      nested_activity = Class.new(Trailblazer::Activity::Railway) do
-        step ->(ctx, **) { ctx[:message] = Object }
-        step ->(ctx, **) { ctx[:status]  = Class }
-      end
-
-      step Nested(nested_activity),
-        Out() => [:status]
-    end
-
-    assert_invoke activity, seq: %{[]}, expected_ctx_variables: {status: Class}
   end
 
   # TODO: move this to some testing gem? We need it a lot of times.

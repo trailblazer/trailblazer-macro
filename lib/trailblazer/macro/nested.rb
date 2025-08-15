@@ -3,19 +3,6 @@ module Trailblazer
     # {Nested} macro.
     # DISCUSS: rename auto_wire => static
     def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [])
-      # Warn developers when they confuse Nested with Subprocess (for simple nesting, without a dynamic decider).
-      if callable.is_a?(Class) && callable < Nested.operation_class
-        caller_locations = caller_locations(1, 2)
-        caller_location = caller_locations[0].to_s =~ /forwardable/ ? caller_locations[1] : caller_locations[0]
-
-        Activity::Deprecate.warn caller_location,
-          "Using the `Nested()` macro without a dynamic decider is deprecated.\n" \
-          "To simply nest an activity or operation, replace `Nested(#{callable})` with `Subprocess(#{callable})`.\n" \
-          "Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess"
-
-        return Activity::Railway.Subprocess(callable)
-      end
-
       task =
         if auto_wire.any?
           Nested.Static(callable, id: id, auto_wire: auto_wire)
@@ -44,10 +31,6 @@ module Trailblazer
     # We don't need to override {Strategy.call} here to prevent {:exec_context} from being changed.
     # The decider is run in the taskWrap before the {Nested} subclass is actually called.
     class Nested < Trailblazer::Activity::Railway
-      def self.operation_class # TODO: remove once we don't need the deprecation anymore.
-        Trailblazer::Activity::DSL::Linear::Strategy
-      end
-
       # TaskWrap step to run the decider.
       # It's part of the API that the decider sees the original ctx.
       # So this has to be placed in tW because we this step needs to be run *before* In() filters
