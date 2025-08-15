@@ -1,12 +1,13 @@
 module Trailblazer
   module Macro
     # {Nested} macro.
-    # DISCUSS: rename auto_wire => static
-    def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [])
+    def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [], static: auto_wire) # TODO: remove {:auto_wire} in 2.3.
+      Activity::Deprecate.warn caller_locations[1], "The `:auto_wire` option in `Nested()` has been renamed to `:static`." if auto_wire.any?
+
       task =
-        if auto_wire.any?
-          Nested.Static(callable, id: id, auto_wire: auto_wire)
-        else # no {auto_wire}
+        if static.any?
+          Nested.Static(callable, id: id, static: static)
+        else # no {static}
           Nested.Dynamic(callable, id: id)
         end
 
@@ -55,7 +56,7 @@ module Trailblazer
         end
       end
 
-      # Dynamic is without auto_wire where we don't even know what *could* be the actual
+      # Dynamic is without static where we don't even know what *could* be the actual
       # nested activity until it's runtime.
       def self.Dynamic(decider, id:)
         _task = Class.new(Macro::Nested) do
@@ -104,7 +105,7 @@ module Trailblazer
 
       end
 
-      # Code to handle [:auto_wire]. This is called "static" as you configure the possible activities at
+      # Code to handle [:static]. This is called "static" as you configure the possible activities at
       # compile-time. This is the recommended way.
       #
       # TODO: allow configuring Output of Nested per internal nested activity, e.g.
@@ -113,8 +114,8 @@ module Trailblazer
       #
       # We create two "abstract" steps, the step evaluating the decision that then routes to the concrete
       # Subprocess, which is the nested activity.
-      def self.Static(decider, id:, auto_wire:)
-        decider_connectors = auto_wire.collect do |activity|
+      def self.Static(decider, id:, static:)
+        decider_connectors = static.collect do |activity|
           [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
         end.to_h
 
@@ -126,7 +127,7 @@ module Trailblazer
             }.merge(decider_connectors)
           )
 
-          auto_wire.each do |activity|
+          static.each do |activity|
             activity_step = Subprocess(activity)
 
             outputs = activity_step[:outputs]

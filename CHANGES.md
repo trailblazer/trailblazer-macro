@@ -7,6 +7,7 @@ Inject(:composer_index) => ->(ctx, index:, **) { index },
    ===>     Inject(:composer_index, pass_aggregate: true) => ->(ctx, aggregate:, **) { aggregate[:index] },
 ```
 * Remove deprecation for `Nested(Memo::Operation::Create)`. Without a dynamic decider, use `Subprocess()`.
+* Rename `:auto_wire` option in `Nested()` to `:static`.
 
 # 2.1.16
 

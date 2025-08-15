@@ -5,7 +5,7 @@
 # Use #assert_invoke
 
 class DocsNestedStaticTest < Minitest::Spec
-#@ {:auto_wire} without any other options
+#@ {:static} without any other options
   module A
     class Song
     end
@@ -41,7 +41,7 @@ class DocsNestedStaticTest < Minitest::Spec
       class Create < Trailblazer::Activity::Railway
         step :model
         step Nested(:decide_file_type,
-          auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
+          static: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
         step :save
         #~meths
         include T.def_steps(:model, :save)
@@ -72,7 +72,7 @@ class DocsNestedStaticTest < Minitest::Spec
 
           step :model
           step Nested(MyDecider,
-            auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
+            static: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
           step :save
           #~meths
           include T.def_steps(:model, :save)
@@ -134,7 +134,7 @@ class DocsNestedStaticTest < Minitest::Spec
       class Create < Trailblazer::Activity::Railway
         step :model
         step Nested(:decide_file_type,
-          auto_wire: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
+          static: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
           Output(:invalid_metadata) => Track(:failure)
 
         step :save
@@ -173,7 +173,7 @@ class DocsNestedStaticTest < Minitest::Spec
       class Create < Trailblazer::Activity::Railway
         step :model
         step Nested(:decide_file_type,
-          auto_wire: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
+          static: [Id3Tag, VorbisComment]), # explicitely define possible nested activities.
           Output(:invalid_metadata) => Track(:failure),
           Output(:unsupported_file_format) => End(:internal_error)
 
@@ -217,7 +217,7 @@ class DocsNestedStaticTest < Minitest::Spec
         step :model
         step Nested(
             :decide_file_type,
-            auto_wire: [Id3Tag, VorbisComment]
+            static: [Id3Tag, VorbisComment]
           ),
           # Output and friends are used *after* Nested().
           # Connect VorbisComment's {unsupported_file_format} to our {failure} track:
@@ -262,7 +262,7 @@ class DocsNestedStaticTest < Minitest::Spec
     module Song::Activity
       class Create < Trailblazer::Activity::FastTrack
         step :model
-        step Nested(:decide_file_type, auto_wire: [Id3Tag, VorbisComment]),
+        step Nested(:decide_file_type, static: [Id3Tag, VorbisComment]),
           fast_track: true,
           Output(:unsupported_file_format) => End(:unsupported_file_format)
         step :save
@@ -331,7 +331,7 @@ class DocsNestedDynamicTest < Minitest::Spec
 
           step :model
           step Nested(MyDecider,
-            auto_wire: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
+            static: [Id3Tag, VorbisComment]) # explicitely define possible nested activities.
           step :save
           #~meths
           include T.def_steps(:model, :save)
@@ -455,27 +455,21 @@ class GenericNestedUnitTest < Minitest::Spec
     end
   end
 
-# TODO: rename :auto_wire to :static
-#   it "shows warning if `Nested()` is being used instead of `Subprocess()`" do
-#     activity_classes = [Trailblazer::Activity::Path, Trailblazer::Activity::Railway, Trailblazer::Activity::FastTrack, Trailblazer::Operation]
+  it "deprecates {Nested(:auto_wire)}, it is {:static} now" do
+    line_number_for_nested, activity = nil
+    _, warnings = capture_io do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Nested(ComputeNested.method(:compute_nested), auto_wire: [DocsNestedStaticTest::A::Song::Activity::Id3Tag])
+      end
+      line_number_for_nested = __LINE__ - 2
+    end
+      # puts _
 
-#     activity_classes.each do |activity_class|
-#       activity = Class.new(activity_class) # the "nested" activity.
+      assert_equal warnings, %{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} The `:auto_wire` option in `Nested()` has been renamed to `:static`.
+}
 
-#       _, warnings = capture_io do
-#         Class.new(Trailblazer::Activity::Railway) do
-#           step Nested(activity)
-#         end
-#       end
-#       line_number_for_nested = __LINE__ - 3
-#       puts _
-
-#       assert_equal warnings, %{[Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_nested} Using the `Nested()` macro without a dynamic decider is deprecated.
-# To simply nest an activity or operation, replace `Nested(#{activity})` with `Subprocess(#{activity})`.
-# Check the Subprocess API docs to learn more about nesting: https://trailblazer.to/2.1/docs/activity.html#activity-wiring-api-subprocess
-# }
-#     end
-#   end
+      assert_invoke activity, what: DocsNestedStaticTest::A::Song::Activity::Id3Tag, seq: "[:parse, :encode_id3]"
+  end
 
   it "allows using multiple Nested() per operation" do
     activity = Class.new(Trailblazer::Activity::Railway) do
@@ -517,7 +511,7 @@ class GenericNestedUnitTest < Minitest::Spec
     #@ nested can see everything.
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
-      auto_wire: [sub_activity])
+      static: [sub_activity])
 
     assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:seq, :what, :dont_look_at_me]}
 
@@ -525,7 +519,7 @@ class GenericNestedUnitTest < Minitest::Spec
     #@ nested can only see {:what}.
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(ComputeNested.method(:compute_nested),
-      auto_wire: [sub_activity]),
+      static: [sub_activity]),
       Trailblazer::Activity::Railway.In() => [:what]
 
     assert_invoke activity, what: sub_activity, dont_look_at_me: true, expected_ctx_variables: {visible: [:what]}
@@ -541,7 +535,7 @@ class GenericNestedUnitTest < Minitest::Spec
   #@ for Static
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity])
+      static: [sub_activity])
 
     #@ nested_activity and top activity can see things from decider.
     expected_variables = {please_discard_me: true, visible: [:seq, :what, :please_discard_me]}
@@ -563,7 +557,7 @@ class GenericNestedUnitTest < Minitest::Spec
   #@ for Static
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity])
+      static: [sub_activity])
 
     #@ nested_activity and top activity cannot see things from decider.
     options = {
@@ -600,7 +594,7 @@ class GenericNestedUnitTest < Minitest::Spec
   #@ for Static
     activity = Class.new(Trailblazer::Activity::Railway)
     activity.step Trailblazer::Activity::Railway.Nested(compute_nested,
-      auto_wire: [sub_activity]).merge(in_out_options)
+      static: [sub_activity]).merge(in_out_options)
 
     #@ nested_activity and top activity cannot see things from decider.
     options = {
@@ -692,7 +686,7 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, {params: {type: "vorbis"}, s
   # TODO: test more options.
   it "assigns ID via {Macro.id_for}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      step Nested(:decide_file_type, auto_wire: [Trailblazer::Activity::Railway])
+      step Nested(:decide_file_type, static: [Trailblazer::Activity::Railway])
     end
 
     assert_equal Trailblazer::Developer::Introspect.find_path(activity,
