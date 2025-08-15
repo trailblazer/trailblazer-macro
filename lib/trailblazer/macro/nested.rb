@@ -84,6 +84,7 @@ module Trailblazer
       class Dynamic
         SUCCESS_SEMANTICS = [:success, :pass_fast] # TODO: make this injectable/or get it from operation.
 
+        # TODO: couldn't we use the taskWrap here?
         def self.call_dynamic_nested_activity((ctx, flow_options), runner:, **circuit_options)
           nested_activity       = flow_options[:decision]
           original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
@@ -127,6 +128,8 @@ module Trailblazer
       #         step Nested(.., Id3Tag => {Output(:invalid_metadata) => ...}
       #       this will help when semantics overlap.
       #
+      # We create two "abstract" steps, the step evaluating the decision that then routes to the concrete
+      # Subprocess, which is the nested activity.
       def self.Static(decider, id:, auto_wire:)
         decider_connectors = auto_wire.collect do |activity|
           [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
