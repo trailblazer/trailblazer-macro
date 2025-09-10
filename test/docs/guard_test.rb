@@ -5,7 +5,7 @@ require "test_helper"
 class DocsGuardProcTest < Minitest::Spec
   #:proc
   class Create < Trailblazer::Operation
-    step Policy::Guard(->(options, pass:, **) { pass })
+    step Policy::Guard(->(options, pass:, **) { pass }), id: :policy
     #:pipeonly
     step :process
 
@@ -27,7 +27,7 @@ class DocsGuardProcTest < Minitest::Spec
   #---
   #- Guard inheritance
   class New < Create
-    step Policy::Guard( ->(options, current_user:, **) { current_user } ), override: true
+    step Policy::Guard( ->(options, current_user:, **) { current_user } ), replace: :policy
   end
 
   it { assert_equal Trailblazer::Developer.railway(New), %{[>policy.default.eval,>process]} }

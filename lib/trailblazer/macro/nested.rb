@@ -20,10 +20,11 @@ module Trailblazer
       # DISCUSS: we could use fields{task_wrap_extensions} from the Nested activity here?
       task_wrap_extension = Activity::TaskWrap.Extension(*merge)
 
-      Activity::Railway.Subprocess(task).merge( # FIXME: allow this directly in Subprocess
-        id:         id,
-        extensions: [task_wrap_extension],
-      )
+      Activity::Railway.Subprocess(task)
+        .merge( # FIXME: allow this directly in Subprocess
+          id:         id,
+          Activity::Railway.Extension() => task_wrap_extension,
+        )
     end
 
     # @private

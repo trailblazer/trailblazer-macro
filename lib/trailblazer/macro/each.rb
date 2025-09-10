@@ -14,10 +14,10 @@ module Trailblazer
       # filter to set ctx[:index]
       # The interesting part here is that we read dynamic values from the {circuit_options}, to not
       # pollute the business ctx.
-      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { [index, ctx] }
+      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { [{index: index}, ctx] }
       my_filter_builder = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME", filter: my_lowlevel_inject_filter, write_name: :index, user_filter: nil) }
       # filter to set ctx[item_key]
-      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { [item, ctx] }
+      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { [{item_key => item}, ctx] }
       my_filter_builder_item = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME.item_key", filter: my_lowlevel_inject_filter_item, write_name: item_key, user_filter: nil) }
 
       # DISCUSS: move to Wrap.
@@ -121,7 +121,7 @@ module Trailblazer
       def self.compute_runtime_id(ctx, trace_node:, activity:, compile_id:, **)
         # activity is the iterated activity
         fields = activity.to_h[:fields]
-        return compile_id unless fields && fields[:each] == true
+        return unless fields && fields[:each] == true
 
         # Developer::Trace::Snapshot::Ctx.ctx_snapshot_for(trace_node.snapshot_before, .data
 # FIXME: BETTER API, we need access to stack now
@@ -130,7 +130,7 @@ module Trailblazer
         # index = trace_node.snapshot_before.data[:ctx_snapshot].fetch(:index)
         index = trace_node.snapshot_before.data[:ctx_variable_changeset].find { |name, version, value| name == :index }[2]
 
-        ctx[:runtime_id] = "#{compile_id}.#{index}"
+        ctx.merge(runtime_id: "#{compile_id}.#{index}")
       end
     end
   end

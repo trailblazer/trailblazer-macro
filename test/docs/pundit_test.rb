@@ -52,7 +52,7 @@ class DocsPunditProcTest < Minitest::Spec
   end
 
   #---
-  #- override
+  #- replace
   class New < Create
     step Policy::Pundit( MyPolicy, :new? ), replace: :"policy.default.eval"
   end
@@ -72,12 +72,12 @@ class DocsPunditProcTest < Minitest::Spec
   #---
   #- override with :name
   class Edit < Trailblazer::Operation
-    step Policy::Pundit( MyPolicy, :create?, name: "first" )
+    step Policy::Pundit( MyPolicy, :create?, name: "first" ), id: "policy.first.eval"
     step Policy::Pundit( MyPolicy, :new?,    name: "second" )
   end
 
   class Update < Edit
-    step Policy::Pundit( MyPolicy, :new?, name: "first" ), override: true
+    step Policy::Pundit( MyPolicy, :new?, name: "first" ), replace: "policy.first.eval"
   end
 
   it { assert_equal Trailblazer::Developer.railway(Edit), %{[>policy.first.eval,>policy.second.eval]} }

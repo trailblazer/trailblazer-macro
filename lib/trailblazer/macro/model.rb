@@ -8,11 +8,9 @@ module Trailblazer
         Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
 
         # defaulting as per Inject() API.
-        Activity::Railway.Inject() => {
-          :"model.class"          => ->(*) { model_class },
-          :"model.action"         => ->(*) { action },
-          :"model.find_by_key"    => ->(*) { find_by_key },
-        }
+        Activity::Railway.Inject(:"model.class") => ->(*) { model_class },
+        Activity::Railway.Inject(:"model.action") => ->(*) { action },
+        Activity::Railway.Inject(:"model.find_by_key") => ->(*) { find_by_key },
       }
 
       options = {task: task, id: id}.merge(injections)

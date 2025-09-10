@@ -18,6 +18,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_development_dependency "minitest"
+  spec.add_development_dependency "minitest-line"
   spec.add_development_dependency "rake"
   # spec.add_development_dependency "trailblazer-developer", ">= 0.1.0", "< 0.2.0"
   # spec.add_dependency "trailblazer-operation", ">= 0.11.0" # TODO: this dependency will be removed. currently needed for tests and for Guard::Result
