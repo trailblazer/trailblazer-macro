@@ -14,24 +14,62 @@ module Trailblazer
       # filter to set ctx[:index]
       # The interesting part here is that we read dynamic values from the {circuit_options}, to not
       # pollute the business ctx.
-      my_lowlevel_inject_filter = ->((ctx, flow_options), index:, **circuit_options) { [{index: index}, ctx] }
-      my_filter_builder = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME", filter: my_lowlevel_inject_filter, write_name: :index, user_filter: nil) }
-      # filter to set ctx[item_key]
-      my_lowlevel_inject_filter_item = ->((ctx, flow_options), item:, **circuit_options) { [{item_key => item}, ctx] }
-      my_filter_builder_item = ->(*) { Trailblazer::Activity::DSL::Linear::VariableMapping::SetVariable.new(name: "bla.FIXME.item_key", filter: my_lowlevel_inject_filter_item, write_name: item_key, user_filter: nil) }
+      index_filter = ->(ctx, flow_options, circuit_options) {
+        value     = circuit_options.fetch(:index)
+
+        return ctx, flow_options, value
+      }
+
+      index_filter_builder = ->(right_option, **) {
+        pipe_task = Activity::DSL::Linear::VariableMapping::Runtime::FilterStep.build(write_name: :index, filter: index_filter, wrap_value_with_hash: true)
+
+        [
+          [
+            pipe_task,
+            id: "each.index",
+            prepend: "input.scope"
+          ]
+        ]
+      }
+
+      item_filter = ->(ctx, flow_options, circuit_options) {
+        value     = circuit_options.fetch(:item)
+
+        return ctx, flow_options, value
+      }
+
+      item_filter_builder = ->(right_option, **) {
+        pipe_task = Activity::DSL::Linear::VariableMapping::Runtime::FilterStep.build(write_name: item_key, filter: item_filter, wrap_value_with_hash: true)
+
+        [
+          [
+            pipe_task,
+            id: "each.item",
+            prepend: "input.scope"
+          ]
+        ]
+      }
 
       # DISCUSS: move to Wrap.
       # TODO: if a patched step in the iterated activity would add another teminus, this would be inconsistent.
       #       we'd have to recompute this via `inherited`.
-        termini_from_block_activity =
+        termini_instructions_from_block_activity =
           outputs_from_block_activity.
             # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
             sort { |a,b| a.semantic == :success ? 1 : -1 }.
             collect { |output|
-              [output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
+              [:terminus, task: output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
             }
 
-      each_activity = Trailblazer::Activity::Railway(termini: termini_from_block_activity) do
+      railway_options = Activity::Railway::DSL.options_for_initialize
+      start_instruction = railway_options[:layout_instructions][0]
+
+      layout_instructions = [
+        start_instruction,
+        *termini_instructions_from_block_activity
+      ]
+
+      each_activity = Trailblazer::Activity::Railway(layout_instructions: layout_instructions) do
 
         # TODO: make publicly configurable.
         @state.update!(:fields) do |fields|
@@ -43,15 +81,17 @@ module Trailblazer
 
         step Subprocess(iterated_activity, strict: true),
             id: "iterated_block",
-            Inject(:index, filter_builder: my_filter_builder) => my_lowlevel_inject_filter,
-            Inject(:item, filter_builder: my_filter_builder_item) => my_lowlevel_inject_filter_item,
+            Inject(:index, builder: index_filter_builder) => index_filter_builder,
+            Inject(:item, builder: item_filter_builder) => item_filter_builder,
             Out() => [], # per default, don't let anything out.
             **Each.options_for_collect(collect: collect),
             **dsl_options_for_iterated
       end
 
       each_activity.class_eval do
-        def self.call((ctx, flow_options), runner:, **circuit_options)
+        def self.call(ctx, flow_options, circuit_options)
+          runner = circuit_options.fetch(:runner)
+
           # We don't really need to override/replace {circuit} as we only want to change the way it's run.
           iterated_railway = to_h[:circuit].to_h[:map].keys[1] # DISCUSS: maybe find by id?
 
@@ -68,13 +108,13 @@ module Trailblazer
             }
 
             # we "inject" item_key and index via Runner.(..., item_key => ..) and then the input filter grabs that.
-            signal, (ctx, flow_options) = runner.(iterated_railway, [ctx, flow_options], runner: runner, **circuit_options, activity: self, **each_options_for_iterated)
+            ctx, flow_options, signal = runner.(iterated_railway, ctx, flow_options, circuit_options.merge(activity: self, **each_options_for_iterated))
 
             # Break the loop if {iterated_activity} emits a failure signal.
             break if failing_semantics.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
           end
 
-          return signal, [ctx, flow_options]
+          return ctx, flow_options, signal
         end
       end
 
@@ -91,9 +131,11 @@ module Trailblazer
       # FIXME: for Strategy that wants to pass-through the {:exec_context}, so it
       # looks "invisible" for steps.
       module Transitive
-        def call(args, exec_context:, **circuit_options)
+        def call(ctx, flow_options, circuit_options)
+          exec_context = circuit_options.fetch(:exec_context) # FIXME: not needed.
+
           # exec_context is our hosting Song::Activity::Cover
-          to_h[:activity].call(args, exec_context: exec_context, **circuit_options)
+          to_h[:activity].call(ctx, flow_options, circuit_options)
         end
       end
 
@@ -118,10 +160,10 @@ module Trailblazer
 
 
       # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
-      def self.compute_runtime_id(ctx, trace_node:, activity:, compile_id:, **)
+      def self.compute_runtime_id(ctx, flow_options, _, trace_node:, activity:, compile_id:, **)
         # activity is the iterated activity
         fields = activity.to_h[:fields]
-        return unless fields && fields[:each] == true
+        return ctx, flow_options unless fields && fields[:each] == true
 
         # Developer::Trace::Snapshot::Ctx.ctx_snapshot_for(trace_node.snapshot_before, .data
 # FIXME: BETTER API, we need access to stack now
@@ -130,7 +172,9 @@ module Trailblazer
         # index = trace_node.snapshot_before.data[:ctx_snapshot].fetch(:index)
         index = trace_node.snapshot_before.data[:ctx_variable_changeset].find { |name, version, value| name == :index }[2]
 
-        ctx.merge(runtime_id: "#{compile_id}.#{index}")
+        ctx = ctx.merge(runtime_id: "#{compile_id}.#{index}")
+
+        return ctx, flow_options
       end
     end
   end

@@ -629,9 +629,9 @@ class EachStrategyComplianceTest < Minitest::Spec
 
 
   it "find_path" do
-    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
-      ["Each/composers_for_each", "iterated_block", :notify_composers])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+    assert_equal CU.strip(Trailblazer::Developer::Introspect.find_path(Song::Activity::Cover,
+      ["Each/composers_for_each", "iterated_block", :notify_composers])[0].task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:notify_composers>>>)
 
 =begin
 #:find_path
@@ -672,8 +672,8 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
     node, _activity = Trailblazer::Developer::Introspect.find_path(activity,
       [%{Each/#{id}}, "iterated_block", :notify_composers])
 
-    assert_equal node.task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=notify_composers>}
+    assert_equal CU.strip(node.task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:notify_composers>>>)
     assert_equal _activity.class.inspect, "Trailblazer::Activity"
   end
 
@@ -750,7 +750,7 @@ class DocsEachUnitTest < Minitest::Spec
 
     ctx = {seq: [], dataset: [3,2,1]}
 
-    signal, (ctx, flow_options) = activity.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
+    ctx, flow_options, signal = activity.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
 
     stack = flow_options[:stack]
 
@@ -779,9 +779,9 @@ class DocsEachUnitTest < Minitest::Spec
 
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Each/1", "iterated_block", :compute_item])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=compute_item>}
+    assert_equal CU.strip(Trailblazer::Developer::Introspect.find_path(activity,
+      ["Each/1", "iterated_block", :compute_item])[0].task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:compute_item>>>)
     # puts Trailblazer::Developer::Render::TaskWrap.(activity, ["Each/1", "Each.iterate.block", "invoke_block_activity", :compute_item])
 
   # TODO: grab runtime ctx for iteration 134
@@ -798,10 +798,10 @@ class DocsEachUnitTest < Minitest::Spec
       dataset: [1,2,3]
     }
 
-    signal, (_ctx, _) = activity.__(activity, ctx, circuit_options: {exec_context: my_exec_context})
+    ctx, _, signal = activity.__(activity, ctx, circuit_options: {exec_context: my_exec_context})
     # signal, (_ctx, _) = Trailblazer::Developer.wtf?(activity, ctx, exec_context: my_exec_context)
 
-    assert_equal _ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
+    assert_equal ctx[:collected_from_each], ["1-0", "2-1", "3-2"]
   end
 
 

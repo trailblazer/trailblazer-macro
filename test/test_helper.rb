@@ -26,6 +26,8 @@ end
 
 Minitest::Spec.include Trailblazer::Core::Utils::Assertions
 
+CU = Trailblazer::Core::Utils
+
 Minitest::Spec.class_eval do
   def trace(activity, ctx)
     signal, (ctx, flow_options) = Trailblazer::Activity::Railway.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
