@@ -667,9 +667,9 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, {params: {type: "vorbis"}, s
 
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.
-    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Create,
-      ["Nested/decide_file_type", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=encode_id3>}
+    assert_equal CU.strip(Trailblazer::Developer::Introspect.find_path(Song::Activity::Create,
+      ["Nested/decide_file_type", DocsNestedStaticTest::A::Song::Activity::Id3Tag, :encode_id3])[0].task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:encode_id3>>>)
 
     output =
     #:create-introspect
@@ -680,7 +680,7 @@ Trailblazer::Developer.wtf?(Song::Activity::Create, {params: {type: "vorbis"}, s
       ]
     )
     #:create-introspect end
-    assert_match /user_proc=encode_id3>/, output
+    assert_match /@filter=:encode_id3>/, output
   end
 
   # TODO: test more options.

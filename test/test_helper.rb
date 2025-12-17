@@ -30,7 +30,7 @@ CU = Trailblazer::Core::Utils
 
 Minitest::Spec.class_eval do
   def trace(activity, ctx)
-    signal, (ctx, flow_options) = Trailblazer::Activity::Railway.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
+    ctx, flow_options, signal = Trailblazer::Activity::Railway.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
 
     stack = flow_options[:stack]
 

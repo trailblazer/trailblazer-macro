@@ -22,7 +22,7 @@ module Trailblazer
 
       Activity::Railway.Subprocess(task)
         .merge( # FIXME: allow this directly in Subprocess
-          id:         id,
+          id: id,
           Activity::Railway.Extension() => task_wrap_extension,
         )
     end
@@ -39,21 +39,19 @@ module Trailblazer
       # to resemble the behavior from pre 2.1.12.
       class Decider
         def initialize(nested_activity_decider)
-          @nested_activity_decider = Activity::Circuit.Step(nested_activity_decider, option: true)
+          @nested_activity_decider = Activity::Circuit.Step(nested_activity_decider)
         end
 
         # TaskWrap API.
-        def call(wrap_ctx, original_args)
-          (ctx, flow_options), original_circuit_options = original_args
-
+        def call(wrap_ctx, flow_options, circuit_options)
           # FIXME: allow calling a Step task without the Binary decision (in Activity::TaskAdapter).
-          nested_activity, _ = @nested_activity_decider.([ctx, flow_options], **original_circuit_options) # no TaskWrap::Runner because we shall not trace!
+          _, _, nested_activity = @nested_activity_decider.(wrap_ctx[:application_ctx], flow_options, circuit_options) # no TaskWrap::Runner because we shall not trace!
 
           new_flow_options = flow_options.merge(
             decision: nested_activity
           )
 
-          return wrap_ctx, [[ctx, new_flow_options], original_circuit_options]
+          return wrap_ctx, new_flow_options
         end
       end
 
@@ -70,23 +68,24 @@ module Trailblazer
         SUCCESS_SEMANTICS = [:success, :pass_fast] # TODO: make this injectable/or get it from operation.
 
         # TODO: couldn't we use the taskWrap here?
-        def self.call_dynamic_nested_activity((ctx, flow_options), runner:, **circuit_options)
+        def self.call_dynamic_nested_activity(ctx, flow_options, circuit_options)
           nested_activity       = flow_options[:decision]
           original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
+          runner                = circuit_options.fetch(:runner)
 
           host_activity = Dynamic.host_activity_for(activity: nested_activity)
 
           # TODO: make activity here that has only one step (plus In and Out config) which is {nested_activity}
 
-          return_signal, (ctx, flow_options) = runner.(
+          ctx, flow_options, return_signal = runner.(
             nested_activity,
-            [ctx, original_flow_options], # pass {flow_options} without a {:decision}.
-            runner:   runner,
-            **circuit_options,
-            activity: host_activity
+            ctx, original_flow_options, # pass {flow_options} without a {:decision}.
+            circuit_options.merge(
+              activity: host_activity
+            )
           )
 
-          return compute_legacy_return_signal(return_signal), [ctx, flow_options]
+          return ctx, flow_options, compute_legacy_return_signal(return_signal)
         end
 
         def self.compute_legacy_return_signal(return_signal)
@@ -148,12 +147,12 @@ module Trailblazer
       end
 
       module Static
-        def self.return_route_signal((ctx, flow_options), **circuit_options)
+        def self.return_route_signal(ctx, flow_options, circuit_options)
           nested_activity = flow_options[:decision] # we use the decision class as a signal.
 
           original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
 
-          return nested_activity, [ctx, original_flow_options]
+          return ctx, original_flow_options, nested_activity
         end
       end
 
