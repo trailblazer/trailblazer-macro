@@ -42,11 +42,14 @@ module Trailblazer
 
     # Wrap exposes {#inherited} which will also copy the block activity.
     # Currently, this is only used for patching (as it will try to subclass Wrap).
-    class Wrap < Macro::Strategy # TODO: it would be cool to have Activity::Interface and Strategy::Interface
+    class Wrap < Macro::Strategy
       # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
       # class Wrapped
       # @private
       def self.deprecate_positional_wrap_signature(user_wrap)
+        return user_wrap
+        # FIXME: deprecate old array-kwargs based circuit interface.
+
         parameters = user_wrap.is_a?(Proc) || user_wrap.is_a?(Method) ? user_wrap.parameters : user_wrap.method(:call).parameters
 
         return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
@@ -57,22 +60,23 @@ module Trailblazer
         end
       end
 
-      def self.call((ctx, flow_options), **circuit_options)
+      def self.call(ctx, flow_options, circuit_options)
         # since yield is called without arguments, we need to pull default params from here. Oh ... tricky.
-        block_calling_wrapped = ->(args=[ctx, flow_options], kwargs=circuit_options) {
-          Activity::Circuit::Runner.(block_activity, args, **kwargs)
+
+        block_called_from_user_yield = ->() { # DISCUSS: because we allow users to call {yield}, we don't receive any args here.
+          Activity::Circuit::Runner.(block_activity, ctx, flow_options, circuit_options)
         }
 
         # call the user's Wrap {} block in the operation.
-        # This will invoke block_calling_wrapped above if the user block yields.
-        returned = @state.get(:user_wrap).([ctx, flow_options], **circuit_options, &block_calling_wrapped)
+        # This will invoke block_called_from_user_yield above if the user block yields.
+        returned = @state.get(:user_wrap).(ctx, flow_options, circuit_options, &block_called_from_user_yield)
 
         # {returned} can be
         #   1. {circuit interface return} from the begin block, because the wrapped OP passed
         #   2. {task interface return} because the user block returns "customized" signals, true of fale
 
         if returned.is_a?(Array) # 1. {circuit interface return}, new style.
-          signal, (ctx, flow_options) = returned
+          ctx, flow_options, signal = returned
         else                     # 2. {task interface return}, only a signal (or true/false)
           # TODO: deprecate this?
           signal = returned
@@ -82,7 +86,7 @@ module Trailblazer
         # This usually means signal is a terminus or a custom signal.
         signal = @state.get(:signal_to_output).fetch(signal, signal)
 
-        return signal, [ctx, flow_options]
+        return ctx, flow_options, signal
       end
     end # Wrap
   end

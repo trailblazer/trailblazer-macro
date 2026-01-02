@@ -26,21 +26,20 @@ module Trailblazer
         @variable_name      = variable_name
       end
 
-      def call((ctx, flow_options), **circuit_options)
-        return_value, ctx = @return_value_step.([ctx, flow_options], **circuit_options)
+      def call(ctx, flow_options, circuit_options)
+        puts "yooo"
+        ctx, flow_options, return_value = @return_value_step.(ctx, flow_options, circuit_options)
 
         ctx[@variable_name] = return_value
 
-        return return_value, ctx
+        return ctx, flow_options, Trailblazer::Activity::Right
       end
     end
 
     def self.task_adapter_for_decider(decider_with_step_interface, variable_name:)
-      return_value_circuit_step = Activity::Circuit.Step(decider_with_step_interface, option: true)
+      return_value_circuit_step = Activity::Circuit.Step(decider_with_step_interface) # FIXME: this should be binary!
 
-      assign_task = AssignVariable.new(return_value_circuit_step, variable_name: variable_name)
-
-      Activity::Circuit::TaskAdapter.new(assign_task) # call {assign_task} with circuit-interface, interpret result.
+      AssignVariable.new(return_value_circuit_step, variable_name: variable_name)
     end
 
     def self.block_activity_for(block_activity, &block)

@@ -12,9 +12,10 @@ module Trailblazer::Macro
       # outgoing Task::Binary API.
       #
       # Retrieve the injectable {condition}, execute it and interpret its {Result} object.
-      def call((ctx, flow_options), **circuit_options)
+      def call(ctx, flow_options, circuit_options)
         condition = ctx[@path] # this allows dependency injection.
-        result    = condition.([ctx, flow_options], **circuit_options)
+        result    = condition.(ctx, flow_options, circuit_options)
+        puts "@@@@@ #{result.inspect}"
 
         ctx[:"policy.#{@name}"]        = result[:policy] # assign the policy as a ctx variable.
         ctx[:"result.policy.#{@name}"] = result
@@ -22,7 +23,7 @@ module Trailblazer::Macro
         # flow control
         signal = result.success? ? Trailblazer::Activity::Right : Trailblazer::Activity::Left
 
-        return signal, [ctx, flow_options]
+        return ctx, flow_options, signal
       end
     end
 

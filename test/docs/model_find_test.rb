@@ -46,7 +46,7 @@ class Unit_ExplicitOptionsTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find_method-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
     ctx[:model] #=> #<struct Song id=1>
     #:find_method-invoke end
 
@@ -54,7 +54,7 @@ class Unit_ExplicitOptionsTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
@@ -85,14 +85,14 @@ class ExplicitColumnKeyAndParamsKeyTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: "1"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: "1"}, seq: [])
     ctx[:model] #=> #<struct Song id=1>
 
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id="1">}
   end
 
   it "fails" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
 end
@@ -127,14 +127,14 @@ class FindByQueryTest < Minitest::Spec
   it do
     current_user = Module
 
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, current_user: current_user, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, current_user: current_user, seq: [])
     ctx[:model] #=> #<struct Song id=1>
 
     assert_equal ctx[:model].inspect, %(#<struct FindByQueryTest::Song id=[\"1\", Module]>)
   end
 
   it "fails" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
 end
@@ -162,14 +162,14 @@ class FindByQueryWithParamsKeyTest < Minitest::Spec
   it do
     current_user = Module
 
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1"}, current_user: current_user, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1"}, current_user: current_user, seq: [])
     ctx[:model] #=> #<struct Song id=1>
 
     assert_equal ctx[:model].inspect, %(#<struct FindByQueryWithParamsKeyTest::Song id=[\"1\", Module]>)
   end
 
   it "fails" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
 end
@@ -197,14 +197,14 @@ class FindByQueryWithParamsBlockTest < Minitest::Spec
   it do
     current_user = Module
 
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug_from_params: "1"}, current_user: current_user, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug_from_params: "1"}, current_user: current_user, seq: [])
     ctx[:model] #=> #<struct Song id=1>
 
     assert_equal ctx[:model].inspect, %(#<struct FindByQueryWithParamsBlockTest::Song id=[\"1\", Module]>)
   end
 
   it "fails" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
 end
@@ -232,7 +232,7 @@ class DocsModelFindByColumnTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find_by_id-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
     ctx[:model] #=> #<struct Song id=1>
     #:find_by_id-invoke end
 
@@ -240,14 +240,14 @@ class DocsModelFindByColumnTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
 
 # TODO: put this test somewhere else
   it "doesn't leak anything but {:model} to the outer world" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: "1"}, seq: [])
 
     assert_equal ctx.keys.inspect, %([:params, :seq, :model])
   end
@@ -281,7 +281,7 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find_by_column-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: "1f396"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: "1f396"}, seq: [])
     ctx[:model] #=> #<struct Song short_id="1f396">
     #:find_by_column-invoke end
 
@@ -289,7 +289,7 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {short_id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
@@ -318,7 +318,7 @@ class DocsModelFindByDifferentParamsKeyTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:params_key-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1f396"}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug: "1f396"}, seq: [])
     ctx[:model] #=> #<struct Song id=2, id="1f396">
     #:params_key-invoke end
 
@@ -326,7 +326,7 @@ class DocsModelFindByDifferentParamsKeyTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {slug: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
@@ -360,7 +360,7 @@ class DocsModelFindWithTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find_with-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 2}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: 2}, seq: [])
     ctx[:model] #=> #<struct Song id=2>
     #:find_with-invoke end
 
@@ -368,7 +368,7 @@ class DocsModelFindWithTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
   #~ctx_to_result end
@@ -404,7 +404,7 @@ class DocsModelIdFromProcTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:id_from-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
     ctx[:model] #=> #<struct Song id="1f396">
     #:id_from-invoke end
 
@@ -413,7 +413,7 @@ class DocsModelIdFromProcTest < Minitest::Spec
   end
 
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
 
     assert_equal ctx[:model].inspect, %{nil}
     assert_equal ctx[:seq].inspect, %([])
@@ -449,7 +449,7 @@ class DocsModelFindPositionaTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:find-ok
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:find-ok end
 
@@ -478,7 +478,7 @@ class DocsModelFindPositionalWithParamsBlockTest < Minitest::Spec
 
   #~ctx_to_result
   it do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: 1}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: 1}, seq: [])
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
 
     assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1>}
@@ -486,7 +486,7 @@ class DocsModelFindPositionalWithParamsBlockTest < Minitest::Spec
   #~ctx_to_result end
 
   it "fails" do
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: nil}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {params_slug: nil}, seq: [])
     assert_equal ctx[:model].inspect, %{nil}
   end
 end
@@ -518,7 +518,7 @@ class DocsModelAccessorTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:show-ok
-    signal, (ctx, _) = Trailblazer::Developer.wtf?(Song::Activity::Update, {params: {id: 1}, seq: []})
+    ctx, _, signal = Trailblazer::Developer.wtf?(Song::Activity::Update, {params: {id: 1}, seq: []})
     ctx[:model] #=> #<struct Song id=1, title="Roxanne">
     #:show-ok end
 
@@ -548,7 +548,7 @@ end
 #   #~ctx_to_result
 #   it do
 #     #:block-invoke
-#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
+#     ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {song: {id: "1f396"}}, seq: [])
 #     ctx[:model] #=> #<struct Song id="1f396">
 #     #:block-invoke end
 
@@ -557,7 +557,7 @@ end
 #   end
 
 #   it do
-#     signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
+#     ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {}, seq: [])
 
 #     assert_equal ctx[:model].inspect, %{nil}
 #     assert_equal ctx[:seq].inspect, %([])
@@ -588,7 +588,7 @@ class DocsModelNewTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:new-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
     ctx[:model] #=> #<struct Song id=1>
     #:new-invoke end
 
@@ -621,7 +621,7 @@ class DocsModelBuildTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:build-invoke
-    signal, (ctx, _) = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
     ctx[:model] #=> #<struct Song id=1>
     #:build-invoke end
 
@@ -671,7 +671,7 @@ class ModelFind404TerminusTest < Minitest::Spec
     assert_invoke Song::Activity::Update, params: {id: 2}, terminus: :not_found, expected_ctx_variables: {model: nil}
 
     #:not-found-invoke
-    signal, (ctx, _) = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
+    ctx, _, signal = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, [{params: {id: nil}},{}])
     puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
     #:not-found-invoke end
   end

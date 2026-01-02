@@ -80,7 +80,7 @@ module Trailblazer
       end
 
       def self.for_query(model_class, query, column_key: :id, params_key: column_key, **, &block) # FIXME: defaulting is redundant with bla_explicit_positional.
-        query_on_model_class = ->(ctx, **kws) { model_class.instance_exec(ctx, **kws, &query) } # FIXME: we can only use procs here. what about methods, classes etc?
+        query_on_model_class = ->(ctx, **kws) { puts kws.inspect; model_class.instance_exec(ctx, **kws, &query) } # FIXME: we can only use procs here. what about methods, classes etc?
 
         finder = Macro.task_adapter_for_decider(query_on_model_class, variable_name: :model) # FIXME: {:model} is hard-coded.
 

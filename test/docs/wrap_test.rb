@@ -3,10 +3,11 @@ require "test_helper"
   #@ yield returns a circuit-interface result set, we can return it to the flow
 #:my_transaction
 class MyTransaction
-  def self.call((ctx, flow_options), **, &block)
-    signal, (ctx, flow_options) = yield # calls the wrapped steps
+  # def self.call((ctx, flow_options), **, &block) # FIXME: deprecate
+  def self.call(ctx, flow_options, _circuit_options, &block) # FIXME: deprecate the old composite style interface [ctx, ...],
+    ctx, flow_options, signal = yield # calls the wrapped steps
 
-    return signal, [ctx, flow_options]
+    return ctx, flow_options, signal
   end
 end
 #:my_transaction end
@@ -40,6 +41,19 @@ class WrapSimpleHandlerTest < Minitest::Spec
   #@ transfer returns false
     assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
       terminus: :failure
+  end
+
+  it "what" do
+    raise "deprecate the old circuit interface for user handlers  "
+
+      # def self.call((ctx, flow_options), **, &block)
+      #   yield # calls the wrapped steps
+      # rescue
+      #   MyFailSignal
+
+      # or: Left, [ctx, flow_options]
+      # end
+
   end
 end
 
@@ -86,13 +100,13 @@ end
 class WrapMyRescueTest < Minitest::Spec
   #:my_rescue
   class MyRescue
-    def self.call((ctx, flow_options), **, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
+    def self.call(ctx, flow_options, _circuit_options, &block)
+      ctx, flow_options, signal = yield # calls the wrapped steps
 
-      return signal, [ctx, flow_options]
+      return ctx, flow_options, signal
     rescue
       ctx[:exception] = $!.message
-      return Trailblazer::Activity::Left, [ctx, flow_options]
+      return ctx, flow_options, Trailblazer::Activity::Left
     end
   end
   #:my_rescue end
@@ -112,6 +126,7 @@ class WrapMyRescueTest < Minitest::Spec
       left :log_error
       #~meths
       include T.def_steps(:model, :update, :transfer, :notify, :log_error)
+
       def transfer(ctx, seq:, transfer: true, **)
         seq << :transfer
         raise RuntimeError.new("transfer failed") unless transfer
@@ -140,11 +155,12 @@ When raise:   return {Railway.fail!}
   #:wrap-handler
   class HandleUnsafeProcess
     def self.call((ctx, flow_options), *, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
-      return signal, [ctx, flow_options]
+      ctx, flow_options, signal = yield # calls the wrapped steps
+      return ctx, flow_options, signal
     rescue
       ctx[:exception] = $!.message
-      [ Trailblazer::Operation::Railway.fail!, [ctx, flow_options] ]
+
+      [ctx, flow_options, Trailblazer::Operation::Railway.fail!] # FIXME: deprecate the old return set!
     end
   end
   #:wrap-handler end
@@ -183,10 +199,10 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
-          [ Trailblazer::Operation::Railway.fail!, [ctx, {}] ]
+          [ctx, flow_options, Trailblazer::Operation::Railway.fail!]
         end
       end
 
@@ -217,10 +233,10 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 
     #:fail-fast-handler
     class HandleUnsafeProcess
-      def self.call((ctx), *, &block)
+      def self.call(ctx, flow_options, _circuit_options, &block)
         yield # calls the wrapped steps
       rescue
-        [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
+        [ctx, flow_options, Trailblazer::Operation::Railway.fail_fast!]
       end
     end
     #:fail-fast-handler end
@@ -256,7 +272,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     class MyTransaction
       MyFailSignal = Class.new(Trailblazer::Activity::Signal)
 
-      def self.call((ctx, flow_options), *, &block)
+      def self.call(ctx, flow_options, _circuit_options, &block)
         yield # calls the wrapped steps
       rescue
         MyFailSignal
@@ -295,10 +311,10 @@ When raise:   return {Railway.pass!} and go "successful"
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
-          [ Trailblazer::Operation::Railway.pass!, [ctx, {}] ]
+          [ctx, flow_options, Trailblazer::Operation::Railway.pass!]
         end
       end
 
@@ -330,7 +346,7 @@ You can return boolean true in wrap.
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
           true
@@ -366,7 +382,7 @@ You can return boolean false in wrap.
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
           false
@@ -402,7 +418,7 @@ You can return nil in wrap.
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
           nil
@@ -438,16 +454,16 @@ This one is mostly to show how one could wrap steps in a transaction
 
     module Sequel
       def self.transaction
-        _end_event, (_ctx, _flow_options) = yield
+        _ctx, _flow_options, _terminus = yield
       end
     end
 
     #:transaction-handler
     class MyTransaction
-      def self.call((ctx, flow_options), *, &block)
+      def self.call(ctx, flow_options, _circuit_options, &block)
         Sequel.transaction { yield } # calls the wrapped steps
       rescue
-        [ Trailblazer::Operation::Railway.fail!, [ctx, flow_options] ]
+        return ctx, flow_options, Trailblazer::Operation::Railway.fail!
       end
     end
     #:transaction-handler end
@@ -483,13 +499,13 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     #:handler-with-signature-evaluator
     class HandleUnsafeProcess
       def self.call((_ctx, _flow_options), *, &block)
-        signal, (ctx, flow_options) = yield
+        ctx, flow_options, signal = yield
         evaluated_signal = if signal.to_h[:semantic] == :success
                             Trailblazer::Operation::Railway.pass_fast!
                           else
                             Trailblazer::Operation::Railway.fail!
                           end
-        [ evaluated_signal, [ctx, flow_options] ]
+        return ctx, flow_options, evaluated_signal
       end
     end
     #:handler-with-signature-evaluator end
@@ -518,7 +534,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
 
     module Song::Activity
       class HandleUnsafeProcess
-        def self.call((ctx), *, &block)
+        def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
           [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
@@ -572,18 +588,18 @@ end
 
 class WrapUnitTest < Minitest::Spec
   class HandleUnsafeProcess
-    def self.call((ctx, flow_options), **, &block)
+    def self.call(_ctx, _flow_options, _circuit_options, &block)
       yield # calls the wrapped steps
     end
   end
 
   it "assigns IDs via {Macro.id_for}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      def self.my_wrap_handler((ctx, flow_options), **, &block)
+      def self.my_wrap_handler(ctx, flow_options, _circuit_options, &block)
         yield # calls the wrapped steps
       end
 
-      my_wrap_handler = ->((ctx, flow_options), **, &block) do
+      my_wrap_handler = ->(ctx, flow_options, _circuit_options, &block) do
         block.call # calls the wrapped steps
       end
 
@@ -630,9 +646,9 @@ class WrapUnitTest < Minitest::Spec
     mock_validation = ->(ctx, seq:, **) { ctx[:seq] = seq + [:mock_validation] }
 
     #@ Introspect::TaskMap  interface
-    assert_equal Trailblazer::Developer::Introspect.find_path(activity,
-      ["Wrap/WrapUnitTest::HandleUnsafeProcess", :validation, :validate])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=validate>}
+    assert_equal CU.strip(Trailblazer::Developer::Introspect.find_path(activity,
+      ["Wrap/WrapUnitTest::HandleUnsafeProcess", :validation, :validate])[0].task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:validate>>>)
 
     #@ Patch interface
     patched_activity = Trailblazer::Activity::DSL::Linear::Patch.call(
@@ -682,9 +698,9 @@ class WrapStrategyComplianceTest < Minitest::Spec
   end
 
   it "find_path" do
-    assert_equal Trailblazer::Developer::Introspect.find_path(Song::Activity::Upload,
-      ["Wrap/MyTransaction", :transfer])[0].task.inspect,
-      %{#<Trailblazer::Activity::TaskBuilder::Task user_proc=transfer>}
+    assert_equal CU.strip(Trailblazer::Developer::Introspect.find_path(Song::Activity::Upload,
+      ["Wrap/MyTransaction", :transfer])[0].task.inspect),
+      %(#<Trailblazer::Activity::Circuit::Step::Binary:0x @step=#<Trailblazer::Activity::Circuit::Step::Option:0x @step=#<Trailblazer::Activity::Option::InstanceMethod:0x @filter=:transfer>>>)
 
 =begin
 #:find_path

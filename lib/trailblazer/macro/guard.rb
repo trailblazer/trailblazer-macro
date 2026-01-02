@@ -6,10 +6,12 @@ module Trailblazer::Macro
 
     module Guard
       def self.build(callable)
-        option = Trailblazer::Option(callable)
+        option = Trailblazer::Activity::Circuit::Step(callable) # DISCUSS: should we use Option here directly?
 
-        ->((ctx, *), **circuit_args) do
-          Trailblazer::Operation::Result.new(!!option.call(ctx, keyword_arguments: ctx.to_hash, **circuit_args), {})
+        ->(ctx, flow_options, circuit_options) do
+          _, _, result = option.call(ctx, flow_options, circuit_options)
+
+          Trailblazer::Operation::Result.new(!!result, {})
         end
       end
     end

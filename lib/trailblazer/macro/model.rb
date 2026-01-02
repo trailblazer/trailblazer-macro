@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
 
     def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
-      task = Activity::Circuit::TaskAdapter.for_step(Model.new)
+      task = Activity::Circuit.Step(Model.new, binary: true)
 
       injections = {
         Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
@@ -25,7 +25,7 @@ module Trailblazer
         builder = Builder.new
         model   = builder.call(ctx, params) or return
 
-        ctx[:model] = model
+        ctx[:model] = model # DISCUSS: what about nil models?
       end
 
       class Builder
