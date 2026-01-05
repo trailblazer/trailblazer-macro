@@ -42,19 +42,6 @@ class WrapSimpleHandlerTest < Minitest::Spec
     assert_invoke Song::Activity::Upload, transfer: false, seq: "[:model, :update, :transfer, :log_error]",
       terminus: :failure
   end
-
-  it "what" do
-    raise "deprecate the old circuit interface for user handlers  "
-
-      # def self.call((ctx, flow_options), **, &block)
-      #   yield # calls the wrapped steps
-      # rescue
-      #   MyFailSignal
-
-      # or: Left, [ctx, flow_options]
-      # end
-
-  end
 end
 
 class WrapSimpleHandlerRoutesCustomTerminsTest < Minitest::Spec
@@ -155,12 +142,13 @@ When raise:   return {Railway.fail!}
   #:wrap-handler
   class HandleUnsafeProcess
     def self.call((ctx, flow_options), *, &block)
-      ctx, flow_options, signal = yield # calls the wrapped steps
-      return ctx, flow_options, signal
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+      # return ctx, flow_options, signal
+      return signal, [ctx, flow_options]
     rescue
       ctx[:exception] = $!.message
 
-      [ctx, flow_options, Trailblazer::Operation::Railway.fail!] # FIXME: deprecate the old return set!
+      return Trailblazer::Operation::Railway.fail!, [ctx, flow_options] # FIXME: deprecate the old return set!
     end
   end
   #:wrap-handler end
@@ -168,7 +156,7 @@ When raise:   return {Railway.fail!}
   #:wrap
   class Memo::Create < Trailblazer::Operation
     step :model
-    step Wrap( HandleUnsafeProcess ) {
+    step Wrap(HandleUnsafeProcess) {
       step :update
       step :rehash
     }
@@ -714,5 +702,47 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
 
   it "tracing" do
     # Trailblazer::Developer.wtf?(Song::Activity::Upload, {seq: []})
+  end
+end
+
+# NOTE: introduced in 2.2.
+# TODO: remove in 2.3.
+class WrapHandlerDeprecationTest < Minitest::Spec
+  class MyDeprecatedTransaction
+    def self.call((ctx, flow_options), **_circuit_options, &block)
+      signal, (ctx, flow_options) = yield # calls the wrapped steps, old circuit interface.
+
+      ctx[:seq] << :my_deprecated_handler
+
+      return signal, [ctx, flow_options] # old return signature.
+    end
+  end
+
+  it "deprecates Wrap handlers with the old circuit interface" do
+    # TODO: check all types, proc, class, instance, etc.
+
+    line_number_for_wrap, activity = nil
+
+    _, warnings = capture_io do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Wrap(MyDeprecatedTransaction) {
+          step :update
+        }
+
+        include T.def_steps(:update)
+      end
+      line_number_for_wrap = __LINE__ - 6
+    end
+
+    assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_wrap} Handlers for Wrap() and Rescue() have a new interface, the old `(ctx, flow_options), **` signature and the return set is deprecated.
+Please use the new positional circuit interface, check ### FIXME _____---------------
+Do not forget to change the return set, too: `return <signal>, [ctx, flow_options]´ ==> `return ctx, flow_options, signal`
+)
+
+
+  #@ happy days
+    assert_invoke activity, seq: "[:update, :my_deprecated_handler]"
+  #@ transfer returns false
+    assert_invoke activity, update: false, seq: "[:update, :my_deprecated_handler]", terminus: :failure
   end
 end
