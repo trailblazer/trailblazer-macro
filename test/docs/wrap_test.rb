@@ -134,6 +134,58 @@ class WrapMyRescueTest < Minitest::Spec
   end
 end
 
+# Test that an outdated signature handler still works in 2.2.
+# Also, this is needed for docs.
+#
+# TODO: move me to some "deprecated" test file.
+class DocsWrap2_1Test < Minitest::Spec
+  #:wrap-handler-2-1
+  class HandleUnsafeProcess
+    def self.call((ctx, flow_options), *, &block)
+      signal, (ctx, flow_options) = yield # calls the wrapped steps
+
+      return signal, [ctx, flow_options]
+    rescue
+      ctx[:exception] = $!.message
+
+      return Trailblazer::Operation::Railway.fail!, [ctx, flow_options]
+    end
+  end
+  #:wrap-handler-2-1 end
+
+  class Memo
+    module Operation
+    end
+  end
+
+  #:wrap-2-1
+  module Memo::Operation
+    class Create < Trailblazer::Operation
+      step :model
+      step Wrap(HandleUnsafeProcess) {
+        step :update
+        step :rehash
+      }
+      step :notify
+      left :log_error
+      #~methods
+      include T.def_steps(:model, :update, :notify, :log_error)
+      include Rehash
+      #~methods end
+    end
+  end
+  #:wrap-2-1 end
+
+  it do
+  #@ happy days
+    assert_invoke Memo::Operation::Create, seq: "[:model, :update, :rehash, :notify]"
+  #@ rehash raises
+    assert_invoke Memo::Operation::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash, :log_error]",
+      terminus: :failure,
+      expected_ctx_variables: {exception: "RuntimeError"}
+  end
+end
+
 class DocsWrapTest < Minitest::Spec
 =begin
 When success: return the block's returns
@@ -141,14 +193,14 @@ When raise:   return {Railway.fail!}
 =end
   #:wrap-handler
   class HandleUnsafeProcess
-    def self.call((ctx, flow_options), *, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
-      # return ctx, flow_options, signal
-      return signal, [ctx, flow_options]
+    def self.call(ctx, flow_options, circuit_options, &block)
+      ctx, flow_options, signal = yield # calls the wrapped steps
+
+      return ctx, flow_options, signal
     rescue
       ctx[:exception] = $!.message
 
-      return Trailblazer::Operation::Railway.fail!, [ctx, flow_options] # FIXME: deprecate the old return set!
+      return ctx, flow_options, Trailblazer::Operation::Railway.fail!
     end
   end
   #:wrap-handler end
@@ -483,11 +535,14 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
 =end
   class WrapWithBlockReturnSignatureCheckTest < Minitest::Spec
     Memo = Module.new
+    module Memo::Operation
+    end
 
     #:handler-with-signature-evaluator
     class HandleUnsafeProcess
-      def self.call((_ctx, _flow_options), *, &block)
+      def self.call(_ctx, _flow_options, _circuit_options, &block)
         ctx, flow_options, signal = yield
+
         evaluated_signal = if signal.to_h[:semantic] == :success
                             Trailblazer::Operation::Railway.pass_fast!
                           else
@@ -499,21 +554,23 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     #:handler-with-signature-evaluator end
 
     #:transaction
-    class Memo::Create < Trailblazer::Operation
-      step :model
-      step Wrap( HandleUnsafeProcess ) {
-        step :update
-      }, fast_track: true # because Wrap can return pass_fast! now
-      step :notify
-      left :log_error
-      #~methods
-      include T.def_steps(:model, :update, :notify, :log_error)
-      #~methods end
+    module Memo::Operation
+      class Create < Trailblazer::Operation
+        step :model
+        step Wrap(HandleUnsafeProcess) {
+          step :update
+        }, fast_track: true # because Wrap can return pass_fast! now
+        step :notify
+        left :log_error
+        #~methods
+        include T.def_steps(:model, :update, :notify, :log_error)
+        #~methods end
+      end
     end
     #:transaction end
 
-    it { assert_call Memo::Create, seq: "[:model, :update]", terminus: :pass_fast }
-    it { assert_call Memo::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
+    it { assert_call Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
+    it { assert_call Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
   end
 
 
