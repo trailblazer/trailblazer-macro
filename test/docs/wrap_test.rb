@@ -573,6 +573,46 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     it { assert_call Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
   end
 
+  # Test 2.1 behavior.
+  class WrapWithBlockReturnSignatureCheckTest_2_1 < Minitest::Spec
+    Memo = Module.new
+    module Memo::Operation
+    end
+
+    #:handler-with-signature-evaluator-2-1
+    class HandleUnsafeProcess
+      def self.call((ctx, flow_options), **circuit_options, &block)
+        signal, (ctx, flow_options) = yield
+
+        evaluated_signal = if signal.to_h[:semantic] == :success
+                            Trailblazer::Operation::Railway.pass_fast!
+                          else
+                            Trailblazer::Operation::Railway.fail!
+                          end
+        return evaluated_signal, [ctx, flow_options]
+      end
+    end
+    #:handler-with-signature-evaluator-2-1 end
+
+    #:transaction-2-1
+    module Memo::Operation
+      class Create < Trailblazer::Operation
+        step :model
+        step Wrap(HandleUnsafeProcess) {
+          step :update
+        }, fast_track: true # because Wrap can return pass_fast! now
+        step :notify
+        left :log_error
+        #~methods
+        include T.def_steps(:model, :update, :notify, :log_error)
+        #~methods end
+      end
+    end
+    #:transaction-2-1 end
+
+    it { assert_call Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
+    it { assert_call Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
+  end
 
   class WrapOperationWithCustomTerminus < Minitest::Spec
     Song = Module.new
