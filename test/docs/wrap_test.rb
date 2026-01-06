@@ -12,6 +12,8 @@ class MyTransaction
 end
 #:my_transaction end
 
+# TODO: add 2.1 version of the above
+
 class WrapSimpleHandlerTest < Minitest::Spec
   MyTransaction = ::MyTransaction
 
@@ -315,7 +317,7 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
       def self.call(ctx, flow_options, _circuit_options, &block)
         yield # calls the wrapped steps
       rescue
-        MyFailSignal
+        return ctx, flow_options, MyFailSignal
       end
     end
     #:custom-handler end
@@ -389,7 +391,7 @@ You can return boolean true in wrap.
         def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
-          true
+          return ctx, flow_options, Trailblazer::Activity::Right
         end
       end
 
@@ -425,7 +427,7 @@ You can return boolean false in wrap.
         def self.call(ctx, flow_options, _circuit_options, &block)
           yield # calls the wrapped steps
         rescue
-          false
+          return ctx, flow_options, Trailblazer::Activity::Left
         end
       end
 
@@ -444,42 +446,6 @@ You can return boolean false in wrap.
     end
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
-      assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
-    end
-  end
-
-=begin
-When success: return the block's returns
-When raise:   return {nil} and go "failed"
-You can return nil in wrap.
-=end
-  class WrapGoesIntoNilFromRescueTest < Minitest::Spec
-    Memo = Module.new
-
-    class Memo::Create < Trailblazer::Operation
-      class HandleUnsafeProcess
-        def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
-        rescue
-          nil
-        end
-      end
-
-      step :model
-      step Wrap( HandleUnsafeProcess ) {
-        step :update
-        step :rehash
-      }
-      step :notify
-      left :log_error
-
-      #~methods
-      include T.def_steps(:model, :update, :notify, :log_error)
-      include Rehash
-      #~methods end
-    end
-
-    it "translates nil returned form a wrap to a signal with a `failure` semantic" do
       assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
     end
   end

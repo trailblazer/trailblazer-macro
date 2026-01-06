@@ -9,6 +9,24 @@ Inject(:composer_index) => ->(ctx, index:, **) { index },
 * Remove deprecation for `Nested(Memo::Operation::Create)`. Without a dynamic decider, use `Subprocess()`.
 * Rename `:auto_wire` option in `Nested()` to `:static`.
 
+## Wrap
+
+* Silently deprecate the "feature" to return arbitrary "signals" from the user handler.
+  Before 2.2, you could do things like
+
+  ```ruby
+  class HandleUnsafeProcess
+    def self.call(ctx, flow_options, _circuit_options, &block)
+      yield
+    rescue
+      true # Or any other object that will be treated as a signal.
+    end
+  end
+  ```
+
+  As this has never been officially documented, you won't be warned about the deprecation. =========> consistency
+
+
 # 2.1.16
 
 * Fix a bug in `patch` where `Subprocess()` was missing in `Macro::Strategy`.

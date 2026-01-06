@@ -8,16 +8,13 @@ module Trailblazer
 
       outputs   = Hash[outputs.collect { |output| [output.semantic, output] }] # FIXME: redundant to Subprocess().
 
-      # Since in the user block, you can return Railway.pass! etc, we need to map
-      # those to the actual wrapped block_activity's end.
+      # Since in the user block, you can return Railway.pass! etc, we need to translate
+      # those to the actual block_activity's termini.
       signal_to_output = {
         Activity::Right               => outputs[:success].signal,
         Activity::Left                => outputs[:failure].signal,
         Activity::FastTrack::PassFast => outputs[:pass_fast].signal,
         Activity::FastTrack::FailFast => outputs[:fail_fast].signal,
-        true               => outputs[:success].signal,
-        false              => outputs[:failure].signal,
-        nil                => outputs[:failure].signal,
       }
 
       state = Declarative::State(
@@ -45,31 +42,20 @@ module Trailblazer
     class Wrap < Macro::Strategy
       def self.call(ctx, flow_options, circuit_options)
         # since yield is called without arguments, we need to pull default params from here. Oh ... tricky.
-
         block_called_from_user_yield = ->() { # DISCUSS: because we allow users to call {yield}, we don't receive any args here.
           Activity::Circuit::Runner.(block_activity, ctx, flow_options, circuit_options)
         }
 
-        # call the user's Wrap {} block in the operation.
-        # This will invoke block_called_from_user_yield above if the user block yields.
         user_handler = @state.get(:user_wrap)
 
         # Invoke the user's handler.
-        returned = user_handler.(ctx, flow_options, circuit_options, &block_called_from_user_yield)
+        ctx, flow_options, signal = user_handler.(ctx, flow_options, circuit_options, &block_called_from_user_yield)
 
-        # {returned} can be
-        #   1. {circuit interface return} from the begin block, because the wrapped OP passed
-        #   2. {task interface return} because the user block returns "customized" signals, true of fale
-
-        if returned.is_a?(Array) # 1. {circuit interface return}, new style.
-          ctx, flow_options, signal = returned
-        else                     # 2. {task interface return}, only a signal (or true/false)
-          # TODO: deprecate this?
-          signal = returned
-        end
-
-        # If there's no mapping, use the original {signal} .
-        # This usually means signal is a terminus or a custom signal.
+        # The user handler is allowed to return signals like Right and Left. We need to translate
+        # those to termini signals from the block_activity, cause those are the only ones
+        # we route.
+        # DISCUSS: i would love to skip this, but that'd mean the user has to return a
+        #          "native" signal from their block.
         signal = @state.get(:signal_to_output).fetch(signal, signal)
 
         return ctx, flow_options, signal
