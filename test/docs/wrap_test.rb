@@ -815,4 +815,35 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
   #@ transfer returns false
     assert_invoke activity, update: false, seq: "[:update, :my_deprecated_handler]", terminus: :failure
   end
+
+  it "doesn't deprecate anything when done in proper 2.2 style" do
+    def my_2_2_handler(ctx, flow_options, circuit_options, &block)
+      ctx, flow_options, circuit_options = yield(ctx, flow_options, circuit_options)
+
+      ctx[:seq] << :my_deprecated_handler
+
+      return ctx, flow_options, circuit_options
+    end
+
+    my_handler = method(:my_2_2_handler)
+    activity = nil
+
+    _, warnings = capture_io do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Wrap(my_handler) {
+          step :update
+        }
+
+        include T.def_steps(:update)
+      end
+    end
+
+    assert_equal warnings, %()
+
+    _, warnings = capture_io do
+      assert_invoke activity, seq: "[:update, :my_deprecated_handler]"
+    end
+
+    assert_equal warnings, %()
+  end
 end
