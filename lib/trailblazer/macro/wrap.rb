@@ -77,7 +77,8 @@ module Trailblazer
           return user_handler if arity == 3 # new interface, {ctx, flow_options, circuit_options}
 
           Activity::Deprecate.warn(
-            Activity::DSL::Linear::Deprecate.dsl_caller_location(index: 3),
+            # find the stack trace row after "lib/ruby/3.3.0/forwardable.rb:240:in `Wrap'"
+            Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /forwardable.+Wrap/),
             %(Handlers for Wrap() and Rescue() have a new interface, the old `(ctx, flow_options), **` signature and the return set is deprecated.
 Please use the new positional circuit interface, check ### FIXME _____---------------
 Do not forget to change the return set, too: `return <signal>, [ctx, flow_options]´ ==> `return ctx, flow_options, signal`)
@@ -102,9 +103,13 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
         def self.deprecate_yield_without_args(block_activity, ctx, flow_options, circuit_options)
           ->(*args) do
             if args.size == 0 # {yield} old style, deprecated.
+
+              source_line_number = Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /deprecate_user_handler_with_old_circuit_interface/) ||
+                Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /deprecate_yield_without_args/)
+
               Activity::Deprecate.warn(
-                Activity::DSL::Linear::Deprecate.dsl_caller_location(index: 2),
-                  %(When using `yield` in Wrap(), please pass through the three "circuit interface" arguments, see # FIXME ------------------------)
+                source_line_number,
+                %(When using `yield` in Wrap(), please pass through the three "circuit interface" arguments, see # FIXME ------------------------)
               )
 
               return BLOCK_FOR_YIELD.(block_activity, ctx, flow_options, circuit_options) # pass the circuit interface args into the block_activity invocation manually.

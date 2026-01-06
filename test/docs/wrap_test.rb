@@ -1,11 +1,12 @@
 require "test_helper"
 
-  #@ yield returns a circuit-interface result set, we can return it to the flow
+#@ yield returns a circuit-interface result set, we can return it to the flow
 #:my_transaction
 class MyTransaction
-  # def self.call((ctx, flow_options), **, &block) # FIXME: deprecate
-  def self.call(ctx, flow_options, _circuit_options, &block) # FIXME: deprecate the old composite style interface [ctx, ...],
-    ctx, flow_options, signal = yield # calls the wrapped steps
+  def self.call(ctx, flow_options, circuit_options, &block)
+    ctx, flow_options, signal = yield(ctx, flow_options, circuit_options) # calls the wrapped steps
+
+    # maybe do something more?
 
     return ctx, flow_options, signal
   end
@@ -241,8 +242,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
+        def self.call(ctx, flow_options, circuit_options, &block)
+          yield#(ctx, flow_options, circuit_options) # calls the wrapped steps
         rescue
           [ctx, flow_options, Trailblazer::Operation::Railway.fail!]
         end
@@ -781,6 +782,7 @@ class WrapHandlerDeprecationTest < Minitest::Spec
       return signal, [ctx, flow_options] # old return signature.
     end
   end
+  line_number_for_yield = __LINE__ - 7
 
   it "deprecates Wrap handlers with the old circuit interface" do
     # TODO: check all types, proc, class, instance, etc.
@@ -807,7 +809,7 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
     assert_invoke activity, seq: "[:update, :my_deprecated_handler]"
   end
 
-  assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_wrap - 15} When using `yield` in Wrap(), please pass through the three \"circuit interface\" arguments, see # FIXME ------------------------
+  assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_yield} When using `yield` in Wrap(), please pass through the three \"circuit interface\" arguments, see # FIXME ------------------------
 )
 
   #@ happy days
@@ -845,5 +847,38 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
     end
 
     assert_equal warnings, %()
+  end
+
+  it "deprecates yield without args even when the handler is using new circuit interface" do
+    def my_2_2_handler_(ctx, flow_options, circuit_options, &block)
+      ctx, flow_options, circuit_options = yield#(ctx, flow_options, circuit_options)
+
+      ctx[:seq] << :my_deprecated_handler
+
+      return ctx, flow_options, circuit_options
+    end
+    line_number_for_yield = __LINE__ - 6
+
+    my_handler = method(:my_2_2_handler_)
+    activity = nil
+
+    _, warnings = capture_io do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Wrap(my_handler) {
+          step :update
+        }
+
+        include T.def_steps(:update)
+      end
+    end
+
+    assert_equal warnings, %()
+
+    _, warnings = capture_io do
+      assert_invoke activity, seq: "[:update, :my_deprecated_handler]"
+    end
+
+    assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_yield} When using `yield` in Wrap(), please pass through the three \"circuit interface\" arguments, see # FIXME ------------------------
+)
   end
 end

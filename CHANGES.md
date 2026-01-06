@@ -26,6 +26,14 @@ Inject(:composer_index) => ->(ctx, index:, **) { index },
 
   As this has never been officially documented, you won't be warned about the deprecation. =========> consistency
 
+* Deprecate calling `yield` in Wrap() without passing args.
+this still works but will be removed in 2.3.
+  ```ruby
+  def my_handler(ctx, flow_options, circuit_options)
+    # ...
+    yield(ctx, flow_options, circuit_options)
+  ```
+
 
 # 2.1.16
 
