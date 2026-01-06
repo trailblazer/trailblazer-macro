@@ -2,7 +2,6 @@ module Trailblazer
   module Macro
     # TODO: {user_wrap}: rename to {wrap_handler}.
     def self.Wrap(user_wrap, id: Macro.id_for(user_wrap, macro: :Wrap), &block)
-      # user_wrap = Wrap.deprecate_positional_wrap_signature(user_wrap)
       user_wrap = Wrap::Deprecated.deprecate_user_handler_with_old_circuit_interface(user_wrap)
 
       block_activity, outputs = Macro.block_activity_for(nil, &block)
@@ -44,23 +43,6 @@ module Trailblazer
     # Wrap exposes {#inherited} which will also copy the block activity.
     # Currently, this is only used for patching (as it will try to subclass Wrap).
     class Wrap < Macro::Strategy
-      # behaves like an operation so it plays with Nested and simply calls the operation in the user-provided block.
-      # class Wrapped
-      # @private
-      def self.deprecate_positional_wrap_signature(user_wrap)
-        return user_wrap
-        # FIXME: deprecate old array-kwargs based circuit interface.
-
-        parameters = user_wrap.is_a?(Proc) || user_wrap.is_a?(Method) ? user_wrap.parameters : user_wrap.method(:call).parameters
-
-        return user_wrap if parameters[0] == [:req] # means ((ctx, flow_options), *, &block), "new style"
-
-        ->((ctx, flow_options), **circuit_options, &block) do
-          warn "[Trailblazer] Wrap handlers have a new signature: ((ctx), *, &block) XXX"
-          user_wrap.(ctx, &block)
-        end
-      end
-
       def self.call(ctx, flow_options, circuit_options)
         # since yield is called without arguments, we need to pull default params from here. Oh ... tricky.
 
