@@ -772,6 +772,7 @@ end
 # TODO: remove in 2.3.
 class WrapHandlerDeprecationTest < Minitest::Spec
   class MyDeprecatedTransaction
+    # We are using the old circuit interface.
     def self.call((ctx, flow_options), **_circuit_options, &block)
       signal, (ctx, flow_options) = yield # calls the wrapped steps, old circuit interface.
 
@@ -801,7 +802,13 @@ class WrapHandlerDeprecationTest < Minitest::Spec
 Please use the new positional circuit interface, check ### FIXME _____---------------
 Do not forget to change the return set, too: `return <signal>, [ctx, flow_options]´ ==> `return ctx, flow_options, signal`
 )
+  # We print a deprecation warning at runtime.
+  _, warnings = capture_io do
+    assert_invoke activity, seq: "[:update, :my_deprecated_handler]"
+  end
 
+  assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_wrap - 15} When using `yield` in Wrap(), please pass through the three \"circuit interface\" arguments, see # FIXME ------------------------
+)
 
   #@ happy days
     assert_invoke activity, seq: "[:update, :my_deprecated_handler]"

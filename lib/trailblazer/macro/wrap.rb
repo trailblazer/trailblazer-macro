@@ -2,7 +2,7 @@ module Trailblazer
   module Macro
     # TODO: {user_wrap}: rename to {wrap_handler}.
     def self.Wrap(user_wrap, id: Macro.id_for(user_wrap, macro: :Wrap), &block)
-      user_wrap = Wrap::Deprecated.deprecate_user_handler_with_old_circuit_interface(user_wrap)
+      user_wrap = Wrap::Deprecate.deprecate_user_handler_with_old_circuit_interface(user_wrap)
 
       block_activity, outputs = Macro.block_activity_for(nil, &block)
 
@@ -40,11 +40,17 @@ module Trailblazer
     # Wrap exposes {#inherited} which will also copy the block activity.
     # Currently, this is only used for patching (as it will try to subclass Wrap).
     class Wrap < Macro::Strategy
+      # This block is invoked in the user handler when calling {yield(ctx, flow_options, circuit_options)}.
+      BLOCK_FOR_YIELD = ->(block_activity, ctx, flow_options, circuit_options) {
+        Activity::Circuit::Runner.(block_activity, ctx, flow_options, circuit_options)
+      }
+
       def self.call(ctx, flow_options, circuit_options)
         # since yield is called without arguments, we need to pull default params from here. Oh ... tricky.
-        block_called_from_user_yield = ->() { # DISCUSS: because we allow users to call {yield}, we don't receive any args here.
-          Activity::Circuit::Runner.(block_activity, ctx, flow_options, circuit_options)
-        }
+        # TODO: in 2.3, replace this with
+        #         block_called_from_user_yield = BLOCK_FOR_YIELD
+        # We have to create a proc at runtime, unfortunately, since we need ctx and friends.
+        block_called_from_user_yield = Deprecate.deprecate_yield_without_args(block_activity, ctx, flow_options, circuit_options)
 
         user_handler = @state.get(:user_wrap)
 
@@ -62,7 +68,7 @@ module Trailblazer
       end
 
       # Remove in 2.3.
-      module Deprecated
+      module Deprecate
         # Wraps user handlers with a {(ctx, flow_options), **circuit_options} interface and
         # prints a deprecation warning.
         def self.deprecate_user_handler_with_old_circuit_interface(user_handler)
@@ -79,9 +85,9 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
 
           deprecated_user_handler_adapter = ->(ctx, flow_options, circuit_options, &block) do
             block_returning_old_array_style = ->(*args) do # This is yielded by the user.
-              ctx, flow_options, signal = block.(*args)
+              ctx, flow_options, signal = block.(*args) # Run the wrapped activity.
 
-              return signal, [ctx, flow_options]
+              return signal, [ctx, flow_options] # Return the old style circuit interface.
             end
 
             # Translate from new positional circuit interface to the old, clumsy one.
@@ -91,6 +97,21 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
           end
 
           return deprecated_user_handler_adapter
+        end
+
+        def self.deprecate_yield_without_args(block_activity, ctx, flow_options, circuit_options)
+          ->(*args) do
+            if args.size == 0 # {yield} old style, deprecated.
+              Activity::Deprecate.warn(
+                Activity::DSL::Linear::Deprecate.dsl_caller_location(index: 2),
+                  %(When using `yield` in Wrap(), please pass through the three "circuit interface" arguments, see # FIXME ------------------------)
+              )
+
+              return BLOCK_FOR_YIELD.(block_activity, ctx, flow_options, circuit_options) # pass the circuit interface args into the block_activity invocation manually.
+            end
+
+            BLOCK_FOR_YIELD.(block_activity, *args) # pass the "real", procedurally passed args into the block_activity invocation.
+          end
         end
       end
     end # Wrap
