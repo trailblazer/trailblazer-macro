@@ -2,13 +2,16 @@ require "test_helper"
 
 #@ yield returns a circuit-interface result set, we can return it to the flow
 #:my_transaction
+# app/concepts/macro/my_transaction.rb
 class MyTransaction
   def self.call(ctx, flow_options, circuit_options, &block)
-    ctx, flow_options, signal = yield(ctx, flow_options, circuit_options) # calls the wrapped steps
-
+    #:yield-and-return
+                                # Run the wrapped steps.
+    ctx, flow_options, signal = yield(ctx, flow_options, circuit_options)
     # maybe do something more?
 
     return ctx, flow_options, signal
+    #:yield-and-return end
   end
 end
 #:my_transaction end
