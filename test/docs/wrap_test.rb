@@ -90,8 +90,8 @@ end
 class WrapMyRescueTest < Minitest::Spec
   #:my_rescue
   class MyRescue
-    def self.call(ctx, flow_options, _circuit_options, &block)
-      ctx, flow_options, signal = yield # calls the wrapped steps
+    def self.call(ctx, flow_options, circuit_options, &block)
+      ctx, flow_options, signal = yield(ctx, flow_options, circuit_options) # calls the wrapped steps
 
       return ctx, flow_options, signal
     rescue
@@ -197,7 +197,7 @@ When raise:   return {Railway.fail!}
   #:wrap-handler
   class HandleUnsafeProcess
     def self.call(ctx, flow_options, circuit_options, &block)
-      ctx, flow_options, signal = yield # calls the wrapped steps
+      ctx, flow_options, signal = yield(ctx, flow_options, circuit_options) # calls the wrapped steps
 
       return ctx, flow_options, signal
     rescue
@@ -243,7 +243,7 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
         def self.call(ctx, flow_options, circuit_options, &block)
-          yield#(ctx, flow_options, circuit_options) # calls the wrapped steps
+          yield(ctx, flow_options, circuit_options) # calls the wrapped steps
         rescue
           [ctx, flow_options, Trailblazer::Operation::Railway.fail!]
         end
@@ -263,8 +263,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       #~methods end
     end
 
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
   end
 
 =begin
@@ -276,8 +276,8 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 
     #:fail-fast-handler
     class HandleUnsafeProcess
-      def self.call(ctx, flow_options, _circuit_options, &block)
-        yield # calls the wrapped steps
+      def self.call(ctx, flow_options, circuit_options, &block)
+        yield(ctx, flow_options, circuit_options) # calls the wrapped steps
       rescue
         [ctx, flow_options, Trailblazer::Operation::Railway.fail_fast!]
       end
@@ -300,8 +300,8 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
     end
     #:fail-fast end
 
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
   end
 
 =begin
@@ -315,8 +315,8 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     class MyTransaction
       MyFailSignal = Class.new(Trailblazer::Activity::Signal)
 
-      def self.call(ctx, flow_options, _circuit_options, &block)
-        yield # calls the wrapped steps
+      def self.call(ctx, flow_options, circuit_options, &block)
+        yield(ctx, flow_options, circuit_options) # calls the wrapped steps
       rescue
         return ctx, flow_options, MyFailSignal
       end
@@ -341,8 +341,8 @@ When raise:   return {Railway.fail!} or {Railway.pass!}
     end
     #:custom end
 
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash]", terminus: :transaction_worked }
-    it { assert_call Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash]", terminus: :transaction_failed }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", terminus: :transaction_worked }
+    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash]", terminus: :transaction_failed }
   end
 
 =begin
@@ -354,8 +354,8 @@ When raise:   return {Railway.pass!} and go "successful"
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
+        def self.call(ctx, flow_options, circuit_options, &block)
+          yield(ctx, flow_options, circuit_options) # calls the wrapped steps
         rescue
           [ctx, flow_options, Trailblazer::Operation::Railway.pass!]
         end
@@ -375,8 +375,8 @@ When raise:   return {Railway.pass!} and go "successful"
       #~methods end
     end
 
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError }
   end
 
 =begin
@@ -389,8 +389,8 @@ You can return boolean true in wrap.
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
+        def self.call(ctx, flow_options, circuit_options, &block)
+          yield(ctx, flow_options, circuit_options) # calls the wrapped steps
         rescue
           return ctx, flow_options, Trailblazer::Activity::Right
         end
@@ -411,7 +411,7 @@ You can return boolean true in wrap.
     end
 
     it "translates true returned form a wrap to a signal with a `success` semantic" do
-      assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError
+      assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]", rehash_raise: RuntimeError
     end
   end
 
@@ -426,7 +426,7 @@ You can return boolean false in wrap.
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
         def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
+          yield(ctx, flow_options, _circuit_options) # calls the wrapped steps
         rescue
           return ctx, flow_options, Trailblazer::Activity::Left
         end
@@ -447,7 +447,7 @@ You can return boolean false in wrap.
     end
 
     it "translates false returned form a wrap to a signal with a `failure` semantic" do
-      assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
+      assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure
     end
   end
 
@@ -467,8 +467,8 @@ This one is mostly to show how one could wrap steps in a transaction
 
     #:transaction-handler
     class MyTransaction
-      def self.call(ctx, flow_options, _circuit_options, &block)
-        Sequel.transaction { yield } # calls the wrapped steps
+      def self.call(ctx, flow_options, circuit_options, &block)
+        Sequel.transaction { yield(ctx, flow_options, circuit_options) } # calls the wrapped steps
       rescue
         return ctx, flow_options, Trailblazer::Operation::Railway.fail!
       end
@@ -491,8 +491,8 @@ This one is mostly to show how one could wrap steps in a transaction
     end
     #:transaction end
 
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_call Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :log_error]", rehash_raise: RuntimeError, terminus: :failure }
   end
 
 =begin
@@ -507,14 +507,15 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
 
     #:handler-with-signature-evaluator
     class HandleUnsafeProcess
-      def self.call(_ctx, _flow_options, _circuit_options, &block)
-        ctx, flow_options, signal = yield
+      def self.call(ctx, flow_options, circuit_options, &block)
+        ctx, flow_options, signal = yield(ctx, flow_options, circuit_options)
 
         evaluated_signal = if signal.to_h[:semantic] == :success
                             Trailblazer::Operation::Railway.pass_fast!
                           else
                             Trailblazer::Operation::Railway.fail!
                           end
+
         return ctx, flow_options, evaluated_signal
       end
     end
@@ -536,8 +537,8 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     end
     #:transaction end
 
-    it { assert_call Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
-    it { assert_call Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
+    it { assert_invoke Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
+    it { assert_invoke Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
   end
 
   # Test 2.1 behavior.
@@ -549,7 +550,7 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     #:handler-with-signature-evaluator-2-1
     class HandleUnsafeProcess
       def self.call((ctx, flow_options), **circuit_options, &block)
-        signal, (ctx, flow_options) = yield
+        signal, (ctx, flow_options) = yield(ctx, flow_options, circuit_options)
 
         evaluated_signal = if signal.to_h[:semantic] == :success
                             Trailblazer::Operation::Railway.pass_fast!
@@ -577,8 +578,8 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
     end
     #:transaction-2-1 end
 
-    it { assert_call Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
-    it { assert_call Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
+    it { assert_invoke Memo::Operation::Create, seq: "[:model, :update]", terminus: :pass_fast }
+    it { assert_invoke Memo::Operation::Create, seq: "[:model, :update, :log_error]", update: false, terminus: :failure }
   end
 
   class WrapOperationWithCustomTerminus < Minitest::Spec
@@ -586,8 +587,8 @@ This one is mostly to show how one could evaluate Wrap()'s return value based on
 
     module Song::Activity
       class HandleUnsafeProcess
-        def self.call(ctx, flow_options, _circuit_options, &block)
-          yield # calls the wrapped steps
+        def self.call(ctx, flow_options, circuit_options, &block)
+          yield(ctx, flow_options, circuit_options) # calls the wrapped steps
         rescue
           [ Trailblazer::Operation::Railway.fail_fast!, [ctx, {}] ]
         end
@@ -640,19 +641,19 @@ end
 
 class WrapUnitTest < Minitest::Spec
   class HandleUnsafeProcess
-    def self.call(_ctx, _flow_options, _circuit_options, &block)
-      yield # calls the wrapped steps
+    def self.call(ctx, flow_options, circuit_options, &block)
+      yield(ctx, flow_options, circuit_options) # calls the wrapped steps
     end
   end
 
   it "assigns IDs via {Macro.id_for}" do
     activity = Class.new(Trailblazer::Activity::Railway) do
-      def self.my_wrap_handler(ctx, flow_options, _circuit_options, &block)
-        yield # calls the wrapped steps
+      def self.my_wrap_handler(ctx, flow_options, circuit_options, &block)
+        yield(ctx, flow_options, circuit_options) # calls the wrapped steps
       end
 
-      my_wrap_handler = ->(ctx, flow_options, _circuit_options, &block) do
-        block.call # calls the wrapped steps
+      my_wrap_handler = ->(ctx, flow_options, circuit_options, &block) do
+        block.call(ctx, flow_options, circuit_options) # calls the wrapped steps
       end
 
       step Wrap(HandleUnsafeProcess) {}
@@ -782,9 +783,10 @@ class WrapHandlerDeprecationTest < Minitest::Spec
       return signal, [ctx, flow_options] # old return signature.
     end
   end
-  line_number_for_yield = __LINE__ - 7
 
   it "deprecates Wrap handlers with the old circuit interface" do
+    line_number_for_yield = __LINE__ - 9
+
     # TODO: check all types, proc, class, instance, etc.
 
     line_number_for_wrap, activity = nil
@@ -849,7 +851,7 @@ Do not forget to change the return set, too: `return <signal>, [ctx, flow_option
     assert_equal warnings, %()
   end
 
-  it "deprecates yield without args even when the handler is using new circuit interface" do
+  it "deprecates yield-without-args even when the handler around it is using new circuit interface" do
     def my_2_2_handler_(ctx, flow_options, circuit_options, &block)
       ctx, flow_options, circuit_options = yield#(ctx, flow_options, circuit_options)
 
