@@ -13,11 +13,11 @@ class NestedRescueTest < Minitest::Spec
       step :a
       step Rescue {
         step :y
-        pass ->(options, **) { raise Y if options["raise-y"] }
+        pass ->(ctx, **) { raise Y if ctx["raise-y"] }
         step :z
       }
       step :b
-      pass ->(options, **) { raise A if options["raise-a"] }
+      pass ->(ctx, **) { raise A if ctx["raise-a"] }
       step :c
       left :inner_err
     }
@@ -79,7 +79,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
 
     #:rescue-handler
     class MyHandler
-      def self.call(exception, (ctx), *)
+      def self.call(ctx, flow_options, circuit_options, exception:)
         ctx[:exception_class] = exception.class
       end
     end
@@ -115,7 +115,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
     Memo = Class.new
 
     module MyHandler
-      def self.call(exception, (ctx), *)
+      def self.call(ctx, *, exception:)
         ctx[:exception_class] = exception.class
       end
     end
@@ -145,7 +145,7 @@ Rescue( handler: :instance_method )
     #:rescue-method
     class Memo::Create < Trailblazer::Operation
       step :find_model
-      step Rescue( RuntimeError, handler: :my_handler ) {
+      step Rescue(RuntimeError, handler: :my_handler) {
         step :update
         step :rehash
       }
@@ -156,7 +156,7 @@ Rescue( handler: :instance_method )
       include Rehash
       #~methods end
 
-      def my_handler(exception, (ctx), *)
+      def my_handler(ctx, *, exception:)
         ctx[:exception_class] = exception.class
       end
     end
@@ -297,9 +297,9 @@ Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXM
     end
     assert_equal warnings, ""
 
-    # _, warnings = capture_io do
+    _, warnings = capture_io do
       assert_invoke activity, rehash_raise: RuntimeError, terminus: :failure, seq: "[:rehash, :MyHandler]", expected_ctx_variables: {exception_class: RuntimeError}
-    # end
+    end
     assert_equal warnings, ""
   end
 end

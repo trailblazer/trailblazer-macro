@@ -7,27 +7,25 @@ module Trailblazer
 
       # In Rescue(), for whatever reason we support a circuit interface handler
       # where we ignore the result set?
-      # handler    = Trailblazer::Activity::Circuit.Step(handler)
 
       is_instance_method = false
       handler = Activity::Option.build(handler) do |instance_method|
         # this is for :instance_methods
         is_instance_method = true
-        callable = Rescue::InstanceMethodWithCircuitInterfaceAndKwargs.new(instance_method)
 
         # assuming we have to deprecate everything.
-        Rescue::Deprecate::InstanceMethodAtRuntime.new(callable, instance_method) # TODO: remove in 2.3.
+        Rescue::Deprecate::InstanceMethodAtRuntime.new(nil, instance_method)
       end
 
       if is_instance_method
         # deprecate at runtime :D
       else
-        # deprecate now!
-        if handler.method(:call).arity == -3
-          # raise handler.inspect
-          puts "@@@@@ xxx #{handler.inspect}"
+        # This only catches the documented signature:
+        #   def(exception, (ctx), *)
+        if Rescue::Deprecate.old_signature?(handler.method(:call))
           Rescue::Deprecate.warning_for_deprecated_callable
-# raise "why are we not hitting this from line 291?"
+
+          # deprecate now!
           handler = Rescue::Deprecate::Callable.new(handler)
         end
       end
@@ -59,21 +57,38 @@ module Trailblazer
 
     module Rescue
       module Deprecate
+        def self.old_signature?(method)
+          # this doesn't catch all, but we ignore that.
+          method.arity == -3 && method.parameters[1] == [:req] # (ctx)
+        end
+
+          # This is kind of specific to Rescue, but might be useful elsewhere. We want to run a circuit interface
+      # *instance method* with keyword arguments. in a normal CI-conform callable, this doesn't need any
+      # wrapping, but instance_methods are different.
+      # TODO: this is not Deprecate specific!!!!!!!!!!!!!!!!!!!!
+        def self.translate_from_circuit_interface_to_instance_method_option(instance_method_option, ctx, flow_options, circuit_options, **kwargs)
+          instance_method_option.(ctx, flow_options, circuit_options, keyword_arguments: kwargs, **circuit_options)
+        end
+
         class InstanceMethodAtRuntime < Struct.new(:filter, :instance_method_option)
           def call(ctx, flow_options, circuit_options, exception:)
-            exec_context = circuit_options.fetch(:exec_context)
+            # Try to retrieve the method instance of the handler method.
             # hacky, but hey, it's deprecation code!
+            exec_context    = circuit_options.fetch(:exec_context)
             instance_method = exec_context.method(instance_method_option.instance_variable_get(:@filter))
 
-            if instance_method.arity == -3 # this doesn't catch all, but we ignore that.
+            if Deprecate.old_signature?(instance_method)
               # Activity::Deprecate.warn(
                 # Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /forwardable.+Rescue/),
               warning =  "#{exec_context.class}##{instance_method.name} " + Deprecate.message_for_deprecation_warning
 
               Kernel.warn %([Trailblazer] #{warning}\n) # TODO: allow that in Activity::Deprecate.
+
+              # this is a bit hacky but we can call old signature with the "correct" arguments.
+              return Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, exception, [ctx, flow_options], circuit_options)
             end
 
-            filter.(ctx, flow_options, circuit_options, exception: exception)
+            Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, ctx, flow_options, circuit_options, exception: exception)
           end
         end
 
@@ -95,17 +110,7 @@ Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXM
             message_for_deprecation_warning
           )
         end
-      end
-      # This is kind of specific to Rescue, but might be useful elsewhere. We want to run a circuit interface
-      # *instance method* with keyword arguments. in a normal CI-conform callable, this doesn't need any
-      # wrapping, but instance_methods are different.
-      class InstanceMethodWithCircuitInterfaceAndKwargs < Struct.new(:instance_method_option) # DISCUSS: move somewhere else?
-        def call(ctx, flow_options, circuit_options, exception:, **kwargs)
-          # Call the method the old, weird style with exception as a positional argument
-          # followed by the composite circuit interface.
-          instance_method_option.(exception, [ctx, flow_options], keyword_arguments: kwargs, **circuit_options)
-        end
-      end
+      end # Deprecate
     end
   end
 end
