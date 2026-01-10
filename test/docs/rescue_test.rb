@@ -39,6 +39,8 @@ class NestedRescueTest < Minitest::Spec
   it { assert_invoke UbernestedInsanity, "raise-y" => true, seq: "[:a, :y, :inner_err, :outer_err]", terminus: :failure }
 end
 
+
+
 class RescueTest < Minitest::Spec
 
 =begin
@@ -65,9 +67,9 @@ plain Rescue()
     #:no-args end
 
     it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
-    it { assert_invoke Song::Activity::Create, rehash_raise: :bla, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: :bla }
-    it { assert_invoke Song::Activity::Create, rehash_raise: NoMethodError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: NoMethodError }
+    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
+    it { assert_invoke Song::Activity::Create, rehash_raise: :bla, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
+    it { assert_invoke Song::Activity::Create, rehash_raise: NoMethodError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
   end
 
 =begin

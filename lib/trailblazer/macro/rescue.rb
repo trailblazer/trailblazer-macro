@@ -2,8 +2,20 @@ module Trailblazer
   module Macro
     NoopHandler = lambda { |ctx, flow_options, circuit_options, exception:| }
 
-    def self.Rescue(*exceptions, handler: NoopHandler, id: Macro.id_for(nil, macro: :Rescue), &block)
+    def self.Rescue(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
       exceptions = [StandardError] unless exceptions.any?
+
+      if circuit_interface
+        rescue_block = ->(ctx, flow_options, circuit_options, &nested_activity) do
+          begin
+            nested_activity.call(ctx, flow_options, circuit_options) # FIXME: use yield.
+          rescue *exceptions => exception
+            handler.call(ctx, flow_options, circuit_options, exception: exception) # FIXME: when there's an error here, it shows the wrong exception!
+          end
+        end
+
+        return Wrap(rescue_block, id: id, &block)
+      end
 
       # In Rescue(), for whatever reason we support a circuit interface handler
       # where we ignore the result set?
@@ -44,8 +56,6 @@ module Trailblazer
         begin
           nested_activity.call(ctx, flow_options, circuit_options) # FIXME: use yield.
         rescue *exceptions => exception
-          # DISCUSS: should we deprecate this signature and rather apply the Task API here?
-          # handler.call(exception, ctx, flow_options, circuit_options) # FIXME: when there's an error here, it shows the wrong exception!
           handler.call(ctx, flow_options, circuit_options, exception: exception) # FIXME: when there's an error here, it shows the wrong exception!
 
           return ctx, flow_options, Trailblazer::Activity::Left
