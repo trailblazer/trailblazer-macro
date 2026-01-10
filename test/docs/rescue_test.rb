@@ -251,3 +251,106 @@ Rescue(), fast_track: true {}
     end
   end
 end
+
+class RescueDeprecateHandlerWithPositionalExceptionArgumentTest < Minitest::Spec
+  Song = Class.new
+  module Song::Operation; end
+
+  #:rescue-handler-2-1
+  class MyHandler
+    def self.call(exception, (ctx), *)
+      ctx[:seq] << :MyHandler
+      ctx[:exception_class] = exception.class
+    end
+  end
+  #:rescue-handler-2-1 end
+
+  class Song::Operation::Create < Trailblazer::Activity::Railway
+    step :create_model
+    step :notify
+    left :log_error
+    #~methods
+    include T.def_steps(:create_model, :upload, :notify, :log_error)
+    include Rehash
+    #~methods end
+  end
+
+  it do
+    activity = nil
+    _, warnings = capture_io do
+      activity = Class.new(Trailblazer::Activity::Railway) do
+        step Rescue(RuntimeError, handler: MyHandler) {
+          step :rehash
+        }
+        include Rehash
+      end
+    end
+    line_number_for_rescue = __LINE__ - 6
+
+    # Deprecation warning at compile time.
+    assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_rescue} The Rescue() handler has a new interface, the old `(exception, (ctx), ..), **` signature is deprecated.
+Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXME _____---------------
+)
+
+    _, warnings = capture_io do
+      assert_invoke activity, seq: "[:rehash]"
+    end
+    assert_equal warnings, ""
+
+    # _, warnings = capture_io do
+      assert_invoke activity, rehash_raise: RuntimeError, terminus: :failure, seq: "[:rehash, :MyHandler]", expected_ctx_variables: {exception_class: RuntimeError}
+    # end
+    assert_equal warnings, ""
+  end
+end
+
+class RescueDeprecateInstanceMethodHandlerWithPositionalExceptionArgumentTest < Minitest::Spec
+  Song = Class.new
+  module Song::Operation; end
+
+
+  class Song::Operation::Create < Trailblazer::Activity::Railway
+    step Rescue(RuntimeError, handler: :my_handler) {
+      step :upload
+      step :rehash
+    }
+
+    #:rescue-handler-instance-method-2-1
+    def my_handler(exception, (ctx), *)
+    # def my_handler(ctx, flow_options, *, **)
+      ctx[:seq] << :my_handler
+      ctx[:exception_class] = exception.class
+    end
+    #:rescue-handler-instance-method-2-1 end
+    #~methods
+    include T.def_steps(:upload)
+    include Rehash
+    #~methods end
+  end
+
+  it {
+    _, warnings = capture_io do
+      assert_invoke Song::Operation::Create, seq: "[:upload, :rehash]"
+    end
+
+    assert_equal warnings, ""
+  }
+
+  it {
+    _, warnings = capture_io do
+      assert_invoke Song::Operation::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:upload, :rehash, :my_handler]", expected_ctx_variables: {exception_class: RuntimeError}
+    end
+
+    assert_equal warnings, %([Trailblazer] RescueDeprecateInstanceMethodHandlerWithPositionalExceptionArgumentTest::Song::Operation::Create#my_handler The Rescue() handler has a new interface, the old `(exception, (ctx), ..), **` signature is deprecated.
+Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXME _____---------------\n)
+  }
+end
+
+=begin
+Option#call implies we need an :exec_context kwarg, since we want to separate the circuit_options from the Options-specific parameters. E.g. what if the filter
+calls another activity and needs the original circuit_options?
+
+that means pure circuit_options filter are called differently from Option ones (the first don't receive kwargs)
+=end
+
+
