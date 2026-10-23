@@ -1,26 +1,27 @@
 module Trailblazer
   module Macro
-
-    def self.Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
-      task = Activity::Circuit.Step(Model.new, binary: true)
-
-      injections = {
-        Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
-
-        # defaulting as per Inject() API.
-        Activity::Railway.Inject(:"model.class") => ->(*) { model_class },
-        Activity::Railway.Inject(:"model.action") => ->(*) { action },
-        Activity::Railway.Inject(:"model.find_by_key") => ->(*) { find_by_key },
-      }
-
-      options = {task: task, id: id}.merge(injections)
-
-      options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
-
-      options
-    end
-
     class Model
+      module Helper
+        def Model(model_class = nil, action = :new, find_by_key = :id, id: 'model.build', not_found_terminus: false)
+          node = Activity::Step.build(Model.new, binary: true)
+
+          injections = {
+            Activity::Railway.Inject() => [:params], # pass-through {:params} if it's in ctx.
+
+            # defaulting as per Inject() API.
+            Activity::Railway.Inject(:"model.class") => ->(*) { model_class },
+            Activity::Railway.Inject(:"model.action") => ->(*) { action },
+            Activity::Railway.Inject(:"model.find_by_key") => ->(*) { find_by_key },
+          }
+
+          options = {node_for_call_task: node, id: id, node: true}.merge(injections)
+
+          options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.Terminus(:not_found)) if not_found_terminus
+
+          options
+        end
+      end # Helper
+
       def call(ctx, params: {}, **)
         builder = Builder.new
         model   = builder.call(ctx, params) or return

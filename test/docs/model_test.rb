@@ -1,4 +1,4 @@
-require "test_helper"
+require_relative "../test_helper"
 
 class DocsModelTest < Minitest::Spec
   Song = Struct.new(:id, :title) do
@@ -14,9 +14,18 @@ class DocsModelTest < Minitest::Spec
     end
   end
 
+  # TODO: decide how we "globally" inject the {:seq}.
+  Trailblazer::Operation.config.args_compiler_for_invoke = Trailblazer::Circuit::Adds.(
+    Trailblazer::Operation.config.args_compiler_for_invoke,
+    [:add_seq,
+      Trailblazer::Circuit::Node[->(lib_ctx, *args) { lib_ctx[:target_ctx][:seq] = []; return lib_ctx, *args }, Trailblazer::Circuit::Task::Adapter::LibInterface],
+      :after
+    ]
+  )
+
   #:op
-  module Song::Activity
-    class Create < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Create < Trailblazer::Operation
       step Model(Song, :new)
       step :validate
       step :save
@@ -28,8 +37,8 @@ class DocsModelTest < Minitest::Spec
   #:op end
 
   #:update
-  module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Update < Trailblazer::Operation
       step Model(Song, :find_by)
       step :validate
       step :save
@@ -41,54 +50,54 @@ class DocsModelTest < Minitest::Spec
   #:update end
 
   it "defaults {:params} to empty hash when not passed" do
-    assert_invoke Song::Activity::Create, seq: "[:validate, :save]",
-      expected_ctx_variables: {model: Song.new}
+    assert_run Song::Operation::Create, seq: [:validate, :save],
+      model: Song.new, terminus: :success
 
-    assert_invoke Song::Activity::Update, seq: "[]",
+    assert_run Song::Operation::Update, seq: [],
       terminus: :failure
   end
 
-  #~ctx_to_result
   it do
     #:create
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, seq: [])
+    ctx = Song::Operation::Create.(params: {})
     puts ctx[:model] #=> #<struct Song id=nil, title=nil>
     #:create end
 
-    assert_invoke Song::Activity::Create, params: {},
-      seq: "[:validate, :save]", expected_ctx_variables: {model: Song.new}
+    assert_run Song::Operation::Create, target_ctx: {params: {}, seq: []},
+      seq: [:validate, :save], model: Song.new, terminus: :success
   end
 
   it do
     #:update-ok
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
-    ctx[:model] #=> #<Song id=1, ...>
-    puts signal #=> #<Trailblazer::Activity::End semantic=:success>
+    result = Song::Operation::Update.(params: {id: 1})
+    result[:model] #=> #<Song id=1, ...>
+    puts result.success? #=> true
     #:update-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=1, title=nil>}
-    assert_equal signal.to_h[:semantic], :success
+    assert_equal result.success?, true
+
+    assert_equal result[:model].inspect, %{#<struct #{Song} id=1, title=nil>}
+    assert_equal result.terminus.to_h[:semantic], :success
   end
 
   it do
     #:update-fail
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {})
-    ctx[:model] #=> nil
-    puts signal #=> #<Trailblazer::Activity::End semantic=:failure>
+    result = Song::Operation::Update.(params: {})
+    result[:model] #=> nil
+    puts result.success? #=> false #=> #<Trailblazer::Activity::End semantic=:failure>
     #:update-fail end
 
-    assert_equal ctx[:model].inspect, %{nil}
-    assert_equal signal.to_h[:semantic], :failure
+    assert_equal result[:model].inspect, %{nil}
+    assert_equal result.terminus.to_h[:semantic], :failure
   end
-  #~ctx_to_result end
 end
 
 class DocsModelFindByTitleTest < Minitest::Spec
   Song = Class.new(DocsModelTest::Song)
 
   #:update-with-find-by-key
-  module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Update < Trailblazer::Operation
       step Model(Song, :find_by, :title) # third positional argument.
       step :validate
       step :save
@@ -102,18 +111,18 @@ class DocsModelFindByTitleTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:update-with-find-by-key-ok
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {title: "Test"}, seq: [])
-    ctx[:model] #=> #<struct Song id=2, title="Test">
+    result = Song::Operation::Update.(params: {title: "Test"})
+    result[:model] #=> #<struct Song id=2, title="Test">
     #:update-with-find-by-key-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=2, title="Test">}
+    assert_equal result[:model].inspect, %{#<struct #{Song} id=2, title="Test">}
   end
 
   it do
     #:key-title-fail
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {title: nil}, seq: [])
+    result = Song::Operation::Update.(params: {title: nil})
 
-    assert_equal ctx[:model].inspect, %{nil}
+    assert_equal result[:model].inspect, %{nil}
     #:key-title-fail end
   end
   #~ctx_to_result end
@@ -123,8 +132,8 @@ class DocsModelAccessorTest < Minitest::Spec
   Song = Class.new(DocsModelTest::Song)
 
   #:show
-  module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Update < Trailblazer::Operation
       step Model(Song, :[])
       step :validate
       step :save
@@ -138,11 +147,11 @@ class DocsModelAccessorTest < Minitest::Spec
   #~ctx_to_result
   it do
     #:show-ok
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: 1}, seq: [])
-    ctx[:model] #=> #<struct Song id=1, title="Roxanne">
+    result = Song::Operation::Update.(params: {id: 1})
+    result[:model] #=> #<struct Song id=1, title="Roxanne">
     #:show-ok end
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Song} id=100, title=nil>}
+    assert_equal result[:model].inspect, %{#<struct #{Song} id=100, title=nil>}
   end
   #~ctx_to_result end
 end
@@ -150,8 +159,8 @@ end
 class DocsModelDependencyInjectionTest < Minitest::Spec
   Song = Class.new(DocsModelTest::Song)
 
-  module Song::Activity
-    class Create < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Create < Trailblazer::Operation
       step Model(Song, :new)
       step :validate
       step :save
@@ -166,22 +175,21 @@ class DocsModelDependencyInjectionTest < Minitest::Spec
     end
 
     #:di-model-class
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+    result = Song::Operation::Create.(params: {}, :"model.class" => Hit)
     #:di-model-class end
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
+    assert_equal result[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
 
   # inject all variables
     #:di-all
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create,
-      params:               {title: "Olympia"}, # some random variable.
+    result = Song::Operation::Create.(params: {title: "Olympia"}, # some random variable.
       "model.class":        Hit,
       "model.action":       :find_by,
       "model.find_by_key":  :title, seq: []
     )
     #:di-all end
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=2, title="Olympia">}
+    assert_equal result[:model].inspect, %{#<struct #{Hit} id=2, title="Olympia">}
 end
 
   # use empty Model() and inject {model.class} and {model.action}
@@ -190,8 +198,8 @@ class DocsModelEmptyDITest < Minitest::Spec
   Hit  = Class.new(Song)
 
   #:op-model-empty
-  module Song::Activity
-    class Create < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Create < Trailblazer::Operation
       step Model()
       step :validate
       step :save
@@ -203,9 +211,9 @@ class DocsModelEmptyDITest < Minitest::Spec
   end
 
   it do
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, :"model.class" => Hit, seq: [])
+    result = Song::Operation::Create.(params: {}, :"model.class" => Hit)
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
+    assert_equal result[:model].inspect, %{#<struct #{Hit} id=nil, title=nil>}
   end
 end
 
@@ -215,7 +223,7 @@ class DocsModelIOTest < Minitest::Spec
 
   it "allows to use composable I/O with macros" do
     #:in
-    module Song::Activity
+    module Song::Operation
       class Create < Trailblazer::Operation
         step Model(Song, :find_by),
           In() => ->(ctx, my_id:, **) { ctx.merge(params: {id: my_id}) } # Model() needs {params[:id]}.
@@ -224,9 +232,9 @@ class DocsModelIOTest < Minitest::Spec
     end
     #:in end
 
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Create, params: {}, my_id: 1, :"model.class" => Hit)
+    result = Song::Operation::Create.(params: {}, my_id: 1, :"model.class" => Hit)
 
-    assert_equal ctx[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
+    assert_equal result[:model].inspect, %{#<struct #{Hit} id=1, title=nil>}
 =begin
 #:in-call
 result = Create.(my_id: 1)
@@ -239,8 +247,8 @@ end
 class Model404TerminusTest < Minitest::Spec
   Song = Class.new(DocsModelTest::Song)
   #:update-with-not-found-end
-  module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+  module Song::Operation
+    class Update < Trailblazer::Operation
       step Model(Song, :find_by, not_found_terminus: true)
       step :validate
       step :save
@@ -251,43 +259,16 @@ class Model404TerminusTest < Minitest::Spec
   end
   #:update-with-not-found-end end
 
+
   it do
-    assert_invoke Song::Activity::Update, params: {id: 1},
-      seq: "[:validate, :save]", expected_ctx_variables: {model: Song.find_by(id: 1)}
-    assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
+    assert_run Song::Operation::Update, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:validate, :save], model: Song.find_by(id: 1), terminus: :success
+    assert_run Song::Operation::Update, target_ctx: {params: {id: nil}, seq: []}, terminus: :not_found, seq: []
 
     #:not_found
-    ctx, _, signal = Trailblazer::Activity.(Song::Activity::Update, params: {id: nil})
-    puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
+    result = Song::Operation::Update.(params: {id: nil})
+    puts result.terminus #=> #<Trailblazer::Activity::End semantic=:not_found>
     #:not_found end
   end
 end
 
-class Model404TerminusTest < Minitest::Spec
-  Song = Class.new(DocsModelTest::Song)
-  #:update-with-not-found-end
-  class Song
-    module Activity
-      class Update < Trailblazer::Activity::Railway
-        step Model(Song, :find_by, not_found_terminus: true)
-        step :validate
-        step :save
-        #~meths
-        include T.def_steps(:validate, :save)
-        #~meths end
-      end
-    end
-  end
-  #:update-with-not-found-end end
-
-  it do
-    assert_invoke Song::Activity::Update, params: {id: 1},
-      seq: "[:validate, :save]", expected_ctx_variables: {model: Song.find_by(id: 1)}
-    assert_invoke Song::Activity::Update, params: {id: nil}, terminus: :not_found
-
-    #:not_found
-    ctx, _, signal = Trailblazer::Activity::TaskWrap.invoke(Song::Activity::Update, {params: {id: nil}})
-    puts signal #=> #<Trailblazer::Activity::End semantic=:not_found>
-    #:not_found end
-  end
-end

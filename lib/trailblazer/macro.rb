@@ -1,6 +1,5 @@
-require "forwardable"
-require "trailblazer/activity/dsl/linear"
-require "trailblazer/operation" # TODO: remove this dependency
+require "trailblazer/activity/dsl"
+require "trailblazer/activity/variable_mapping"
 
 require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"
@@ -27,7 +26,7 @@ module Trailblazer
       end
 
       def call(ctx, flow_options, circuit_options)
-        puts "yooo"
+        puts "yooo AssignVariable"
         ctx, flow_options, return_value = @return_value_step.(ctx, flow_options, circuit_options)
 
         ctx[@variable_name] = return_value
@@ -65,7 +64,7 @@ module Trailblazer
         elsif user_proc.instance_of?(Method)
           "method(:#{user_proc.name})"
         else
-          hint || rand(4)
+          hint || rand
         end
       end
     end
@@ -73,18 +72,16 @@ module Trailblazer
     def self.id_for(user_proc, **options)
       IdFor.(user_proc, **options)
     end
+
+    TOPOLOGY_BUILD_OPTIONS = {
+      helpers: {
+        Macro::Model::Helper => [:Model],
+        # TODO:
+  # def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue, :Each
+  # Constants::Policy = Trailblazer::Macro::Policy
+  # Constants::Model  = Trailblazer::Macro::Model
+      },
+      adds: []
+    }
   end # Macro
-
-  # All macros sit in the {Trailblazer::Macro} namespace, where we forward calls from
-  # operations and activities to.
-
-  module Activity::DSL::Linear::Helper
-    Constants::Policy = Trailblazer::Macro::Policy
-    Constants::Model  = Trailblazer::Macro::Model
-
-    # Extending the {Linear::Helper} namespace is the canonical way to import
-    # macros into Railway, FastTrack, Operation, etc.
-    extend Forwardable
-    def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue, :Each
-  end # Helper
 end

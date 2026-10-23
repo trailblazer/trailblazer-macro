@@ -8,3 +8,9 @@ Rake::TestTask.new(:test) do |test|
 end
 
 task default: :test
+
+Rake::TestTask.new(:test_activity) do |test|
+  # test.libs << 'test'
+  test.test_files = FileList['test/activity/*_test.rb']
+  test.verbose = true
+end
