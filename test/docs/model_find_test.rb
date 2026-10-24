@@ -30,7 +30,7 @@ class Unit_ExplicitOptionsTest < Minitest::Spec
 
   #:find_method
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       # explicit style:
       step Model::Find(Song, find_method: :find_method) # if it's _really_ Song.find_method(...)
 
@@ -73,7 +73,7 @@ class ExplicitColumnKeyAndParamsKeyTest < Minitest::Spec
   end
 
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       # explicit style:
       step Model::Find(Song, find_method: :find_by, column_key: :slug, params_key: :params_slug)
       step :validate
@@ -110,7 +110,7 @@ class FindByQueryTest < Minitest::Spec
 
   #:query
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(
         Song,
         query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first }
@@ -146,7 +146,7 @@ class FindByQueryWithParamsKeyTest < Minitest::Spec
   Song = Class.new(FindByQueryTest::Song)
 
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song,
         query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first },
         params_key: :slug
@@ -182,7 +182,7 @@ class FindByQueryWithParamsBlockTest < Minitest::Spec
   Song = Class.new(FindByQueryTest::Song)
 
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, query: ->(ctx, id:, current_user:, **) { where(id: id, user: current_user).first }) { |ctx, params:, **|
         params[:slug_from_params]
       }
@@ -218,7 +218,7 @@ class DocsModelFindByColumnTest < Minitest::Spec
 
   #:find_by_id
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, find_by: :id)
       step :validate
       step :save
@@ -267,7 +267,7 @@ class DocsModelFindByDifferentColumnTest < Minitest::Spec
 
   #:find_by_column
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, find_by: :short_id) # Song.find_by(short_id: params[:short_id])
       step :validate
       step :save
@@ -304,7 +304,7 @@ class DocsModelFindByDifferentParamsKeyTest < Minitest::Spec
 
   #:params_key
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, find_by: :id, params_key: :slug) # Song.find_by(id: params[:slug])
       step :validate
       step :save
@@ -346,7 +346,7 @@ class DocsModelFindWithTest < Minitest::Spec
 
   #:find_with
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, find_with: :id)
       step :validate
       step :save
@@ -388,7 +388,7 @@ class DocsModelIdFromProcTest < Minitest::Spec
 
   #:id_from
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, find_by: :id) { |ctx, params:, **|
         params[:song] && params[:song][:id]
       }
@@ -435,7 +435,7 @@ class DocsModelFindPositionaTest < Minitest::Spec
 
   #:find
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, :find) # Song.find(id)
       step :validate
       step :save
@@ -466,7 +466,7 @@ class DocsModelFindPositionalWithParamsBlockTest < Minitest::Spec
   Song = Class.new(DocsModelFindPositionaTest::Song)
 
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, :find) { |ctx, params:, **| params[:params_slug] }
       step :validate
       step :save
@@ -504,7 +504,7 @@ class DocsModelAccessorTest < Minitest::Spec
 
   #:show
   module Song::Activity
-    class Update < Trailblazer::Activity::Railway
+    class Update < Trailblazer::Operation
       step Model::Find(Song, :[])
       step :validate
       step :save
@@ -532,7 +532,7 @@ end
 
 #   #:block
 #   module Song::Activity
-#     class Update < Trailblazer::Activity::Railway
+#     class Update < Trailblazer::Operation
 #       step Model() do |ctx, params:, **|
 
 #       end
@@ -574,7 +574,7 @@ class DocsModelNewTest < Minitest::Spec
 
   #:new
   module Song::Activity
-    class Create < Trailblazer::Activity::Railway
+    class Create < Trailblazer::Operation
       step Model::Build(Song, :new)
       step :validate
       step :save
@@ -607,7 +607,7 @@ class DocsModelBuildTest < Minitest::Spec
 
   #:build
   module Song::Activity
-    class Create < Trailblazer::Activity::Railway
+    class Create < Trailblazer::Operation
       step Model::Build(Song, :build)
       step :validate
       step :save
@@ -646,7 +646,7 @@ class ModelFind404TerminusTest < Minitest::Spec
   #:not-found
   class Song
     module Activity
-      class Update < Trailblazer::Activity::Railway
+      class Update < Trailblazer::Operation
         step Model::Find(Song, find_by: :id, not_found_terminus: true)
         step :validate
         step :save

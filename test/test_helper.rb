@@ -7,14 +7,14 @@ require "trailblazer/operation"
 
 # FIXME: who loads the macros where?
 [Trailblazer::Operation].each do |topology|
-  _, _, builder, helper_forwarder = Trailblazer::Activity::DSL::Topology.build(
+  _, _, builder, helpers_module = Trailblazer::Activity::DSL::Topology.build(
     builder: topology.config.builder,
     default_options: {},
     **Trailblazer::Macro::TOPOLOGY_BUILD_OPTIONS # :helpers and :adds
   )
 
   topology.config.builder = builder
-  topology.extend helper_forwarder
+  topology.include helpers_module
 end
 
 T = Trailblazer::Core

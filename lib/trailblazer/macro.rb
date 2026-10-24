@@ -36,9 +36,14 @@ module Trailblazer
     end
 
     def self.task_adapter_for_decider(decider_with_step_interface, variable_name:)
-      return_value_circuit_step = Activity::Circuit.Step(decider_with_step_interface) # FIXME: this should be binary!
+      return_value_circuit_step = Activity::Step.build(decider_with_step_interface) # FIXME: this should be binary!
 
       AssignVariable.new(return_value_circuit_step, variable_name: variable_name)
+
+raise "implement AssignVariable"
+      Circuit::Builder.Pipeline(
+
+      )
     end
 
     def self.block_activity_for(block_activity, &block)
@@ -81,6 +86,7 @@ module Trailblazer
   # Constants::Policy = Trailblazer::Macro::Policy
   # Constants::Model  = Trailblazer::Macro::Model
       },
+      constants: [Macro::Model::Constants],
       adds: []
     }
   end # Macro
