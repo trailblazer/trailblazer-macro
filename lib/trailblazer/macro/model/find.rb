@@ -40,7 +40,7 @@ module Trailblazer
 
             options = options_for(task, id: id)
 
-            options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.End(:not_found)) if not_found_terminus
+            options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.Terminus(:not_found)) if not_found_terminus
 
             options
           end
@@ -89,7 +89,7 @@ module Trailblazer
             [
               params_key,
               block,
-              {task: finder} # circuit interface for the Task::Adapter.
+              {task: finder, adapter: Circuit::Processor} # circuit interface for the Task::Adapter.
             ]
           end
 
@@ -118,17 +118,21 @@ module Trailblazer
           #   |   `-- End.success
           #   |-- validate
           def self.finder_activity_for(params_key:, finder:, **, &block)
-            id_from =
+            id_provider =
               if block
                 block
               else
-                ->(ctx, params: {}, **) { params[params_key] } # default id_from
+                ->(ctx, params: {}, **) { params[params_key] } # default id_provider
               end
 
-            extract_id = Macro.task_adapter_for_decider(id_from, variable_name: :id)
+            # DISCUSS: this used to be "AssignVariable":
+
+
+            extract_id = Macro.task_adapter_for_decider(id_provider, variable_name: :id)
 
             Class.new(Activity::Railway) do
-              step task: extract_id, id: :extract_id
+              step task: extract_id, id: :extract_id, adapter: Circuit::Processor
+              # step task: ->(lib_ctx, _, signal, *) { raise signal.inspect }, id: :bla
               step finder,           id: "finder.#{finder.class}" # FIXME: discuss ID.
             end
           end

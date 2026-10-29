@@ -18,32 +18,27 @@ module Trailblazer
         # Run {user_proc} with "step interface" and assign its return value to ctx[@variable_name].
         # @private
         # This is experimental.
-    class AssignVariable
+    class AssignVariable < Struct.new(:variable_name, keyword_init: true)
         # name of the ctx variable we want to assign the return_value of {user_proc} to.
-      def initialize(return_value_step, variable_name:)
-        @return_value_step  = return_value_step
-        @variable_name      = variable_name
-      end
+      def call(lib_ctx, flow_options, value, target_ctx:, **)
+        target_ctx[variable_name] = value
 
-      def call(ctx, flow_options, circuit_options)
-        puts "yooo AssignVariable"
-        ctx, flow_options, return_value = @return_value_step.(ctx, flow_options, circuit_options)
-
-        ctx[@variable_name] = return_value
-
-        return ctx, flow_options, Trailblazer::Activity::Right
+        return lib_ctx, flow_options, value.nil? ? Activity::Left : Activity::Right # DISCUSS: if id.nil?, we Left.
       end
     end
 
     def self.task_adapter_for_decider(decider_with_step_interface, variable_name:)
-      return_value_circuit_step = Activity::Step.build(decider_with_step_interface) # FIXME: this should be binary!
+      invoke_provider_step = Activity::Step.build(decider_with_step_interface, binary: false) # FIXME: we cannot deviate to Left here
+      assign_variable_step = AssignVariable.new(variable_name: variable_name)
 
-      AssignVariable.new(return_value_circuit_step, variable_name: variable_name)
-
-raise "implement AssignVariable"
-      Circuit::Builder.Pipeline(
-
+      extract_id = Circuit::Builder.Pipeline(
+        [:call_provider,   node: invoke_provider_step],
+        [:assign_variable, assign_variable_step]
       )
+
+      # Developer.puts  extract_id
+
+      extract_id
     end
 
     def self.block_activity_for(block_activity, &block)

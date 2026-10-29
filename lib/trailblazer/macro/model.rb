@@ -14,7 +14,7 @@ module Trailblazer
             Activity::Railway.Inject(:"model.find_by_key") => ->(*) { find_by_key },
           }
 
-          options = {node_for_call_task: node, id: id, node: true}.merge(injections)
+          options = {node_for_call_task: node, id: id}.merge(injections)
 
           options = options.merge(Activity::Railway.Output(:failure) => Activity::Railway.Terminus(:not_found)) if not_found_terminus
 
