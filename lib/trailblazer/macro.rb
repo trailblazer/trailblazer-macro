@@ -44,11 +44,16 @@ module Trailblazer
     def self.block_activity_for(block_activity, **options, &block)
       return block_activity, block_activity.to_h[:outputs] unless block_given?
 
-      # block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
-      block_circuit, outputs = Activity.FastTrack(**options, &block) # TODO: use Wrap() logic!
+      block_activity = Class.new(Activity::FastTrack)# do # TODO: use Wrap() logic!
+      block_activity.config.builder.default_options.each { |_, dsl_options| dsl_options.merge!(**options) } # TODO: allow this via FastTrack().
+      # puts "@@@@@ ??#{block_activity.config.builder.default_options[:step].inspect}"
+      block_activity.instance_exec(&block)
+      #   &block)
+      # end
+      # block_circuit, outputs = Activity.FastTrack(**options, &block) # TODO: use Wrap() logic!
       # pp block_activity
 
-      # return block_activity, block_activity.to_h[:outputs]
+      return block_activity, block_activity.to_h[:outputs]
     end
 
     module IdFor

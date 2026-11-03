@@ -39,7 +39,12 @@ module Trailblazer
         def Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
           exec_context = self.new # FIXME: how do we guarantee this is the OP?
 
+
           block_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, exec_context: exec_context, &block)
+          failing_termini_signals = outputs_from_block_activity.collect { |_, output| output.signal.is_a?(Activity::Terminus::Failure) ? output.signal : nil }.compact
+
+# Developer.puts(block_activity.config.circuit)# if block
+
 
           iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor, merge_to_circuit_options: {
             exec_context: exec_context
@@ -74,7 +79,7 @@ module Trailblazer
           node_for_item = my_custom_filter.build_node(
             provider_node: provider_node,
             id: :add_item,
-            write_name: :item
+            write_name: item_key
           )
 
 # DISCUSS: so much knowledge about iternals of öy.
@@ -94,7 +99,7 @@ module Trailblazer
         options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
       end
 
-      out_node = Activity::VariableMapping::Build::Output.([collect_value_node].compact, add_default_ctx: true) # FIXME: do we want default ctx here?
+      out_node = Activity::VariableMapping::Build::Output.([collect_value_node].compact, add_default_ctx: false) # FIXME: do we want default ctx here?
 
 
 
@@ -107,8 +112,12 @@ module Trailblazer
             ],
             [:vm_input, node: in_node],
             [:user_logic, node: iterated_node],
-            [:vm_output, node: out_node, connections: Circuit::Resolver::Fixed.new(:fetch_value_from_dataset)],
+            # [:vm_output, node: out_node, connections: Circuit::Resolver::Fixed.new(:fetch_value_from_dataset)],
+            [:vm_output, node: out_node, connections: Circuit::Resolver::Conditional.new(failing_termini_signals, nil, :fetch_value_from_dataset)], # DISCUSS: vmin/user_logic/vm_out could be separate, nested activity.
           )
+
+          # TODO: explicit test that :value and :enumerator etc don't leak to the outside.
+          each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
 
 
 
@@ -122,14 +131,15 @@ module Trailblazer
 
           options = {
             # **Activity::Railway.Subprocess(block_activity),
-            task: circuit,
+            node_for_call_task: each_node,
             outputs: outputs_from_block_activity,
-            adapter: Circuit::Processor,
+            # adapter: Cir,
             id: id,
             Out() => [],# per default, don't let anything out.
             **options_for_dataset_from,
             **options_for_each,
           }
+
           return options
 
 

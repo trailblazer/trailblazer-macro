@@ -1,6 +1,8 @@
 require "test_helper"
 
 
+# TODO: explicit test that no Each internal lib_ctx variables leak to outside (test lib_ctx eq)
+
 # step Macro::Each(:report_templates, key: :report_template) {
 #   step Subprocess(ReportTemplate::Update), input: :input_report_template
 #   left :set_report_template_errors
@@ -78,12 +80,14 @@ class EachTest < Minitest::Spec
       seq: [:rearrange],
       terminus: :success
 
-    assert_equal lib_ctx[:target_ctx], {
+    assert_equal lib_ctx, {
+      target_ctx: {
         params: {id: 1},
         seq: [:rearrange],
         model: B::Song.find_by(id: 1),
         collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
       }
+    }
 
 =begin
     #:collected_from_each
@@ -124,9 +128,10 @@ class EachTest < Minitest::Spec
       class Cover < Trailblazer::Operation
         step :model
         step :find_composers
+
         step Each(collect: true) {
-            step :notify_composers
-        }, In() => {:composers => :dataset}
+          step :notify_composers
+        }, In() => {:composers => :dataset}, id: "Each" # FIXME: id doesn't work
         step :rearrange
 
         def find_composers(ctx, model:, **)
@@ -143,21 +148,29 @@ class EachTest < Minitest::Spec
 
   it "dataset can come from the hosting activity" do
 #@ {:dataset} is not part of the outgoing {ctx}.
-  assert_invoke B::Song::Activity::Cover, params: {id: 1},
-    expected_ctx_variables: {
+  lib_ctx, _ = assert_run B::Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+    seq: [:rearrange], terminus: :success
+
+  assert_equal lib_ctx[:target_ctx], {
+      params: {id: 1},
+      seq: [:rearrange],
       model: B::Song.find_by(id: 1),
       collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
-    }, seq: "[:rearrange]"
+    }
   end
 
   it "dataset coming via In() from the operation" do
   #@ {:dataset} is not part of the {ctx}.
-    assert_invoke C::Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
-        model: C::Song.find_by(id: 1),
-        composers: [Composer.new("Fat Mike"), Composer.new("El Hefe")],
-        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
-      }, seq: "[:rearrange]"
+    lib_ctx, _ = assert_run C::Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:rearrange], terminus: :success
+
+    assert_equal lib_ctx, target_ctx: {
+      params: {id: 1},
+      model: C::Song.find_by(id: 1),
+      composers: [Composer.new("Fat Mike"), Composer.new("El Hefe")],
+      collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],],
+      seq: [:rearrange]
+    }
   end
 
 #@ {:item_key}
@@ -196,12 +209,16 @@ class EachTest < Minitest::Spec
   it "{item_key: :composer}" do
     E::Mailer.send_options = []
 
-    assert_invoke E::Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
+    lib_ctx, _ = assert_run E::Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:rearrange], terminus: :success
+
+    assert_equal lib_ctx, {
+      target_ctx: {
         model: B::Song.find_by(id: 1),
-        # collected_from_each: ["Fat Mike", "El Hefe"]
-      },
-      seq: "[:rearrange]"
+        params: {id: 1}, seq: [:rearrange],
+      }
+    }
+
     assert_equal E::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
 
@@ -246,24 +263,29 @@ class EachTest < Minitest::Spec
 
   it "failure in Each" do
     # last iteration fails:
-    assert_invoke F::Song::Activity::Cover, params: {id: 2},
-      expected_ctx_variables: {
-        model: B::Song.find_by(id: 2),
-        collected_from_each: ["mike@fat.wreck", nil],
-      },
-      seq: "[]",
+    lib_ctx, _ = assert_run F::Song::Activity::Cover, target_ctx: {params: {id: 2}, seq: []},
+      seq: [],
       terminus: :failure
+
+    assert_equal lib_ctx, {target_ctx: {
+      params: {id: 2},
+      seq: [],
+      model: B::Song.find_by(id: 2),
+      collected_from_each: ["mike@fat.wreck", nil],
+    }}
 
     # first iteration fails:
-    assert_invoke F::Song::Activity::Cover, params: {id: 999},
-      expected_ctx_variables: {
-        model: B::Song.find_by(id: 999),
-        collected_from_each: [nil],
-      },
-      seq: "[]",
+    lib_ctx, _ = assert_run F::Song::Activity::Cover, target_ctx: {params: {id: 999}, seq: []},
+      seq: [],
       terminus: :failure
 
-    Trailblazer::Developer.wtf?(F::Song::Activity::Cover, {params: {id: 2}, seq: []})
+    assert_equal lib_ctx, {target_ctx: {
+      params: {id: 999}, seq: [],
+      model: B::Song.find_by(id: 999),
+      collected_from_each: [nil],
+    }}
+
+    # Trailblazer::Developer.wtf?(F::Song::Activity::Cover, {params: {id: 2}, seq: []})
   end
 
 
@@ -304,12 +326,17 @@ class EachTest < Minitest::Spec
   it "Each(Operation)" do
     D::Mailer.send_options = []
 
-    assert_invoke D::Song::Activity::Cover, params: {id: 1},
-      seq:                    "[:rearrange]",
-      expected_ctx_variables: {
-        model:                D::Song.find_by(id: 1),
+    lib_ctx, _ = assert_run D::Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq:                    [:rearrange],
+      terminus: :success
+
+    assert_equal lib_ctx, {
+      target_ctx: {
+        params: {id: 1}, seq: [:rearrange],
+        model: D::Song.find_by(id: 1),
         # collected_from_each:  [[0, "Fat Mike"], [1, "El Hefe"],]
       }
+    }
     assert_equal D::Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
 
@@ -978,3 +1005,5 @@ class EachWithArrayBugTest < Minitest::Spec
       seq: %{[[1, 2], [3, 4], [5, 6]]}
   end
 end
+
+
