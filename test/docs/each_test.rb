@@ -41,7 +41,7 @@ class EachTest < Minitest::Spec
 
     #:each
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         step :model
         #:each-dataset
         step Each(dataset_from: :composers_for_each, collect: true) {
@@ -117,7 +117,7 @@ class EachTest < Minitest::Spec
     class Song < B::Song; end
 
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         step :model
         step :find_composers
         step Each(collect: true) {
@@ -164,7 +164,7 @@ class EachTest < Minitest::Spec
 
     #:composer
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         #~meths
         step :model
         #:item_key
@@ -213,7 +213,7 @@ class EachTest < Minitest::Spec
     end
 
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         step :model
         step Each(dataset_from: :composers_for_each, collect: true) {
           step :notify_composers
@@ -270,7 +270,7 @@ class EachTest < Minitest::Spec
 
     #:operation-class
     module Song::Activity
-      class Notify < Trailblazer::Activity::Railway
+      class Notify < Trailblazer::Operation
         step :send_email
 
         def send_email(ctx, index:, item:, **)
@@ -282,7 +282,7 @@ class EachTest < Minitest::Spec
 
     #:operation
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         step :model
         step Each(Notify, dataset_from: :composers_for_each)
         step :rearrange
@@ -297,7 +297,7 @@ class EachTest < Minitest::Spec
     #:operation end
   end
 
-  it "Each(Activity::Railway)" do
+  it "Each(Operation)" do
     D::Mailer.send_options = []
 
     assert_invoke D::Song::Activity::Cover, params: {id: 1},
@@ -316,7 +316,7 @@ class EachTest < Minitest::Spec
     class Song < B::Song; end
 
     module Song::Activity
-      class Notify < Trailblazer::Activity::Railway
+      class Notify < Trailblazer::Operation
         terminus :spam_email
         # SpamEmail = Class.new(Trailblazer::Activity::Signal)
 
@@ -330,7 +330,7 @@ class EachTest < Minitest::Spec
     end
 
     module Song::Activity
-      class Cover < Trailblazer::Activity::Railway
+      class Cover < Trailblazer::Operation
         terminus :spam_alert
 
         step :model
@@ -347,7 +347,7 @@ class EachTest < Minitest::Spec
     end
   end
 
-  it "Each(Activity::Railway) with End.spam_email" do
+  it "Each(Operation) with End.spam_email" do
     Trailblazer::Developer.wtf?(G::Song::Activity::Cover, {params: {id: 3}})
 
     assert_invoke G::Song::Activity::Cover, params: {id: 3},
@@ -367,7 +367,7 @@ class EachCtxDiscardedTest < Minitest::Spec
 
 #@ iterated steps write to ctx, gets discarded.
   module Song::Activity
-    class Cover < Trailblazer::Activity::Railway
+    class Cover < Trailblazer::Operation
       step :model
       #:write_to_ctx
       step Each(dataset_from: :composers_for_each) {
@@ -410,7 +410,7 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
   Song      = Class.new(EachTest::B::Song)
 
   module Song::Activity
-    class Cover < Trailblazer::Activity::Railway
+    class Cover < Trailblazer::Operation
       step :model
       step Each(dataset_from: :composers_for_each,
 
@@ -456,7 +456,7 @@ class EachCtxInOutTest < Minitest::Spec
   Song      = Class.new(EachTest::B::Song)
 
   module Song::Activity
-    class Cover < Trailblazer::Activity::Railway
+    class Cover < Trailblazer::Operation
       step :model
       step Each(dataset_from: :composers_for_each,
         # Inject(always: true) => {
@@ -509,7 +509,7 @@ class EachSharedIterationVariableTest < Minitest::Spec
 
   #:inject
   module Song::Activity
-    class Cover < Trailblazer::Activity::Railway
+    class Cover < Trailblazer::Operation
       step :model
       step Each(dataset_from: :composers_for_each,
         Inject(:messages) => ->(*) { {} },
@@ -537,10 +537,12 @@ class EachSharedIterationVariableTest < Minitest::Spec
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
         messages: {0=>"Fat Mike", 1=>"El Hefe"}},
-      seq: "[:rearrange]"
+      seq: [:rearrange]
   end
 
 end
+
+# fixme: TEST THAT WE RETURN THE ORIGINAL INNER signal
 
 #@ Each without any option
 class EachPureTest < Minitest::Spec
@@ -550,7 +552,7 @@ class EachPureTest < Minitest::Spec
 
   #:each-pure
   module Song::Activity
-    class Cover < Trailblazer::Activity::Railway
+    class Cover < Trailblazer::Operation
       step :model
       #:each-pure-macro
       step Each(dataset_from: :composers_for_each) {
@@ -585,11 +587,10 @@ class EachPureTest < Minitest::Spec
   it "allows a dataset compute in the hosting activity" do
     Mailer.send_options = []
   #@ {:dataset} is not part of the {ctx}.
-    assert_invoke Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
-        model: Song.find_by(id: 1),
-      },
-      seq: "[:rearrange]"
+    assert_run Song::Activity::Cover, target_ctx: {params: {id: 1},
+          model: Song.find_by(id: 1), seq: []},
+      seq: [:rearrange],
+      terminus: :success
 
     assert_equal Mailer.send_options, [{:to=>nil, :message=>"0) You, Fat Mike, have been warned about your song being copied."}, {:to=>nil, :message=>"1) You, El Hefe, have been warned about your song being copied."}]
   end
@@ -647,8 +648,8 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
   it "{#find_path} for Each(Activity) with anonymous class" do
     id = nil
 
-    activity = Class.new(Trailblazer::Activity::Railway) do
-      sub_activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
+      sub_activity = Class.new(Trailblazer::Operation) do
         step :notify_composers
       end
       id = sub_activity.to_s
@@ -695,7 +696,7 @@ end
 #@ dataset: []
 class EachEmptyDatasetTest < Minitest::Spec
   it do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each() {
         step :raise
       }
@@ -706,11 +707,11 @@ class EachEmptyDatasetTest < Minitest::Spec
 end
 
 class EachIDTest < Minitest::Spec
-  class Validate < Trailblazer::Activity::Railway
+  class Validate < Trailblazer::Operation
   end
 
   it "assigns IDs via {Macro.id_for}" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each() {}
       step Each(Validate)
       step Each() {}, id: "Each-1"
@@ -739,7 +740,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "with Trace" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       include T.def_steps(:a, :b)
       include ComputeItem
 
@@ -806,7 +807,7 @@ class DocsEachUnitTest < Minitest::Spec
 
 
   it "accepts iterated {block}" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       include ComputeItem
 
       step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
@@ -820,7 +821,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "can see the entire ctx" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       def compute_item_with_current_user(ctx, item:, index:, current_user:, **)
         ctx[:value] = "#{item}-#{index.inspect}-#{current_user}"
       end
@@ -842,7 +843,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "allows taskWrap in Each" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each(collect: true) { # expects {:dataset} # NOTE: use {} not {do ... end}
         step :compute_item, In() => {:current_user => :user}, In() => [:item, :index]
       }
@@ -856,7 +857,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "accepts operation" do
-    nested_activity = Class.new(Trailblazer::Activity::Railway) do
+    nested_activity = Class.new(Trailblazer::Operation) do
       step :compute_item
 
       def compute_item(ctx, item:, index:, **)
@@ -864,7 +865,7 @@ class DocsEachUnitTest < Minitest::Spec
       end
     end
 
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each(nested_activity, collect: true)  # expects {:dataset}
     end
     # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
@@ -873,7 +874,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "doesn't override an existing ctx[:index]" do
-   activity = Class.new(Trailblazer::Activity::Railway) do
+   activity = Class.new(Trailblazer::Operation) do
       include T.def_steps(:a, :b)
       include ComputeItem
 
@@ -891,7 +892,7 @@ class DocsEachUnitTest < Minitest::Spec
   end
 
   it "stops iterating when failure" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each(collect: true) {
         step :check
       }
@@ -930,7 +931,7 @@ end
 
 class EachInEachTest < Minitest::Spec
   it "what" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each(item_key: :outer) {
         step :capture_outer
 
@@ -959,7 +960,7 @@ end
 
 class EachWithArrayBugTest < Minitest::Spec
   it "what" do
-    activity = Class.new(Trailblazer::Activity::Railway) do
+    activity = Class.new(Trailblazer::Operation) do
       step Each(item_key: :outer) {
         step :capture_outer
       }

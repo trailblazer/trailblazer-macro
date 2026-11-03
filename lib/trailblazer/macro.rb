@@ -41,14 +41,14 @@ module Trailblazer
       extract_id
     end
 
-    def self.block_activity_for(block_activity, &block)
+    def self.block_activity_for(block_activity, **options, &block)
       return block_activity, block_activity.to_h[:outputs] unless block_given?
 
       # block_activity = Class.new(Activity::FastTrack, &block) # TODO: use Wrap() logic!
-      block_activity = Activity.FastTrack(&block) # TODO: use Wrap() logic!
-      block_activity.extend Each::Transitive
+      block_circuit, outputs = Activity.FastTrack(**options, &block) # TODO: use Wrap() logic!
+      # pp block_activity
 
-      return block_activity, block_activity.to_h[:outputs]
+      # return block_activity, block_activity.to_h[:outputs]
     end
 
     module IdFor
@@ -76,6 +76,7 @@ module Trailblazer
     TOPOLOGY_BUILD_OPTIONS = {
       helpers: {
         Macro::Model::Helper => [:Model],
+        Macro::Each::Helper => [:Each],
         # TODO:
   # def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue, :Each
   # Constants::Policy = Trailblazer::Macro::Policy
