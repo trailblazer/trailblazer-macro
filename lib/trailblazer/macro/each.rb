@@ -79,7 +79,22 @@ module Trailblazer
 
 # DISCUSS: so much knowledge about iternals of öy.
       in_node = Activity::VariableMapping::Build::Input.([[:each_in, node: node_for_index], [:in_item, node: node_for_item]], add_default_ctx: true)
-      out_node = Activity::VariableMapping::Build::Output.([], add_default_ctx: true)
+
+      options_for_each = {} # the top level Each thingy.
+
+      collect_value_node = nil
+      if collect
+        collect_value_node = [:collect_from_each, node: Activity::VariableMapping::Runtime::Filter.build_node(
+          id: nil,
+          args_for_step_build: [->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }, {}],
+          # write_name: :my_slug,
+        )]
+
+        options_for_each.merge!(Activity::Railway.Inject(:collected_from_each) => ->(*) { [] })
+        options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
+      end
+
+      out_node = Activity::VariableMapping::Build::Output.([collect_value_node].compact, add_default_ctx: true) # FIXME: do we want default ctx here?
 
 
 
@@ -101,6 +116,8 @@ module Trailblazer
           # Developer.puts circuit
 
 
+
+
           options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
 
           options = {
@@ -109,7 +126,9 @@ module Trailblazer
             outputs: outputs_from_block_activity,
             adapter: Circuit::Processor,
             id: id,
+            Out() => [],# per default, don't let anything out.
             **options_for_dataset_from,
+            **options_for_each,
           }
           return options
 

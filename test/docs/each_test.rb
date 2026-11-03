@@ -74,12 +74,16 @@ class EachTest < Minitest::Spec
 
   it "allows a dataset compute in the hosting activity" do
   #@ {:dataset} is not part of the {ctx}.
-    assert_invoke B::Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
+    lib_ctx, _ = assert_run B::Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:rearrange],
+      terminus: :success
+
+    assert_equal lib_ctx[:target_ctx], {
+        params: {id: 1},
+        seq: [:rearrange],
         model: B::Song.find_by(id: 1),
         collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
-      },
-      seq: "[:rearrange]"
+      }
 
 =begin
     #:collected_from_each
