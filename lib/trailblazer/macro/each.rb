@@ -99,6 +99,7 @@ module Trailblazer
         options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
       end
 
+      # "per iteration"
       out_node = Activity::VariableMapping::Build::Output.([collect_value_node].compact, add_default_ctx: false) # FIXME: do we want default ctx here?
 
 

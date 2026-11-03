@@ -246,6 +246,7 @@ class EachTest < Minitest::Spec
             ctx[:value] = item.email # let's collect all emails that could be sent.
             return true
           else
+            # ctx[:value] = "test" # TODO: test this, too!
             return false
           end
         end
@@ -379,15 +380,19 @@ class EachTest < Minitest::Spec
   end
 
   it "Each(Operation) with End.spam_email" do
-    Trailblazer::Developer.wtf?(G::Song::Activity::Cover, {params: {id: 3}})
+    # Trailblazer::Developer.wtf?(G::Song::Activity::Cover, {params: {id: 3}})
 
-    assert_invoke G::Song::Activity::Cover, params: {id: 3},
+    lib_ctx, _ = assert_run G::Song::Activity::Cover, target_ctx: {params: {id: 3}},
       terminus:                :spam_alert,
-      seq:                    "[]",
-      expected_ctx_variables: {
+      seq:                    nil
+
+    assert_equal lib_ctx, {
+      target_ctx: {
+        params: {id: 3},
         model:                G::Song.find_by(id: 3),
         collected_from_each:  [[0, "Fat Mike"], nil,]
       }
+    }
   end
 end
 
@@ -426,12 +431,17 @@ class EachCtxDiscardedTest < Minitest::Spec
   end
 
   it "discards {ctx[:variable]}" do
-    assert_invoke Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      terminus: :success, seq: [:write_to_ctx, :write_to_ctx, :rearrange]
+
+    assert_equal lib_ctx, {
+      target_ctx: {
         model: Song.find_by(id: 1),
         # collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+        seq: [:write_to_ctx, :write_to_ctx, :rearrange],
+        params: {id: 1}
       },
-      seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
+    }
   end
 end
 
@@ -471,12 +481,18 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
   end
 
   it "provides {:collected_from_each}" do
-    assert_invoke Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      terminus: :success,
+      seq: [:write_to_ctx, :write_to_ctx, :rearrange]
+
+    assert_equal lib_ctx, {
+      target_ctx: {
+        params: {id: 1},
+        seq: [:write_to_ctx, :write_to_ctx, :rearrange],
         model: Song.find_by(id: 1),
-        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],]
+        collected_from_each: [[0, "Fat Mike"], [1, "El Hefe"],],
       },
-      seq: "[:write_to_ctx, :write_to_ctx, :rearrange]"
+    }
   end
 end
 
@@ -517,13 +533,15 @@ class EachCtxInOutTest < Minitest::Spec
   end
 
   it "discards {ctx[:variable]}" do
-    assert_invoke Song::Activity::Cover, params: {id: 1},
-      expected_ctx_variables: {
-        model: Song.find_by(id: 1),
-        :"composer-0-value" => "0 + Song",
-        :"composer-1-value" => "1 + Song",
-      },
-      seq: "[:rearrange]"
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:rearrange], terminus: :success
+
+    assert_equal lib_ctx, target_ctx: {
+      model: Song.find_by(id: 1),
+      :"composer-0-value" => "0 + Song",
+      :"composer-1-value" => "1 + Song",
+      seq: [:rearrange]
+    }
   end
 end
 
@@ -564,7 +582,7 @@ class EachSharedIterationVariableTest < Minitest::Spec
   #:inject end
 
   it "passes {ctx[:messages]} across iterations and makes it grow" do
-    assert_invoke Song::Activity::Cover, params: {id: 1},
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}},
       expected_ctx_variables: {
         model: Song.find_by(id: 1),
         messages: {0=>"Fat Mike", 1=>"El Hefe"}},
@@ -644,7 +662,7 @@ class EachStrategyComplianceTest < Minitest::Spec
     cover_patched.include(T.def_steps(:log_email, :notify_composers))
 
   #@ Original class isn't changed.
-    assert_invoke Song::Activity::Cover, params: {id: 1},
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}},
       expected_ctx_variables: {
           model: Song.find_by(id: 1),
         },
@@ -846,9 +864,11 @@ class DocsEachUnitTest < Minitest::Spec
       }
     end
 
-    Trailblazer::Developer.wtf?(activity, {dataset: ["one", "two", "three"]})
+    # Trailblazer::Developer.wtf?(activity, {dataset: ["one", "two", "three"]})
 
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+    lib_ctx, _ = assert_run activity, target_ctx: {dataset: ["one", "two", "three"]}, seq: nil, terminus: :success
+
+    assert_equal lib_ctx, {target_ctx: {collected_from_each: ["one-0", "two-1", "three-2"], dataset: ["one", "two", "three"]}}
   end
 
   it "can see the entire ctx" do
@@ -862,15 +882,17 @@ class DocsEachUnitTest < Minitest::Spec
       }
     end
 
-    Trailblazer::Developer.wtf?(
-      activity,
-      {
-          dataset:      ["one", "two", "three"],
-          current_user: Object,
-        },
-    )
+    # Trailblazer::Developer.wtf?(
+    #   activity,
+    #   {
+    #       dataset:      ["one", "two", "three"],
+    #       current_user: Object,
+    #     },
+    # )
 
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: Object, expected_ctx_variables: {collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: ["one", "two", "three"], current_user: Object}, seq: nil, terminus: :success
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["one-0-Object", "two-1-Object", "three-2-Object"]}}
   end
 
   it "allows taskWrap in Each" do
@@ -884,7 +906,9 @@ class DocsEachUnitTest < Minitest::Spec
       end
     end
 
-    assert_invoke activity, dataset: ["one", "two", "three"], current_user: "Yogi", expected_ctx_variables: {collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: ["one", "two", "three"], current_user: "Yogi"}, seq: nil, terminus: :success
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["one-0-Yogi", "two-1-Yogi", "three-2-Yogi"]}}
   end
 
   it "accepts operation" do
@@ -901,7 +925,9 @@ class DocsEachUnitTest < Minitest::Spec
     end
     # Trailblazer::Developer.wtf?(activity, [{dataset: ["one", "two", "three"]}, {}])
 
-    assert_invoke activity, dataset: ["one", "two", "three"], expected_ctx_variables: {collected_from_each: ["one-0", "two-1", "three-2"]}
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: ["one", "two", "three"]}, seq: nil, terminus: :success
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["one-0", "two-1", "three-2"]}}
   end
 
   it "doesn't override an existing ctx[:index]" do
@@ -917,9 +943,15 @@ class DocsEachUnitTest < Minitest::Spec
 
     end
 
-    assert_invoke activity, dataset: [1,2,3], index: 9,
-      expected_ctx_variables: {collected_from_each: ["1-0", "2-1", "3-2"]},
-      seq: "[9]"
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: [1,2,3], index: 9, seq: []}, seq: [9], terminus: :success
+
+    assert_equal lib_ctx, {
+      target_ctx: {
+        **ctx,
+        collected_from_each: ["1-0", "2-1", "3-2"],
+        seq: [9]
+      }
+      }
   end
 
   it "stops iterating when failure" do
@@ -939,26 +971,30 @@ class DocsEachUnitTest < Minitest::Spec
     end
 
     #@ all works
-    assert_invoke activity, dataset: [1,2],
-      expected_ctx_variables: {collected_from_each: ["1", "2"]},
-      seq: "[:a]"
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: [1,2], seq: []},
+      seq: [:a], terminus: :success
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["1", "2"]},}
 
     #@ fail at 3 but still collect 3rd iteration!
-    Trailblazer::Developer.wtf?(activity, {dataset: [1,2,3]})
+    # Trailblazer::Developer.wtf?(activity, {{dataset: [1,2,3]}, seq: []})
 
-    assert_invoke activity, dataset: [1,2,3],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
-      seq: "[]",
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: [1,2,3], seq: []},
+      seq: [],
       terminus: :failure
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["1", "2", "3"]},}
 
     #@ fail at 3, skip 4
-    assert_invoke activity, dataset: [1,2,3,4],
-      expected_ctx_variables: {collected_from_each: ["1", "2", "3"]},
-      seq: "[]",
+    lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: [1,2,3,4], seq: []},
+      seq: [],
       terminus: :failure
+
+    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["1", "2", "3"]},}
   end
 end
 
+# FIXME: allow passing {:exec_context}?
 
 class EachInEachTest < Minitest::Spec
   it "what" do
@@ -984,8 +1020,8 @@ class EachInEachTest < Minitest::Spec
       end
     end
 
-    assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
-      seq: %{[[1, 2], 10, 20, [3, 4], 30, 40, [5, 6], 50, 60]}
+    lib_ctx, _ = assert_run activity, target_ctx: {dataset: [[1,2],[3,4],[5,6]], seq: []},
+      seq: [[1, 2], 10, 20, [3, 4], 30, 40, [5, 6], 50, 60], terminus: :success
   end
 end
 
@@ -1001,8 +1037,8 @@ class EachWithArrayBugTest < Minitest::Spec
       end
     end
 
-    assert_invoke activity, dataset: [[1,2],[3,4],[5,6]],
-      seq: %{[[1, 2], [3, 4], [5, 6]]}
+    lib_ctx, _ = assert_run activity, target_ctx: {dataset: [[1,2],[3,4],[5,6]],
+      seq: [[1, 2], [3, 4], [5, 6]]}
   end
 end
 
