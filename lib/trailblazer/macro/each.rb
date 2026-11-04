@@ -52,56 +52,77 @@ module Trailblazer
 
 
 # :index, :item
+          my_custom_filter_with_wrap_hash = Class.new(Trailblazer::Activity::VariableMapping::Runtime::Filter) do
+            def self.build_circuit(**)
+              circuit = Trailblazer::Circuit::Adds.(super, Trailblazer::Activity::VariableMapping::Runtime::Filter::Build::WRAP_VALUE_WITH_HASH) # redundant to Override.
+            end
+          end
+
           provider_filter = ->(lib_ctx, flow_options, signal, index:, **) do
             return lib_ctx, flow_options, index
           end
 
           provider_node = Trailblazer::Circuit::Node[provider_filter, Trailblazer::Circuit::Task::Adapter::LibInterface]
 
-          my_custom_filter = Class.new(Trailblazer::Activity::VariableMapping::Runtime::Filter) do
-            def self.build_circuit(**)
-              circuit = Trailblazer::Circuit::Adds.(super, Trailblazer::Activity::VariableMapping::Runtime::Filter::Build::WRAP_VALUE_WITH_HASH) # redundant to Override.
-            end
-          end
-
-          node_for_index = my_custom_filter.build_node(
+          node_for_index = my_custom_filter_with_wrap_hash.build_node(
             provider_node: provider_node,
             id: :add_index,
             write_name: :index
           )
-
 
           provider_filter = ->(lib_ctx, flow_options, signal, value:, **) do
             return lib_ctx, flow_options, value
           end
 
           provider_node = Trailblazer::Circuit::Node[provider_filter, Trailblazer::Circuit::Task::Adapter::LibInterface]
-          node_for_item = my_custom_filter.build_node(
+
+          node_for_item = my_custom_filter_with_wrap_hash.build_node(
             provider_node: provider_node,
             id: :add_item,
             write_name: item_key
           )
 
 # DISCUSS: so much knowledge about iternals of öy.
-      in_node = Activity::VariableMapping::Build::Input.([[:each_in, node: node_for_index], [:in_item, node: node_for_item]], add_default_ctx: true)
+      # in_node = Activity::VariableMapping::Build::Input.([[:each_in, node: node_for_index], [:in_item, node: node_for_item]], add_default_ctx: true)
+
+
+    my_left_tuple = ->(*) { [[:"each.in.item", node: node_for_item], [:"each.in.index", node: node_for_index]] }
+
 
       options_for_each = {} # the top level Each thingy.
 
-      collect_value_node = nil
+      collect_value_node_builder = ->(*) { [] }
       if collect
-        collect_value_node = [:collect_from_each, node: Activity::VariableMapping::Runtime::Filter.build_node(
+      # "per iteration"
+        collect_value_node_builder =
+        ->(*) {
+        [[:"each.out.collect_from_each", node: Activity::VariableMapping::Runtime::Filter.build_node(
           id: nil,
           args_for_step_build: [->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }, {}],
           # write_name: :my_slug,
-        )]
+        )]]
+         }
 
         options_for_each.merge!(Activity::Railway.Inject(:collected_from_each) => ->(*) { [] })
         options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
       end
 
-      # "per iteration"
-      out_node = Activity::VariableMapping::Build::Output.([collect_value_node].compact, add_default_ctx: false) # FIXME: do we want default ctx here?
+raise "add dsl_options_for_iterated here!"
+    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
+      ins: [
+        # [dsl.In(), [:current_user]],
+        [my_left_tuple]],
+      outs: [[Activity::VariableMapping::DSL.Out(), []],
+        collect_value_node_builder
+      ],
+      injects: [],
+      default_ctx_for_input: true,
+      default_ctx_for_output: false,
 
+      exec_context: self,
+    )
+
+    in_node, out_node = lib_ctx[:node_for_input], lib_ctx[:node_for_output]
 
 
 
