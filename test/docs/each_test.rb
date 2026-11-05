@@ -457,7 +457,9 @@ class EachCtxAddsCollectedFromEachTest < Minitest::Spec
 
         # all filters called before/after each iteration!
         Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-        Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+        Out() => ->(ctx, collected_from_each:, **) {
+          {collected_from_each: collected_from_each += [ctx[:value]] }
+        }
 
 
 
@@ -504,10 +506,24 @@ class EachCtxInOutTest < Minitest::Spec
 
   module Song::Activity
     class Cover < Trailblazer::Operation
+      # mimicking Inject(:composer_index)
+
       step :model
       step Each(dataset_from: :composers_for_each,
         # Inject(always: true) => {
-        Inject(:composer_index, pass_aggregate: true) => ->(ctx, aggregate:, **) { aggregate[:index] },
+        # Inject(:composer_index) => ->(ctx, index:, **) { index },
+        # DISCUSS: this is how we currently inject our own filters with lib interface.
+        Class.new(Trailblazer::Activity::VariableMapping::DSL::Inject) do
+          def call(*)
+            index_node = Trailblazer::Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+              provider_node: Trailblazer::Circuit::Node[->(lib_ctx, flow_options, _, index:, **) { return lib_ctx, flow_options, index }, Trailblazer::Circuit::Task::Adapter::LibInterface],
+              id: :_add_composer_index,
+              write_name: :composer_index
+            )
+
+            [[:bla, node: index_node]]
+          end
+        end.new => nil,
         # all filters called before/after each iteration!
         Out() => ->(ctx, index:, variable:, **) { {:"composer-#{index}-value" => variable} }
 
@@ -537,6 +553,7 @@ class EachCtxInOutTest < Minitest::Spec
       seq: [:rearrange], terminus: :success
 
     assert_equal lib_ctx, target_ctx: {
+      params: {id: 1},
       model: Song.find_by(id: 1),
       :"composer-0-value" => "0 + Song",
       :"composer-1-value" => "1 + Song",
@@ -582,11 +599,17 @@ class EachSharedIterationVariableTest < Minitest::Spec
   #:inject end
 
   it "passes {ctx[:messages]} across iterations and makes it grow" do
-    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}},
-      expected_ctx_variables: {
+    lib_ctx, _ = assert_run Song::Activity::Cover, target_ctx: {params: {id: 1}, seq: []},
+      seq: [:rearrange], terminus: :success
+
+    assert_equal lib_ctx, {
+      target_ctx: {
+        params: {id: 1},
         model: Song.find_by(id: 1),
-        messages: {0=>"Fat Mike", 1=>"El Hefe"}},
-      seq: [:rearrange]
+        messages: {0=>"Fat Mike", 1=>"El Hefe"},
+        seq: [:rearrange]
+      }
+    }
   end
 
 end

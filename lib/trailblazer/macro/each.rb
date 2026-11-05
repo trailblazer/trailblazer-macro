@@ -36,90 +36,43 @@ module Trailblazer
         #       BLOG: Each() is a perfect example of how versatile the TRB mechanics are
 
         # @api private The internals here are considered private and might change at some point.
-        def Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **dsl_options_for_iterated, &block)
+        def Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **variable_mapping_options_for_iterated, &block)
           exec_context = self.new # FIXME: how do we guarantee this is the OP?
 
 
           block_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, exec_context: exec_context, &block)
           failing_termini_signals = outputs_from_block_activity.collect { |_, output| output.signal.is_a?(Activity::Terminus::Failure) ? output.signal : nil }.compact
 
-# Developer.puts(block_activity.config.circuit)# if block
+          iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor,
+            merge_to_circuit_options: {exec_context: exec_context}
+          ]
 
-
-          iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor, merge_to_circuit_options: {
-            exec_context: exec_context
-          }]
-
-
-# :index, :item
-          my_custom_filter_with_wrap_hash = Class.new(Trailblazer::Activity::VariableMapping::Runtime::Filter) do
-            def self.build_circuit(**)
-              circuit = Trailblazer::Circuit::Adds.(super, Trailblazer::Activity::VariableMapping::Runtime::Filter::Build::WRAP_VALUE_WITH_HASH) # redundant to Override.
-            end
-          end
-
-          provider_filter = ->(lib_ctx, flow_options, signal, index:, **) do
-            return lib_ctx, flow_options, index
-          end
-
-          provider_node = Trailblazer::Circuit::Node[provider_filter, Trailblazer::Circuit::Task::Adapter::LibInterface]
-
-          node_for_index = my_custom_filter_with_wrap_hash.build_node(
-            provider_node: provider_node,
-            id: :add_index,
-            write_name: :index
-          )
-
-          provider_filter = ->(lib_ctx, flow_options, signal, value:, **) do
-            return lib_ctx, flow_options, value
-          end
-
-          provider_node = Trailblazer::Circuit::Node[provider_filter, Trailblazer::Circuit::Task::Adapter::LibInterface]
-
-          node_for_item = my_custom_filter_with_wrap_hash.build_node(
-            provider_node: provider_node,
-            id: :add_item,
-            write_name: item_key
-          )
-
-# DISCUSS: so much knowledge about iternals of öy.
-      # in_node = Activity::VariableMapping::Build::Input.([[:each_in, node: node_for_index], [:in_item, node: node_for_item]], add_default_ctx: true)
-
-
-    my_left_tuple = ->(*) { [[:"each.in.item", node: node_for_item], [:"each.in.index", node: node_for_index]] }
-
+          item_and_index_filter = Item_and_index_filterBuilder.new(item_key: item_key)
 
       options_for_each = {} # the top level Each thingy.
 
-      collect_value_node_builder = ->(*) { [] }
+      collect_value_node_builder = {}
       if collect
-      # "per iteration"
-        collect_value_node_builder =
-        ->(*) {
-        [[:"each.out.collect_from_each", node: Activity::VariableMapping::Runtime::Filter.build_node(
-          id: nil,
-          args_for_step_build: [->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }, {}],
-          # write_name: :my_slug,
-        )]]
-         }
+        # "per iteration":
+        collect_filter = ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+        collect_value_node_builder = {Activity::VariableMapping::DSL.Out() => collect_filter}
 
         options_for_each.merge!(Activity::Railway.Inject(:collected_from_each) => ->(*) { [] })
         options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
       end
 
-raise "add dsl_options_for_iterated here!"
-    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
-      ins: [
-        # [dsl.In(), [:current_user]],
-        [my_left_tuple]],
-      outs: [[Activity::VariableMapping::DSL.Out(), []],
-        collect_value_node_builder
-      ],
-      injects: [],
-      default_ctx_for_input: true,
-      default_ctx_for_output: false,
+      # TODO: we're mimicking the dsl gem here in order to get i/o. very error-prone and leaky. and (too?) much knowledge about öy.
 
+    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.disect_input_and_output({}, {}, nil,
+      item_and_index_filter => nil, # acts like Inject().
+      Activity::VariableMapping::DSL.Out() => [],
+      **collect_value_node_builder,
+      **variable_mapping_options_for_iterated
+    )
+
+    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
       exec_context: self,
+      **lib_ctx
     )
 
     in_node, out_node = lib_ctx[:node_for_input], lib_ctx[:node_for_output]
@@ -142,13 +95,6 @@ raise "add dsl_options_for_iterated here!"
           each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
 
 
-
-          # pp circuit
-          # Developer.puts circuit
-
-
-
-
           options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
 
           options = {
@@ -157,7 +103,7 @@ raise "add dsl_options_for_iterated here!"
             outputs: outputs_from_block_activity,
             # adapter: Cir,
             id: id,
-            Out() => [],# per default, don't let anything out.
+            # Out() => [],# per default, don't let anything out.
             **options_for_dataset_from,
             **options_for_each,
           }
@@ -200,7 +146,7 @@ raise "add dsl_options_for_iterated here!"
                 Inject(:item, builder: item_filter_builder) => item_filter_builder,
                 Out() => [], # per default, don't let anything out.
                 **Each.options_for_collect(collect: collect),
-                **dsl_options_for_iterated
+                **variable_mapping_options_for_iterated
           end
 
           each_activity.class_eval do
@@ -252,7 +198,34 @@ raise "add dsl_options_for_iterated here!"
           }
         end
 
+        Item_and_index_filterBuilder = Class.new(Activity::VariableMapping::DSL::Inject) do
+          def initialize(item_key:)
+            @item_key = item_key
+          end
 
+          def call(*) # This is called in {VM::Input.convert_tuples_to_node}.
+            # A filter with circuit interface.
+            index_provider_filter = ->(lib_ctx, flow_options, _, index:, **) { return lib_ctx, flow_options, index }
+            value_provider_filter = ->(lib_ctx, flow_options, _, value:, **) { return lib_ctx, flow_options, value }
+
+            index_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+              provider_node: Circuit::Node[index_provider_filter, Circuit::Task::Adapter::LibInterface],
+              id: :add_index,
+              write_name: :index
+            )
+
+            item_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+              provider_node: Circuit::Node[value_provider_filter, Circuit::Task::Adapter::LibInterface],
+              id: :add_item,
+              write_name: @item_key
+            )
+
+            return [
+              ["each.in.index", node: index_node],
+              ["each.in.item", node: item_node]
+            ]
+          end
+        end
 
 
 
