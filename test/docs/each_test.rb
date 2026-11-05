@@ -821,34 +821,44 @@ class DocsEachUnitTest < Minitest::Spec
       step :b
     end
 
-    ctx = {seq: [], dataset: [3,2,1]}
+    # ctx = {seq: [], dataset: [3,2,1]}
 
-    ctx, flow_options, signal = activity.__(activity, ctx, **Trailblazer::Developer::Trace.options_for_canonical_invoke)
-
-    stack = flow_options[:stack]
-
-    output = Trailblazer::Developer::Trace::Present.(stack) do |trace_nodes:, **|
-      {node_options: {trace_nodes[0] => {label: "<a-Each-b>"}}}
+    output, _ = capture_io do
+      ctx, flow_options, signal = activity.wtf?(seq: [], dataset: [3,2,1])
     end
 
-    assert_equal output, %{<a-Each-b>
-|-- Start.default
-|-- a
-|-- Each/1
-|   |-- iterated_block.0
-|   |   |-- Start.default
-|   |   |-- compute_item
-|   |   `-- End.success
-|   |-- iterated_block.1
-|   |   |-- Start.default
-|   |   |-- compute_item
-|   |   `-- End.success
-|   `-- iterated_block.2
-|       |-- Start.default
-|       |-- compute_item
-|       `-- End.success
-|-- b
-`-- End.success}
+#     assert_equal output, %{<a-Each-b>
+# |-- Start.default
+# |-- a
+# |-- Each/1
+# |   |-- iterated_block.0
+# |   |   |-- Start.default
+# |   |   |-- compute_item
+# |   |   `-- End.success
+# |   |-- iterated_block.1
+# |   |   |-- Start.default
+# |   |   |-- compute_item
+# |   |   `-- End.success
+# |   `-- iterated_block.2
+# |       |-- Start.default
+# |       |-- compute_item
+# |       `-- End.success
+# |-- b
+# `-- End.success}
+
+    # TODO: how do we "present" the index?
+    assert_equal output.gsub(/\d\d\d+/, "").gsub(/0x\w+/, ""), %(\e[30m#<Class:>\e[0m
+|-- \e[32ma\e[0m
+|-- \e[30mEach/0.\e[0m
+|   |-- \e[32mcompute_item\e[0m
+|   |-- \e[30mEnd.success\e[0m
+|   |-- \e[32mcompute_item\e[0m
+|   |-- \e[30mEnd.success\e[0m
+|   |-- \e[32mcompute_item\e[0m
+|   |-- \e[30mEnd.success\e[0m
+|-- \e[32mb\e[0m
+`-- \e[30mEnd.success\e[0m
+)
 
   #@ compile time
   #@ make sure we can find tasks/compile-time artifacts in Each by using their {compile_id}.

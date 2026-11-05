@@ -30,8 +30,6 @@ module Trailblazer
       end
 
       module Helper
-        # module_function
-
         # TODO: explain termini routing, Inject usage for "block activity", Out() => []
         #       BLOG: Each() is a perfect example of how versatile the TRB mechanics are
 
@@ -61,24 +59,7 @@ module Trailblazer
         options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
       end
 
-      # TODO: we're mimicking the dsl gem here in order to get i/o. very error-prone and leaky. and (too?) much knowledge about öy.
-
-    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.disect_input_and_output({}, {}, nil,
-      item_and_index_filter => nil, # acts like Inject().
-      Activity::VariableMapping::DSL.Out() => [],
-      **collect_value_node_builder,
-      **variable_mapping_options_for_iterated
-    )
-
-    lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
-      exec_context: self,
-      **lib_ctx
-    )
-
-    in_node, out_node = lib_ctx[:node_for_input], lib_ctx[:node_for_output]
-
-
-
+          in_node, out_node = Each.input_and_output_nodes_for_iterated(item_and_index_filter, collect_value_node_builder, variable_mapping_options_for_iterated)
 
           circuit = Circuit::Builder.Pipeline(
             [:init, Step.method(:init)],
@@ -87,105 +68,23 @@ module Trailblazer
             ],
             [:vm_input, node: in_node],
             [:user_logic, node: iterated_node],
-            # [:vm_output, node: out_node, connections: Circuit::Resolver::Fixed.new(:fetch_value_from_dataset)],
             [:vm_output, node: out_node, connections: Circuit::Resolver::Conditional.new(failing_termini_signals, nil, :fetch_value_from_dataset)], # DISCUSS: vmin/user_logic/vm_out could be separate, nested activity.
           )
 
           # TODO: explicit test that :value and :enumerator etc don't leak to the outside.
           each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
 
-
           options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
 
           options = {
-            # **Activity::Railway.Subprocess(block_activity),
             node_for_call_task: each_node,
             outputs: outputs_from_block_activity,
-            # adapter: Cir,
             id: id,
-            # Out() => [],# per default, don't let anything out.
             **options_for_dataset_from,
             **options_for_each,
           }
 
           return options
-
-
-          # DISCUSS: move to Wrap.
-          # TODO: if a patched step in the iterated activity would add another teminus, this would be inconsistent.
-          #       we'd have to recompute this via `inherited`.
-            termini_instructions_from_block_activity =
-              outputs_from_block_activity.
-                # DISCUSS: End.success needs to be the last here, so it's directly behind {Start.default}.
-                sort { |a,b| a.semantic == :success ? 1 : -1 }.
-                collect { |output|
-                  [:terminus, task: output.signal, id: "End.#{output.semantic}", magnetic_to: output.semantic, append_to: "Start.default"]
-                }
-
-          railway_options = Activity::Railway::DSL.options_for_initialize
-          start_instruction = railway_options[:layout_instructions][0]
-
-          layout_instructions = [
-            start_instruction,
-            *termini_instructions_from_block_activity
-          ]
-
-          each_activity = Trailblazer::Activity::Railway(layout_instructions: layout_instructions) do
-
-            # TODO: make publicly configurable.
-            @state.update!(:fields) do |fields|
-              fields.merge(
-                failing_semantics: [:failure, :fail_fast],
-                each: true, # mark this activity for {compute_runtime_id}.
-              )
-            end
-
-            step Subprocess(iterated_activity, strict: true),
-                id: "iterated_block",
-                Inject(:index, builder: index_filter_builder) => index_filter_builder,
-                Inject(:item, builder: item_filter_builder) => item_filter_builder,
-                Out() => [], # per default, don't let anything out.
-                **Each.options_for_collect(collect: collect),
-                **variable_mapping_options_for_iterated
-          end
-
-          each_activity.class_eval do
-            def self.call(ctx, flow_options, circuit_options)
-              runner = circuit_options.fetch(:runner)
-
-              # We don't really need to override/replace {circuit} as we only want to change the way it's run.
-              iterated_railway = to_h[:circuit].to_h[:map].keys[1] # DISCUSS: maybe find by id?
-
-              failing_semantics = @state.get(:fields).fetch(:failing_semantics)
-
-              dataset = ctx.fetch(:dataset)
-              signal  = iterated_railway.to_h[:outputs].find { |output| output.semantic == :success }.signal # FIXME: !!! do this at compile time and recompute when patched via {#inherited}.
-
-              dataset.each_with_index do |item, index|
-
-                each_options_for_iterated = {
-                  index: index,
-                  item: item,
-                }
-
-                # we "inject" item_key and index via Runner.(..., item_key => ..) and then the input filter grabs that.
-                ctx, flow_options, signal = runner.(iterated_railway, ctx, flow_options, circuit_options.merge(activity: self, **each_options_for_iterated))
-
-                # Break the loop if {iterated_activity} emits a failure signal.
-                break if failing_semantics.include?(signal.to_h[:semantic]) # TODO: use generic check from older macro
-              end
-
-              return ctx, flow_options, signal
-            end
-          end
-
-          options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
-
-          {
-            **Trailblazer::Activity::Railway.Subprocess(each_activity),
-            id: id,
-            **options_for_dataset_from,
-          }
         end
 
          # DSL options added to {block_activity} to implement {collect: true}.
@@ -197,64 +96,62 @@ module Trailblazer
             Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
           }
         end
+      end
 
-        Item_and_index_filterBuilder = Class.new(Activity::VariableMapping::DSL::Inject) do
-          def initialize(item_key:)
-            @item_key = item_key
-          end
+      # Mimick the i/o DSL for the iterated activity, and return the in and out nodes.
+      def self.input_and_output_nodes_for_iterated(item_and_index_filter, collect_value_node_builder, variable_mapping_options_for_iterated)
+        # TODO: we're mimicking the dsl gem here in order to get i/o. very error-prone and leaky. and (too?) much knowledge about öy.
+        lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.disect_input_and_output({}, {}, nil,
+          item_and_index_filter => nil, # acts like Inject().
+          Activity::VariableMapping::DSL.Out() => [],
+          **collect_value_node_builder,
+          **variable_mapping_options_for_iterated
+        )
 
-          def call(*) # This is called in {VM::Input.convert_tuples_to_node}.
-            # A filter with circuit interface.
-            index_provider_filter = ->(lib_ctx, flow_options, _, index:, **) { return lib_ctx, flow_options, index }
-            value_provider_filter = ->(lib_ctx, flow_options, _, value:, **) { return lib_ctx, flow_options, value }
+        lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
+          exec_context: self,
+          **lib_ctx
+        )
 
-            index_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
-              provider_node: Circuit::Node[index_provider_filter, Circuit::Task::Adapter::LibInterface],
-              id: :add_index,
-              write_name: :index
-            )
+        return lib_ctx[:node_for_input], lib_ctx[:node_for_output]
+      end
 
-            item_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
-              provider_node: Circuit::Node[value_provider_filter, Circuit::Task::Adapter::LibInterface],
-              id: :add_item,
-              write_name: @item_key
-            )
-
-            return [
-              ["each.in.index", node: index_node],
-              ["each.in.item", node: item_node]
-            ]
-          end
+      Item_and_index_filterBuilder = Class.new(Activity::VariableMapping::DSL::Inject) do
+        def initialize(item_key:)
+          @item_key = item_key
         end
 
+        def call(*) # This is called in {VM::Input.convert_tuples_to_node}.
+          # A filter with circuit interface.
+          index_provider_filter = ->(lib_ctx, flow_options, _, index:, **) { return lib_ctx, flow_options, index }
+          value_provider_filter = ->(lib_ctx, flow_options, _, value:, **) { return lib_ctx, flow_options, value }
 
+          index_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+            provider_node: Circuit::Node[index_provider_filter, Circuit::Task::Adapter::LibInterface],
+            id: :add_index,
+            write_name: :index
+          )
 
-        # Gets included in Debugger's Normalizer. Results in IDs like {invoke_block_activity.1}.
-        def self.compute_runtime_id(ctx, flow_options, _, trace_node:, activity:, compile_id:, **)
-          # activity is the iterated activity
-          fields = activity.to_h[:fields]
-          return ctx, flow_options unless fields && fields[:each] == true
+          item_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+            provider_node: Circuit::Node[value_provider_filter, Circuit::Task::Adapter::LibInterface],
+            id: :add_item,
+            write_name: @item_key
+          )
 
-          # Developer::Trace::Snapshot::Ctx.ctx_snapshot_for(trace_node.snapshot_before, .data
-  # FIXME: BETTER API, we need access to stack now
-
-
-          # index = trace_node.snapshot_before.data[:ctx_snapshot].fetch(:index)
-          index = trace_node.snapshot_before.data[:ctx_variable_changeset].find { |name, version, value| name == :index }[2]
-
-          ctx = ctx.merge(runtime_id: "#{compile_id}.#{index}")
-
-          return ctx, flow_options
+          return [
+            ["each.in.index", node: index_node],
+            ["each.in.item", node: item_node]
+          ]
         end
       end
     end
   end
 
-  if const_defined?(:Developer) # FIXME: how do you properly check for a gem?
-    Developer::Trace::Debugger.add_normalizer_step!(
-      Macro::Each.method(:compute_runtime_id),
-      id:     "Each.runtime_id",
-      append: :runtime_id, # so that the following {#runtime_path} picks up those changes made here.
-    )
-  end
+  # if const_defined?(:Developer) # FIXME: how do you properly check for a gem?
+  #   Developer::Trace::Debugger.add_normalizer_step!(
+  #     Macro::Each.method(:compute_runtime_id),
+  #     id:     "Each.runtime_id",
+  #     append: :runtime_id, # so that the following {#runtime_path} picks up those changes made here.
+  #   )
+  # end
 end
