@@ -10,11 +10,35 @@ module Trailblazer
       end
 
       module Guard
-        class Atom < DSL::Atom
-          def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # called via Normalizer.evaluate_macro
-            guard = Trailblazer::Activity::Step.build(options[:provider], binary: true, exec_context: exec_context)
+        class Context < Struct.new(:name)
+          include Macro::Policy::Context # TODO: make that unnecessary.
 
-            return Macro::Policy.options_for_step(node: guard, name: options[:name])
+          def evaluate(lib_ctx, flow_options, decision, **)
+            return lib_ctx, flow_options, [!!decision, "this should be a reference to the guard"]
+          end
+        end
+
+        class Atom < DSL::Atom
+          # Build the policy node via the normalizer.
+          def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # called via Normalizer.evaluate_macro
+            name = options.fetch(:name)
+            provider = options.fetch(:provider)
+            # the remaining code should be independent of the "Atom".
+
+            guard = Trailblazer::Activity::Step.build(provider, binary: false, exec_context: exec_context)
+
+            policy_context = Context.new(name)
+
+            node_for_policy = Macro::Policy.build_node(
+              [:invoke_guard, node: guard],
+              [:evaluate, :evaluate, Circuit::Task::Adapter::LibInterface::InstanceMethod],
+              policy_context: policy_context,
+            )
+
+            {
+              id: "policy.guard.#{name}",
+              node_for_call_task: node_for_policy,
+            }
           end
 
         end

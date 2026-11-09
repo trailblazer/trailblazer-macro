@@ -106,7 +106,7 @@ end
 class DocsGuardNamedTest < Minitest::Spec
   #:name
   class Create < Trailblazer::Operation
-    step Policy::Guard( ->(options, current_user:, **) { current_user }, name: :user )
+    step Policy::Guard(->(options, current_user:, **) { current_user }, name: :user)
     # ...
   end
   #:name end

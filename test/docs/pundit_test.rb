@@ -54,7 +54,7 @@ class DocsPunditProcTest < Minitest::Spec
   #---
   #- replace
   class New < Create
-    step Policy::Pundit( MyPolicy, :new? ), replace: :"policy.default.eval"
+    step Policy::Pundit( MyPolicy, :new? ), replace: :"policy.pundit.default"
   end
 
   it { assert_equal Trailblazer::Developer.railway(New), %{[>model.build,>policy.default.eval]} }

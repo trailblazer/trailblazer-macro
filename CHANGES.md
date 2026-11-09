@@ -1,3 +1,7 @@
+# 3.0.0
+
+IDs in Pundit/Guard are now "policy.guard.default" etc
+
 # 2.2.0
 
 * "Each/composers_for_each", "Each.iterate.block", "invoke_block_activity" is now `"Each/composers_for_each", "iterated_block"`
