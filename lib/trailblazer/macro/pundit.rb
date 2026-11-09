@@ -1,36 +1,56 @@
-module Trailblazer::Macro
-  module Policy
-    def self.Pundit(policy_class, action, name: :default)
-      Policy.step(Pundit.build(policy_class, action), name: name)
-    end
+module Trailblazer
+  module Macro
+    module Policy
+      module Constants
+        module Policy
+          def self.Pundit(policy_class, action, name: :default)
+            node_for_policy = Pundit.build(policy_class, action, name)
 
-    module Pundit
-      def self.build(*args, &block)
-        Condition.new(*args, &block)
+            # Macro::Policy.options_for_step(node: node_for_decision, name: name)
+            # FIXME
+            {
+              id: path = :"policy.#{name}.eval",
+              node_for_call_task: node_for_policy,
+            }
+          end
+        end
       end
 
-      # Pundit::Condition is invoked at runtime when iterating the pipe.
-      class Condition
-        def initialize(policy_class, action)
-          @policy_class, @action = policy_class, action
+      module Pundit
+        def self.build(*args, &block)
+          policy_context = Context.new(*args) # just like in VariableMapping, keep logic and configuration.
+
+          circuit = Circuit::Builder.Pipeline(
+            [:build_policy, :build_policy, Circuit::Task::Adapter::StepInterface::InstanceMethod], # this is basically a Step.build(, binary: false).
+            [:evaluate, :evaluate, Circuit::Task::Adapter::LibInterface::InstanceMethod#,
+            #  connections: Activity::Step::Resolver::ValueOnSignal::Conditional.new([true], )
+            ],
+            [:build_result, :build_result, Circuit::Task::Adapter::LibInterface::InstanceMethod,
+              connections: {true => [nil, Activity::Right], false => [nil, Activity::Left]}
+            ],
+          )
+
+          Circuit::Node::MergeToCircuitOptions[circuit, Circuit::Processor, merge_to_circuit_options: {exec_context: policy_context}]
         end
 
-        # Instantiate the actual policy object, and call it.
-        def call((options), *)
-          policy = build_policy(options) # this translates to Pundit interface.
-          result!(policy.send(@action), policy)
-        end
+        # Pundit::Decision is invoked at runtime when iterating the pipe.
+        class Context < Struct.new(:policy_class, :action, :name)
+          # Instantiate the actual policy object, and call it.
+          def build_policy(ctx, current_user: nil, model: nil, **)
+            _value = policy_class.new(current_user, model) # this translates to Pundit interface.
+          end
 
-      private
-        def build_policy(options)
-          @policy_class.new(options[:current_user], options[:model])
-        end
+          def evaluate(lib_ctx, flow_options, policy, **)
+            decision = !! policy.send(action)
 
-        def result!(success, policy)
-          data = { policy: policy }
-          data[:message] = "Breach" if !success # TODO: how to allow messages here?
+            return lib_ctx, flow_options, [decision, policy]
+          end
 
-          Trailblazer::Operation::Result.new(success, data)
+          def build_result(lib_ctx, flow_options, (decision, policy), target_ctx:, **)
+            target_ctx[:"result.policy.#{name}"] = Operation::Result.new(decision, {policy: policy}, nil)
+
+            return lib_ctx.merge(target_ctx: target_ctx), flow_options, decision
+          end
         end
       end
     end
