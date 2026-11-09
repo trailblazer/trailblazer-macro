@@ -1,6 +1,7 @@
 require "trailblazer/activity/dsl"
 require "trailblazer/activity/variable_mapping"
 
+require "trailblazer/macro/dsl"
 require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"
 require "trailblazer/macro/model/find"
@@ -78,6 +79,11 @@ module Trailblazer
       IdFor.(user_proc, **options)
     end
 
+    ADDS_FOR_EVALUATE_MACRO = [
+      :"macro.evaluate_macro", Circuit::Node[DSL::Normalizer.method(:evaluate_macro), Circuit::Task::Adapter::LibInterface],
+      :before
+    ]
+
     TOPOLOGY_BUILD_OPTIONS = {
       helpers: {
         Macro::Model::Helper => [:Model],
@@ -87,8 +93,14 @@ module Trailblazer
   # Constants::Policy = Trailblazer::Macro::Policy
   # Constants::Model  = Trailblazer::Macro::Model
       },
-      constants: [Macro::Model::Constants],
-      adds: []
+      constants: [
+        Macro::Model::Constants,
+        Macro::Policy::Constants,
+      ],
+
+      adds: [
+        ADDS_FOR_EVALUATE_MACRO,
+      ]
     }
   end # Macro
 end

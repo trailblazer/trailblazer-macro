@@ -5,12 +5,13 @@ require "test_helper"
 class DocsGuardProcTest < Minitest::Spec
   #:proc
   class Create < Trailblazer::Operation
-    step Policy::Guard(->(options, pass:, **) { pass }), id: :policy
+    step Policy::Guard(->(ctx, pass:, **) { pass }), id: :policy
+    # raise "id funzt nicht"
     #:pipeonly
     step :process
 
-    def process(options, **)
-      options[:x] = true
+    def process(ctx, **)
+      ctx[:x] = true
     end
     #:pipeonly end
   end
@@ -69,7 +70,10 @@ end
 class DocsGuardMethodTest < Minitest::Spec
   #:method
   class Create < Trailblazer::Operation
-    step Policy::Guard( :pass? )
+    # include Trailblazer::Macro::Policy::Constants::Policy # FIXME: automatic, please.
+    Trailblazer::Developer.puts(self.config.builder.normalizers[:step])
+
+    step Policy::Guard(:pass?)
 
     def pass?(options, pass:, **)
       pass

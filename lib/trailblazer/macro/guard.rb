@@ -1,17 +1,22 @@
-module Trailblazer::Macro
-  module Policy
-    def self.Guard(proc, name: :default, &block)
-      Policy.step(Guard.build(proc), name: name)
-    end
+module Trailblazer
+  module Macro
+    module Policy
+      module Constants
+        module Policy
+          def self.Guard(proc, name: :default, &block)
+            Guard::Atom.new({name: name, provider: proc})
+          end
+        end
+      end
 
-    module Guard
-      def self.build(callable)
-        option = Trailblazer::Activity::Circuit::Step(callable) # DISCUSS: should we use Option here directly?
+      module Guard
+        class Atom < DSL::Atom
+          def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # called via Normalizer.evaluate_macro
+            guard = Trailblazer::Activity::Step.build(options[:provider], binary: true, exec_context: exec_context)
 
-        ->(ctx, flow_options, circuit_options) do
-          _, _, result = option.call(ctx, flow_options, circuit_options)
+            return Macro::Policy.options_for_step(node: guard, name: options[:name])
+          end
 
-          Trailblazer::Operation::Result.new(!!result, {})
         end
       end
     end
