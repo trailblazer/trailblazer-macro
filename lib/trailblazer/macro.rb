@@ -88,6 +88,7 @@ module Trailblazer
       helpers: {
         Macro::Model::Helper => [:Model],
         Macro::Each::Helper => [:Each],
+        Macro::Wrap::Helper => [:Wrap],
         # TODO:
   # def_delegators Trailblazer::Macro, :Model, :Nested, :Wrap, :Rescue, :Each
   # Constants::Policy = Trailblazer::Macro::Policy
