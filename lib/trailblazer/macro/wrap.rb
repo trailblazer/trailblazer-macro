@@ -16,6 +16,8 @@ module Trailblazer
         block_activity, outputs = Macro.block_activity_for(nil, exec_context: exec_context, &block)
 
         options_for_node = {
+          Activity::Railway.Output(:failure_from_wrap_handler, signal: Activity::Left) => Activity::Railway.Track(:failure),
+          Activity::Railway.Output(:success_from_wrap_handler, signal: Activity::Right) => Activity::Railway.Track(:success), # TODO: test this explicitly, return it from the handler.
           outputs: outputs,
           id: id,
           node_for_call_task: Wrap::Node[block_activity, Circuit::Processor, options: {handler_for_wrap: handler_for_wrap}]
