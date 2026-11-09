@@ -141,58 +141,6 @@ class WrapMyRescueTest < Minitest::Spec
   end
 end
 
-# Test that an outdated signature handler still works in 2.2.
-# Also, this is needed for docs.
-#
-# TODO: move me to some "deprecated" test file.
-class DocsWrap2_1Test < Minitest::Spec
-  #:wrap-handler-2-1
-  class HandleUnsafeProcess
-    def self.call((ctx, flow_options), *, &block)
-      signal, (ctx, flow_options) = yield # calls the wrapped steps
-
-      return signal, [ctx, flow_options]
-    rescue
-      ctx[:exception] = $!.message
-
-      return Trailblazer::Operation::Railway.fail!, [ctx, flow_options]
-    end
-  end
-  #:wrap-handler-2-1 end
-
-  class Memo
-    module Operation
-    end
-  end
-
-  #:wrap-2-1
-  module Memo::Operation
-    class Create < Trailblazer::Operation
-      step :model
-      step Wrap(HandleUnsafeProcess) {
-        step :update
-        step :rehash
-      }
-      step :notify
-      left :log_error
-      #~methods
-      include T.def_steps(:model, :update, :notify, :log_error)
-      include Rehash
-      #~methods end
-    end
-  end
-  #:wrap-2-1 end
-
-  it do
-  #@ happy days
-    assert_invoke Memo::Operation::Create, seq: "[:model, :update, :rehash, :notify]"
-  #@ rehash raises
-    assert_invoke Memo::Operation::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash, :log_error]",
-      terminus: :failure,
-      expected_ctx_variables: {exception: "RuntimeError"}
-  end
-end
-
 class DocsWrapTest < Minitest::Spec
 =begin
 When success: return the block's returns
@@ -200,14 +148,14 @@ When raise:   return {Railway.fail!}
 =end
   #:wrap-handler
   class HandleUnsafeProcess
-    def self.call(ctx, flow_options, circuit_options, &block)
-      ctx, flow_options, signal = yield(ctx, flow_options, circuit_options) # calls the wrapped steps
+    def self.call(ctx, flow_options, signal, **circuit_options, &block)
+      ctx, flow_options, signal = yield(ctx, flow_options, signal, **circuit_options) # calls the wrapped steps
 
       return ctx, flow_options, signal
     rescue
-      ctx[:exception] = $!.message
+      ctx[:target_ctx][:exception] = $!.message
 
-      return ctx, flow_options, Trailblazer::Operation::Railway.fail!
+      return ctx, flow_options, Trailblazer::Operation.fail!
     end
   end
   #:wrap-handler end
@@ -230,9 +178,9 @@ When raise:   return {Railway.fail!}
 
   it do
   #@ happy days
-    assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]"
+    assert_run Memo::Create, seq: [:model, :update, :rehash, :notify], terminus: :success
   #@ rehash raises
-    assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash, :log_error]",
+    assert_run Memo::Create, target_ctx: {rehash_raise: RuntimeError, seq: []}, seq: [:model, :update, :rehash, :log_error],
       terminus: :failure,
       expected_ctx_variables: {exception: "RuntimeError"}
   end
@@ -246,15 +194,15 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
 
     class Memo::Create < Trailblazer::Operation
       class HandleUnsafeProcess
-        def self.call(ctx, flow_options, circuit_options, &block)
-          yield(ctx, flow_options, circuit_options) # calls the wrapped steps
+        def self.call(ctx, flow_options, signal, **circuit_options, &block)
+          yield(ctx, flow_options, signal, **circuit_options) # calls the wrapped steps
         rescue
-          [ctx, flow_options, Trailblazer::Operation::Railway.fail!]
+          return ctx, flow_options, Trailblazer::Operation.fail!
         end
       end
 
       step :model
-      step Wrap( HandleUnsafeProcess ) {
+      step Wrap(HandleUnsafeProcess) {
         step :update
         step :rehash
       }, fail_fast: true
@@ -267,8 +215,8 @@ When raise:   return {Railway.fail!}, but wire Wrap() to {fail_fast: true}
       #~methods end
     end
 
-    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
+    it { assert_run Memo::Create, seq: [:model, :update, :rehash, :notify], terminus: :success }
+    it { assert_run Memo::Create, seq: [:model, :update, :rehash], target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :fail_fast }
   end
 
 =begin
@@ -312,42 +260,42 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
 When success: return the block's returns
 When raise:   return {Railway.fail!} or {Railway.pass!}
 =end
-  # class WrapWithCustomEndsTest < Minitest::Spec
-  #   Memo   = Module.new
+  class WrapWithCustomEndsTest < Minitest::Spec
+    Memo   = Module.new
 
-  #   #:custom-handler
-  #   class MyTransaction
-  #     MyFailSignal = Class.new(Trailblazer::Activity::Signal)
+    #:custom-handler
+    class MyTransaction
+      MyFailSignal = Class.new(Trailblazer::Activity::Signal)
 
-  #     def self.call(ctx, flow_options, circuit_options, &block)
-  #       yield(ctx, flow_options, circuit_options) # calls the wrapped steps
-  #     rescue
-  #       return ctx, flow_options, MyFailSignal
-  #     end
-  #   end
-  #   #:custom-handler end
+      def self.call(ctx, flow_options, circuit_options, &block)
+        yield(ctx, flow_options, circuit_options) # calls the wrapped steps
+      rescue
+        return ctx, flow_options, MyFailSignal
+      end
+    end
+    #:custom-handler end
 
-  #   #:custom
-  #   class Memo::Create < Trailblazer::Operation
-  #     step :model
-  #     step Wrap( MyTransaction ) {
-  #       step :update
-  #       step :rehash
-  #     },
-  #       Output(:success) => Terminus(:transaction_worked),
-  #       Output(MyTransaction::MyFailSignal, :failure) => Terminus(:transaction_failed)
-  #     step :notify
-  #     left :log_error
-  #     #~methods
-  #     include T.def_steps(:model, :update, :notify, :log_error)
-  #     include Rehash
-  #     #~methods end
-  #   end
-  #   #:custom end
+    #:custom
+    class Memo::Create < Trailblazer::Operation
+      step :model
+      step Wrap( MyTransaction ) {
+        step :update
+        step :rehash
+      },
+        Output(:success) => Terminus(:transaction_worked),
+        Output(:failure, signal: MyTransaction::MyFailSignal) => Terminus(:transaction_failed)
+      step :notify
+      left :log_error
+      #~methods
+      include T.def_steps(:model, :update, :notify, :log_error)
+      include Rehash
+      #~methods end
+    end
+    #:custom end
 
-  #   it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", terminus: :transaction_worked }
-  #   it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash]", terminus: :transaction_failed }
-  # end
+    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", terminus: :transaction_worked }
+    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:model, :update, :rehash]", terminus: :transaction_failed }
+  end
 
 =begin
 When success: return the block's returns
