@@ -18,8 +18,6 @@ module Trailblazer
         adds_for_translate_signal = build_adds_for_translate_signal(outputs)
 
         options_for_node = {
-          Activity::Railway.Output(:failure_from_wrap_handler, signal: Activity::Left) => Activity::Railway.Track(:failure),
-          Activity::Railway.Output(:success_from_wrap_handler, signal: Activity::Right) => Activity::Railway.Track(:success), # TODO: test this explicitly, return it from the handler.
           outputs: outputs,
           id: id,
           node_for_call_task: Wrap::Node[block_activity, Circuit::Processor, options: {handler_for_wrap: handler_for_wrap}],
@@ -67,8 +65,9 @@ module Trailblazer
         def call(lib_ctx, flow_options, signal, **circuit_options)
           handler_for_wrap = options.fetch(:handler_for_wrap)
 
-          block_for_yield = ->(*args) { interface.(task, lib_ctx, flow_options, signal, **circuit_options) }
+          block_for_yield = ->(*args, **circuit_options) { super(*args, **circuit_options) }
 
+          # DISCUSS: could we somehow execute this as a step? but what about the &block?
           lib_ctx, flow_options, signal = handler_for_wrap.(lib_ctx, flow_options, signal, **circuit_options, &block_for_yield)
 
           return lib_ctx, flow_options, signal
