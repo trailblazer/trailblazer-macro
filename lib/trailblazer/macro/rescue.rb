@@ -1,16 +1,57 @@
 module Trailblazer
   module Macro
-    NoopHandler = lambda { |ctx, flow_options, circuit_options, exception:| }
+    NoopHandler = lambda { |lib_ctx, flow_options, *| return lib_ctx, flow_options, Activity::Left }
 
-    def self.Rescue(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
-      exceptions = [StandardError] unless exceptions.any?
+    module Rescue
+      module Helper
+        def Rescue(*exceptions, exec_context: nil, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
+          exceptions = [StandardError] unless exceptions.any?
 
+
+          wrap_options = Wrap.build_node(exec_context: exec_context, handler_for_wrap: Runtime.new(exceptions), id: id, block: block,
+            options_for_invoke_handler: {connections: Circuit::Resolver::Conditional.new([Runtime::Rescued], :handle_rescue, :translate_signal)},
+
+            rows_after_invoke_handler: [
+              [:handle_rescue, handler, Circuit::Task::Adapter::LibInterface],
+            ]
+          )
+return wrap_options
+          # Developer.puts(wrap_options[:node_for_call_task].task)
+
+          return Wrap(Runtime.new(exceptions, handler), &block)
+        end
+      end
+
+      class Runtime < Struct.new(:exceptions, :handler_for_rescue)
+        Rescued = Class.new
+
+        def call(lib_ctx, flow_options, signal, **circuit_options, &block)
+          begin
+            return yield(lib_ctx, flow_options, signal, **circuit_options)
+          rescue *exceptions => exception
+            # puts "exception"
+            return lib_ctx, flow_options, Rescued
+          end
+        end
+      end
+    end
+
+
+    def self.Rescue_(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
+
+      # This is the "new" interface, where we basically don't have to do anything (which is good!).
       if circuit_interface
+        handler = Activity::Option.build(handler) do |instance_method_option|
+          raise "why are we wrapping this? because Step wants to call the handler with a step interface"
+          ->(*args, **kwargs) { Rescue::Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, *args, **kwargs) }
+        end
+
         rescue_block = ->(ctx, flow_options, circuit_options, &nested_activity) do
           begin
             nested_activity.call(ctx, flow_options, circuit_options) # FIXME: use yield.
           rescue *exceptions => exception
-            handler.call(ctx, flow_options, circuit_options, exception: exception) # FIXME: when there's an error here, it shows the wrong exception!
+            # we are playing special Runner here:
+            handler.call(ctx, flow_options, circuit_options, exception: exception) # TODO: when there's an error here, it shows the wrong exception!
           end
         end
 

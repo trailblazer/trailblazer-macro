@@ -51,9 +51,9 @@ plain Rescue()
     module Song::Activity; end
 
     #:no-args
-    class Song::Activity::Create < Trailblazer::Activity::Railway
+    class Song::Activity::Create < Trailblazer::Operation
       step :create_model
-      step Rescue() {
+      step Rescue(exec_context: self.new) {
         step :upload
         step :rehash
       }
@@ -66,10 +66,10 @@ plain Rescue()
     end
     #:no-args end
 
-    it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: :bla, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: NoMethodError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]" }
+    it { assert_run Song::Activity::Create, seq: [:create_model, :upload, :rehash, :notify], terminus: :success }
+    it { assert_run Song::Activity::Create, target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :failure, seq: [:create_model, :upload, :rehash, :log_error] }
+    it { assert_run Song::Activity::Create, target_ctx: {rehash_raise: :bla, seq: []}, terminus: :failure, seq: [:create_model, :upload, :rehash, :log_error] }
+    it { assert_run Song::Activity::Create, target_ctx: {rehash_raise: NoMethodError, seq: []}, terminus: :failure, seq: [:create_model, :upload, :rehash, :log_error] }
   end
 
 =begin
@@ -88,7 +88,7 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
     #:rescue-handler end
 
     #:rescue
-    class Song::Activity::Create < Trailblazer::Activity::Railway
+    class Song::Activity::Create < Trailblazer::Operation
       step :create_model
       step Rescue(RuntimeError, handler: MyHandler) {
         step :upload
@@ -177,7 +177,7 @@ Rescue(), fast_track: true {}
     #:rescue-fasttrack
     class Memo::Create < Trailblazer::Operation
       rescue_block = ->(*) {
-        step :update, Output(:failure) => End(:fail_fast)
+        step :update, Output(:failure) => Terminus(:fail_fast)
         step :rehash
       }
 
@@ -267,7 +267,7 @@ class RescueDeprecateHandlerWithPositionalExceptionArgumentTest < Minitest::Spec
   end
   #:rescue-handler-2-1 end
 
-  class Song::Operation::Create < Trailblazer::Activity::Railway
+  class Song::Operation::Create < Trailblazer::Operation
     step :create_model
     step :notify
     left :log_error
@@ -311,7 +311,7 @@ class RescueDeprecateInstanceMethodHandlerWithPositionalExceptionArgumentTest < 
   module Song::Operation; end
 
 
-  class Song::Operation::Create < Trailblazer::Activity::Railway
+  class Song::Operation::Create < Trailblazer::Operation
     step Rescue(RuntimeError, handler: :my_handler) {
       step :upload
       step :rehash
