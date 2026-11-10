@@ -252,8 +252,8 @@ When raise:   return {Railway.fail_fast!} and configure Wrap() to {fast_track: t
     end
     #:fail-fast end
 
-    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash, :notify]" }
-    it { assert_invoke Memo::Create, seq: "[:model, :update, :rehash]", rehash_raise: RuntimeError, terminus: :fail_fast }
+    it { assert_run Memo::Create, seq: [:model, :update, :rehash, :notify], terminus: :success }
+    it { assert_run Memo::Create, seq: [:model, :update, :rehash], target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :fail_fast }
   end
 
 =begin
