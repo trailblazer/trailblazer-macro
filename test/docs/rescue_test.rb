@@ -81,8 +81,10 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
 
     #:rescue-handler
     class MyHandler
-      def self.call(ctx, flow_options, circuit_options, exception:)
+      def self.call(ctx, exception:, **)
         ctx[:exception_class] = exception.class
+
+        false
       end
     end
     #:rescue-handler end
@@ -99,26 +101,50 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
       #~methods
       include T.def_steps(:create_model, :upload, :notify, :log_error)
       include Rehash
+      # def log_error(ctx, **)
+      #   raise ctx.inspect
+      # end
       #~methods end
     end
     #:rescue end
 
-    it { assert_invoke Song::Activity::Create, seq: "[:create_model, :upload, :rehash, :notify]" }
-    it { assert_invoke Song::Activity::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:create_model, :upload, :rehash, :log_error]", exception_class: RuntimeError }
+    it { assert_run Song::Activity::Create, seq: [:create_model, :upload, :rehash, :notify], terminus: :success }
     it do
-      # Since we don't catch NoMethodError, execution stops.
-      assert_raises NoMethodError do
-        Song::Activity::Create.invoke([{seq: {}, rehash_raise: NoMethodError}])
+      lib_ctx, _ = assert_run Song::Activity::Create, target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :failure, seq: [:create_model, :upload, :rehash, :log_error]
+
+      assert_equal lib_ctx, {
+        target_ctx: {
+          rehash_raise: RuntimeError,
+          exception_class: RuntimeError,
+          seq: [:create_model, :upload, :rehash, :log_error]
+        }
+      }
+    end
+    it do
+      # Since we don't catch KeyError, execution stops.
+      assert_raises KeyError do
+        Song::Activity::Create.({seq: [], rehash_raise: KeyError})
       end
     end
+  end
+
+  # TODO: we don't leak :exception
+  it "what" do
+    raise
+  end
+
+  it "we can use {:lib_interface} for the rescue handler" do
+    raise
   end
 
   class RescueWithModuleHandlerTest < Minitest::Spec
     Memo = Class.new
 
     module MyHandler
-      def self.call(ctx, *, exception:)
+      def self.call(ctx, exception:, **)
         ctx[:exception_class] = exception.class
+
+        false
       end
     end
 
@@ -134,8 +160,12 @@ Rescue( SPECIFIC_EXCEPTION, handler: X )
       include Rehash
     end
 
-    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
-    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:find_model, :update, :rehash, :log_error]", expected_ctx_variables: {exception_class: RuntimeError}, terminus: :failure }
+    it { assert_run Memo::Create, seq: [:find_model, :update, :rehash, :notify], terminus: :success }
+    it do
+      lib_ctx, _ = assert_run Memo::Create, target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :failure, seq: [:find_model, :update, :rehash, :log_error]
+
+      assert_equal lib_ctx[:target_ctx][:exception_class], RuntimeError
+    end
   end
 
 =begin
@@ -158,14 +188,20 @@ Rescue( handler: :instance_method )
       include Rehash
       #~methods end
 
-      def my_handler(ctx, *, exception:)
+      def my_handler(ctx, exception:, **)
         ctx[:exception_class] = exception.class
+
+        false
       end
     end
     #:rescue-method end
 
-    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
-    it { assert_invoke Memo::Create, rehash_raise: RuntimeError, seq: "[:find_model, :update, :rehash, :log_error]", expected_ctx_variables: {exception_class: RuntimeError}, terminus: :failure }
+    it { assert_run Memo::Create, seq: [:find_model, :update, :rehash, :notify], terminus: :success }
+    it do
+      lib_ctx, _ = assert_run Memo::Create, target_ctx: {rehash_raise: RuntimeError, seq: []}, terminus: :failure, seq: [:find_model, :update, :rehash, :log_error]
+
+      assert_equal lib_ctx[:target_ctx][:exception_class], RuntimeError
+    end
   end
 
 =begin
@@ -182,15 +218,18 @@ Rescue(), fast_track: true {}
       }
 
       step :find_model
-      step Rescue(&rescue_block), fail_fast: true
+      step Rescue(&rescue_block), fail_fast: true, fast_track: true # FIXME: does fail_fast mean we want to connect both fail outputs automatically?
       step :notify
       left :log_error
       #~methods
       include T.def_steps(:find_model, :update, :notify, :log_error, :rehash)
     end
 
-    it { assert_invoke Memo::Create, seq: "[:find_model, :update, :rehash, :notify]" }
-    it { assert_invoke Memo::Create, update: false, seq: "[:find_model, :update]", terminus: :fail_fast }
+    # Trailblazer::Developer.puts(Memo::Create.config.circuit)
+    # pp Memo::Create.config.circuit.flow_map
+
+    it { assert_run Memo::Create, seq: [:find_model, :update, :rehash, :notify], terminus: :success }
+    it { assert_run Memo::Create, target_ctx: {update: false, seq: []}, seq: [:find_model, :update], terminus: :fail_fast }
   end
 
   class RescueIDTest < Minitest::Spec
@@ -252,100 +291,6 @@ Rescue(), fast_track: true {}
 `-- End.failure)
     end
   end
-end
-
-class RescueDeprecateHandlerWithPositionalExceptionArgumentTest < Minitest::Spec
-  Song = Class.new
-  module Song::Operation; end
-
-  #:rescue-handler-2-1
-  class MyHandler
-    def self.call(exception, (ctx), *)
-      ctx[:seq] << :MyHandler
-      ctx[:exception_class] = exception.class
-    end
-  end
-  #:rescue-handler-2-1 end
-
-  class Song::Operation::Create < Trailblazer::Operation
-    step :create_model
-    step :notify
-    left :log_error
-    #~methods
-    include T.def_steps(:create_model, :upload, :notify, :log_error)
-    include Rehash
-    #~methods end
-  end
-
-  it do
-    activity = nil
-    _, warnings = capture_io do
-      activity = Class.new(Trailblazer::Activity::Railway) do
-        step Rescue(RuntimeError, handler: MyHandler) {
-          step :rehash
-        }
-        include Rehash
-      end
-    end
-    line_number_for_rescue = __LINE__ - 6
-
-    # Deprecation warning at compile time.
-    assert_equal warnings, %([Trailblazer] #{File.realpath(__FILE__)}:#{line_number_for_rescue} The Rescue() handler has a new interface, the old `(exception, (ctx), ..), **` signature is deprecated.
-Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXME _____---------------
-)
-
-    _, warnings = capture_io do
-      assert_invoke activity, seq: "[:rehash]"
-    end
-    assert_equal warnings, ""
-
-    _, warnings = capture_io do
-      assert_invoke activity, rehash_raise: RuntimeError, terminus: :failure, seq: "[:rehash, :MyHandler]", expected_ctx_variables: {exception_class: RuntimeError}
-    end
-    assert_equal warnings, ""
-  end
-end
-
-class RescueDeprecateInstanceMethodHandlerWithPositionalExceptionArgumentTest < Minitest::Spec
-  Song = Class.new
-  module Song::Operation; end
-
-
-  class Song::Operation::Create < Trailblazer::Operation
-    step Rescue(RuntimeError, handler: :my_handler) {
-      step :upload
-      step :rehash
-    }
-
-    #:rescue-handler-instance-method-2-1
-    def my_handler(exception, (ctx), *)
-    # def my_handler(ctx, flow_options, *, **)
-      ctx[:seq] << :my_handler
-      ctx[:exception_class] = exception.class
-    end
-    #:rescue-handler-instance-method-2-1 end
-    #~methods
-    include T.def_steps(:upload)
-    include Rehash
-    #~methods end
-  end
-
-  it {
-    _, warnings = capture_io do
-      assert_invoke Song::Operation::Create, seq: "[:upload, :rehash]"
-    end
-
-    assert_equal warnings, ""
-  }
-
-  it {
-    _, warnings = capture_io do
-      assert_invoke Song::Operation::Create, rehash_raise: RuntimeError, terminus: :failure, seq: "[:upload, :rehash, :my_handler]", expected_ctx_variables: {exception_class: RuntimeError}
-    end
-
-    assert_equal warnings, %([Trailblazer] RescueDeprecateInstanceMethodHandlerWithPositionalExceptionArgumentTest::Song::Operation::Create#my_handler The Rescue() handler has a new interface, the old `(exception, (ctx), ..), **` signature is deprecated.
-Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXME _____---------------\n)
-  }
 end
 
 =begin

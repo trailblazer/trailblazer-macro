@@ -8,31 +8,81 @@ module Trailblazer
           build_node(**options, exec_context: exec_context)
         end
 
-        def build_node(exceptions:, handler:, id:, **options)
+        def build_node(exceptions:, handler:, id:, lib_interface:, exec_context:, **options)
           exceptions = [StandardError] unless exceptions.any?
 
-          wrap_options = Wrap.build_node(handler_for_wrap: Runtime.new(exceptions), id: id, **options)
+          node_for_handler =
+            if lib_interface
+              Circuit::Node[handler, Circuit::Task::Adapter::LibInterface]
+            else
+              in_node, out_node = input_and_output_nodes_for_rescue_handler
+
+              circuit = Circuit::Builder.Pipeline(
+                [:in, node: in_node],
+                [:handler, node: Activity::Step.build(handler, binary: true, exec_context: exec_context)],
+                [:out, node: out_node],
+              )
+
+              Circuit::Node[circuit, Circuit::Processor]
+            end
+
+          wrap_options = Wrap.build_node(handler_for_wrap: Runtime.new(exceptions), id: id, exec_context: exec_context, **options)
 
           node = wrap_options[:node_for_call_task]
           circuit = node.task
 
           new_resolver_for_invoke_handler = Circuit::Resolver::Conditional.new([Runtime::Rescued], :handle_rescue, :translate_signal)
-
           circuit = Circuit::Adds.(circuit,
-            [:handle_rescue, Circuit::Node[handler, Circuit::Task::Adapter::LibInterface], :before, :translate_signal],
+            [:handle_rescue, node_for_handler, :before, :translate_signal],
             [:invoke_handler, circuit.nodes[:invoke_handler], :replace, :invoke_handler, resolver: new_resolver_for_invoke_handler],
           ) # DISCUSS: patch? grabbing the original invoke_handler node is a contract breach.
 
-          rescue_options = wrap_options.merge(
-            node_for_call_task: node.class[circuit, node.interface, options: node.options] # FIXME: better way to "clonstumize" node
+          return wrap_options.merge(
+            node_for_call_task: node.class[circuit, node.interface, copy_to_outer_ctx: node.copy_to_outer_ctx] # FIXME: better way to "clonstumize" node
+          )
+        end
+
+        # FIXME: better API in vm.
+        def input_and_output_nodes_for_rescue_handler()
+          custom_inject = Class.new(Activity::VariableMapping::DSL::Inject) do
+            def call(*) # This is called in {VM::Input.convert_tuples_to_node}.
+              # A filter with circuit interface.
+              provider_filter = ->(lib_ctx, flow_options, _, exception:, **) { return lib_ctx, flow_options, exception }
+
+              inject_node = Activity::VariableMapping::Runtime::Filter::Wrapped.build_node(
+                provider_node: Circuit::Node[provider_filter, Circuit::Task::Adapter::LibInterface],
+                id: :inject_exception,
+                write_name: :exception
+              )
+
+              return [
+                ["rescue.inject.exception", node: inject_node],
+              ]
+            end
+          end.new
+
+
+          # TODO: we're mimicking the dsl gem here in order to get i/o. very error-prone and leaky. and (too?) much knowledge about öy.
+          lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.disect_input_and_output({}, {}, nil,
+            custom_inject => nil, # acts like Inject().
+            # Activity::VariableMapping::DSL.Out() => [],
+            # **collect_value_node_builder,
+            # **variable_mapping_options_for_iterated
           )
 
-          return rescue_options
+          lib_ctx, _ = Activity::VariableMapping::DSL::Normalizer.convert_dsl_to_nodes({}, {}, nil,
+            exec_context: self,
+            **lib_ctx
+          )
+
+          return lib_ctx[:node_for_input], lib_ctx[:node_for_output]
         end
       end
       module Helper
-        def Rescue(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
-          return Atom.new({exceptions: exceptions, handler: handler, id: id, block: block})
+        def Rescue(*exceptions, handler: NoopHandler, lib_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
+          lib_interface = true if handler == NoopHandler
+
+          return Atom.new({exceptions: exceptions, handler: handler, id: id, block: block, lib_interface: lib_interface})
         end
       end
 
@@ -44,139 +94,11 @@ module Trailblazer
             return yield(lib_ctx, flow_options, signal, **circuit_options)
           rescue *exceptions => exception
             # puts "exception"
-            return lib_ctx, flow_options, Rescued
+            return lib_ctx.merge(exception: exception), flow_options, Rescued
           end
         end
       end
-    end
-
-
-    def self.Rescue_(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
-
-      # This is the "new" interface, where we basically don't have to do anything (which is good!).
-      if circuit_interface
-        handler = Activity::Option.build(handler) do |instance_method_option|
-          raise "why are we wrapping this? because Step wants to call the handler with a step interface"
-          ->(*args, **kwargs) { Rescue::Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, *args, **kwargs) }
-        end
-
-        rescue_block = ->(ctx, flow_options, circuit_options, &nested_activity) do
-          begin
-            nested_activity.call(ctx, flow_options, circuit_options) # FIXME: use yield.
-          rescue *exceptions => exception
-            # we are playing special Runner here:
-            handler.call(ctx, flow_options, circuit_options, exception: exception) # TODO: when there's an error here, it shows the wrong exception!
-          end
-        end
-
-        return Wrap(rescue_block, id: id, &block)
-      end
-
-      # In Rescue(), for whatever reason we support a circuit interface handler
-      # where we ignore the result set?
-
-      is_instance_method = false
-      handler = Activity::Option.build(handler) do |instance_method|
-        # this is for :instance_methods
-        is_instance_method = true
-
-        # assuming we have to deprecate everything.
-        Rescue::Deprecate::InstanceMethodAtRuntime.new(nil, instance_method)
-      end
-
-      if is_instance_method
-        # deprecate at runtime :D
-      else
-        # This only catches the documented signature:
-        #   def(exception, (ctx), *)
-        if Rescue::Deprecate.old_signature?(handler.method(:call))
-          Rescue::Deprecate.warning_for_deprecated_callable
-
-          # deprecate now!
-          handler = Rescue::Deprecate::Callable.new(handler)
-        end
-      end
-
-
-      # every handler is called identically, no matter if it's a callable or an :instance_method.
-      # the idea is we do NOT have to know that and can always call CI/extended circuit interface (with kwargs)
-      # the other idea is that we have to wrap as little as possible, and :instance_method is a special case (not edge case, though).
-      # handler.(ctx, flow_options, circuit_options, exception: exception)
-
-
-
-
-      # This block is evaluated by {Wrap}.
-      rescue_block = ->(ctx, flow_options, circuit_options, &nested_activity) do
-        begin
-          nested_activity.call(ctx, flow_options, circuit_options) # FIXME: use yield.
-        rescue *exceptions => exception
-          handler.call(ctx, flow_options, circuit_options, exception: exception) # FIXME: when there's an error here, it shows the wrong exception!
-
-          return ctx, flow_options, Trailblazer::Activity::Left
-        end
-      end
-
-      Wrap(rescue_block, id: id, &block)
-    end
-
-    module Rescue
-      module Deprecate
-        def self.old_signature?(method)
-          # this doesn't catch all, but we ignore that.
-          method.arity == -3 && method.parameters[1] == [:req] # (ctx)
-        end
-
-          # This is kind of specific to Rescue, but might be useful elsewhere. We want to run a circuit interface
-      # *instance method* with keyword arguments. in a normal CI-conform callable, this doesn't need any
-      # wrapping, but instance_methods are different.
-      # TODO: this is not Deprecate specific!!!!!!!!!!!!!!!!!!!!
-        def self.translate_from_circuit_interface_to_instance_method_option(instance_method_option, ctx, flow_options, circuit_options, **kwargs)
-          instance_method_option.(ctx, flow_options, circuit_options, keyword_arguments: kwargs, **circuit_options)
-        end
-
-        class InstanceMethodAtRuntime < Struct.new(:filter, :instance_method_option)
-          def call(ctx, flow_options, circuit_options, exception:)
-            # Try to retrieve the method instance of the handler method.
-            # hacky, but hey, it's deprecation code!
-            exec_context    = circuit_options.fetch(:exec_context)
-            instance_method = exec_context.method(instance_method_option.instance_variable_get(:@filter))
-
-            if Deprecate.old_signature?(instance_method)
-              # Activity::Deprecate.warn(
-                # Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /forwardable.+Rescue/),
-              warning =  "#{exec_context.class}##{instance_method.name} " + Deprecate.message_for_deprecation_warning
-
-              Kernel.warn %([Trailblazer] #{warning}\n) # TODO: allow that in Activity::Deprecate.
-
-              # this is a bit hacky but we can call old signature with the "correct" arguments.
-              return Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, exception, [ctx, flow_options], circuit_options)
-            end
-
-            Deprecate.translate_from_circuit_interface_to_instance_method_option(instance_method_option, ctx, flow_options, circuit_options, exception: exception)
-          end
-        end
-
-        class Callable < Struct.new(:filter)
-          def call(ctx, flow_options, circuit_options, exception:)
-            # Call a user handler with the deprecated interface.
-            filter.(exception, [ctx, flow_options], **circuit_options)
-          end
-        end
-
-        def self.message_for_deprecation_warning
-          %(The Rescue() handler has a new interface, the old `(exception, (ctx), ..), **` signature is deprecated.
-Please use (ctx, flow_options, circuit_options, exception:, **) , check ### FIXME _____---------------)
-        end
-
-        def self.warning_for_deprecated_callable
-          Activity::Deprecate.warn(
-            Activity::DSL::Linear::Deprecate.dsl_caller_location(after: /forwardable.+Rescue/),
-            message_for_deprecation_warning
-          )
-        end
-      end # Deprecate
-    end
+    end # Rescue
   end
 end
 
