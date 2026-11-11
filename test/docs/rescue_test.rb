@@ -218,7 +218,7 @@ Rescue(), fast_track: true {}
       }
 
       step :find_model
-      step Rescue(&rescue_block), fail_fast: true, fast_track: true # FIXME: does fail_fast mean we want to connect both fail outputs automatically?
+      step Rescue(&rescue_block), fast_track: true
       step :notify
       left :log_error
       #~methods
@@ -240,7 +240,7 @@ Rescue(), fast_track: true {}
     end
 
     it "assigns ID via {Macro.id_for}" do
-      activity = Class.new(Trailblazer::Activity::Railway) do
+      activity = Class.new(Trailblazer::Operation) do
         step Rescue() {}
         step Rescue(handler: Validate) {}
         step Rescue(handler: :instance_method) {}
