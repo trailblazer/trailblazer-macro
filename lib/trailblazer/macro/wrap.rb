@@ -26,7 +26,8 @@ module Trailblazer
         options_for_node = {
           outputs: outputs,
           id: id,
-          node_for_call_task: Circuit::Node::Scoped[wrap_circuit, Circuit::Processor], # TODO: test we do not leak anything.
+                                                                                        # FIXME: can we make a Activity::Scoped node, that does this automatically?
+          node_for_call_task: Circuit::Node::Scoped[wrap_circuit, Circuit::Processor, copy_to_outer_ctx: [:target_ctx]], # TODO: test we do not leak anything.
         }
 
         return options_for_node
