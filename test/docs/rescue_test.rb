@@ -9,9 +9,9 @@ class NestedRescueTest < Minitest::Spec
   class NestedInsanity < Trailblazer::Operation
     include T.def_steps(:a, :y, :outer_err, :z, :e, :b, :c, :inner_err)
 
-    step Rescue {
+    step Rescue() {
       step :a
-      step Rescue {
+      step Rescue() {
         step :y
         pass ->(ctx, **) { raise Y if ctx["raise-y"] }
         step :z
@@ -26,17 +26,17 @@ class NestedRescueTest < Minitest::Spec
   end
 
   it { assert_match /\[>Rescue\/[\d\.]+,>nested/, Trailblazer::Developer.railway(NestedInsanity)  } # FIXME: better introspect tests for all id-generating macros.
-  it { assert_invoke NestedInsanity, seq: "[:a, :y, :z, :b, :c, :e]" }
-  it { assert_invoke NestedInsanity, "raise-y" => true, seq: "[:a, :y, :inner_err, :outer_err]", terminus: :failure }
-  it { assert_invoke NestedInsanity, "raise-a" => true, seq: "[:a, :y, :z, :b, :outer_err]", terminus: :failure }
+  it { assert_run NestedInsanity, seq: [:a, :y, :z, :b, :c, :e], terminus: :success }
+  it { assert_run NestedInsanity, target_ctx: {"raise-y" => true, seq: []}, seq: [:a, :y, :inner_err, :outer_err], terminus: :failure }
+  it { assert_run NestedInsanity, target_ctx: {"raise-a" => true, seq: []}, seq: [:a, :y, :z, :b, :outer_err], terminus: :failure }
 
   #-
   # inheritance
   class UbernestedInsanity < NestedInsanity
   end
 
-  it { assert_invoke UbernestedInsanity, seq: "[:a, :y, :z, :b, :c, :e]" }
-  it { assert_invoke UbernestedInsanity, "raise-y" => true, seq: "[:a, :y, :inner_err, :outer_err]", terminus: :failure }
+  it { assert_run UbernestedInsanity, seq: [:a, :y, :z, :b, :c, :e], terminus: :success }
+  it { assert_run UbernestedInsanity, target_ctx: {"raise-y" => true, seq: []}, seq: [:a, :y, :inner_err, :outer_err], terminus: :failure }
 end
 
 
