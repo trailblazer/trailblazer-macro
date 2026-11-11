@@ -53,7 +53,7 @@ plain Rescue()
     #:no-args
     class Song::Activity::Create < Trailblazer::Operation
       step :create_model
-      step Rescue(exec_context: self.new) {
+      step Rescue() {
         step :upload
         step :rehash
       }

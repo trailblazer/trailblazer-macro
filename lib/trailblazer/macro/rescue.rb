@@ -3,26 +3,40 @@ module Trailblazer
     NoopHandler = lambda { |lib_ctx, flow_options, *| return lib_ctx, flow_options, Activity::Left }
 
     module Rescue
-      module Helper
-        def Rescue(*exceptions, exec_context: nil, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
+      class Atom < DSL::Atom
+        def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **)
+          build_node(**options, exec_context: exec_context)
+        end
+
+        def build_node(exceptions:, handler:, id:, **options)
           exceptions = [StandardError] unless exceptions.any?
 
+          wrap_options = Wrap.build_node(handler_for_wrap: Runtime.new(exceptions), id: id, **options)
 
-          wrap_options = Wrap.build_node(exec_context: exec_context, handler_for_wrap: Runtime.new(exceptions), id: id, block: block,
-            options_for_invoke_handler: {connections: Circuit::Resolver::Conditional.new([Runtime::Rescued], :handle_rescue, :translate_signal)},
+          node = wrap_options[:node_for_call_task]
+          circuit = node.task
 
-            rows_after_invoke_handler: [
-              [:handle_rescue, handler, Circuit::Task::Adapter::LibInterface],
-            ]
+          new_resolver_for_invoke_handler = Circuit::Resolver::Conditional.new([Runtime::Rescued], :handle_rescue, :translate_signal)
+
+          circuit = Circuit::Adds.(circuit,
+            [:handle_rescue, Circuit::Node[handler, Circuit::Task::Adapter::LibInterface], :before, :translate_signal],
+            [:invoke_handler, circuit.nodes[:invoke_handler], :replace, :invoke_handler, resolver: new_resolver_for_invoke_handler],
+          ) # DISCUSS: patch? grabbing the original invoke_handler node is a contract breach.
+
+          rescue_options = wrap_options.merge(
+            node_for_call_task: node.class[circuit, node.interface, options: node.options] # FIXME: better way to "clonstumize" node
           )
-return wrap_options
-          # Developer.puts(wrap_options[:node_for_call_task].task)
 
-          return Wrap(Runtime.new(exceptions, handler), &block)
+          return rescue_options
+        end
+      end
+      module Helper
+        def Rescue(*exceptions, handler: NoopHandler, circuit_interface: false, id: Macro.id_for(nil, macro: :Rescue), &block)
+          return Atom.new({exceptions: exceptions, handler: handler, id: id, block: block})
         end
       end
 
-      class Runtime < Struct.new(:exceptions, :handler_for_rescue)
+      class Runtime < Struct.new(:exceptions)
         Rescued = Class.new
 
         def call(lib_ctx, flow_options, signal, **circuit_options, &block)
