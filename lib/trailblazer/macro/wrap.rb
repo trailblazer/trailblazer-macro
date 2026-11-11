@@ -8,25 +8,18 @@ module Trailblazer
         end
       end
 
-      def self.build_node(handler_for_wrap:, adapter: Runtime::YieldAdapter, block:, id:, exec_context:, options_for_invoke_handler: {}, rows_after_invoke_handler: [])
+      def self.build_node(handler_for_wrap:, adapter: Runtime::YieldAdapter, block:, id:, exec_context:)
         block_activity, outputs = Macro.block_activity_for(nil, exec_context: exec_context, &block)
 
-        # DISCUSS: we're currently allowing structural parameters for Rescue().
-        rows = [
-          [:block_activity, node: Runtime::Node::BlockForYield[block_activity, Circuit::Processor]], # {:block_for_yield} is now in lib_ctx.
-          [:invoke_handler, handler_for_wrap, adapter, options_for_invoke_handler], # this is where the user's code yields, and we run the {block_activity}.
-          *rows_after_invoke_handler,
-          [:translate_signal, Runtime.method(:translate_signal), merge_to_lib_ctx: {outputs: outputs}],
-        ]
-
         wrap_circuit = Circuit::Builder.Pipeline(
-          *rows
+          [:block_activity, node: Runtime::Node::BlockForYield[block_activity, Circuit::Processor]], # {:block_for_yield} is now in lib_ctx.
+          [:invoke_handler, handler_for_wrap, adapter], # this is where the user's code yields, and we run the {block_activity}.
+          [:translate_signal, Runtime.method(:translate_signal), merge_to_lib_ctx: {outputs: outputs}],
         )
 
         options_for_node = {
           outputs: outputs,
-          id: id,
-                                                                                        # FIXME: can we make a Activity::Scoped node, that does this automatically?
+          id: id,                                                                                        # FIXME: can we make a Activity::Scoped node, that does this automatically?
           node_for_call_task: Circuit::Node::Scoped[wrap_circuit, Circuit::Processor, copy_to_outer_ctx: [:target_ctx]], # TODO: test we do not leak anything.
         }
 
