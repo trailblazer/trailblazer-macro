@@ -647,60 +647,65 @@ class GenericNestedUnitTest < Minitest::Spec
       static: [sub_activity])
 
     #@ nested_activity and top activity cannot see things from decider.
-    options = {
-      what: sub_activity, expected_ctx_variables: {
-        visible:            [:seq, :what, :visible_in_decider],
-        visible_in_decider: [[:seq, :what, :visible_in_decider]]
-      }
+
+    expected_ctx_variables = {
+      visible:            [:what, :visible_in_decider],
+      visible_in_decider: [[:what, :visible_in_decider]],
+      what: sub_activity
     }
 
-    assert_invoke activity, **options, visible_in_decider: []
+    lib_ctx, _ = assert_run activity, target_ctx: {what: sub_activity, visible_in_decider: []}, seq: nil, terminus: :success
+    assert_equal lib_ctx[:target_ctx], expected_ctx_variables
 
   #@ for dynamic
     activity = Class.new(Trailblazer::Operation)
     activity.step Trailblazer::Operation.Nested(compute_nested)
 
     #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, **options, visible_in_decider: []
+    lib_ctx, _ = assert_run activity, target_ctx: {what: sub_activity, visible_in_decider: []}, seq: nil, terminus: :success
+    assert_equal lib_ctx[:target_ctx], expected_ctx_variables
   end
 
-  it "with In/Out, decider sees original ctx, nested_activity sees filtered" do
-    # sees {:activity_to_nest}
-    decider_with_visible_variable = ->(ctx, activity_to_nest:, **) do
+  it "with In/Out, decider sees same ctx as nested_activity" do
+    # sees {:what}
+    decider_with_visible_variable = ->(ctx, what:, **) do
       ctx[:visible_in_decider] << ctx.keys # this is horrible, we're bleeding through to a "global" variable.
-      activity_to_nest
+      what
     end
 
     sub_activity    = activity_with_visible_variable()
     compute_nested  = decider_with_visible_variable
     in_out_options  = {
-      Trailblazer::Operation.In() => {:activity_to_nest => :what}#,
-      # Trailblazer::Operation.In() => [:visible_in_decider]
+      Trailblazer::Operation.In() => {:activity_to_nest => :what},
+      Trailblazer::Operation.In() => [:visible_in_decider]
     }
 
   #@ for Static
-    activity = Class.new(Trailblazer::Operation)
-    activity.step Trailblazer::Operation.Nested(compute_nested,
-      static: [sub_activity]).merge(in_out_options)
+    activity = Class.new(Trailblazer::Operation) do
+      step Nested(compute_nested, static: [sub_activity]), **in_out_options
+    end
 
     #@ nested_activity and top activity cannot see things from decider.
     options = {
       please_discard_me: true,
       activity_to_nest: sub_activity, # renamed to {:what}
-      expected_ctx_variables: {
-        visible:            [:what],
-        visible_in_decider: [[:seq, :please_discard_me, :activity_to_nest, :visible_in_decider]]
-      }
     }
 
-    assert_invoke activity, **options, visible_in_decider: []
+    expected_ctx_variables = {
+      visible:            [:what, :visible_in_decider],
+      visible_in_decider: [[:what, :visible_in_decider]]
+    }
+
+    lib_ctx, _ = assert_run activity, target_ctx: {**options, visible_in_decider: []}, seq: nil, terminus: :success
+    assert_equal lib_ctx[:target_ctx], options.merge(expected_ctx_variables)
 
   #@ for dynamic
-    activity = Class.new(Trailblazer::Operation)
-    activity.step Trailblazer::Operation.Nested(compute_nested).
-      merge(in_out_options)
+    activity = Class.new(Trailblazer::Operation) do
+      step Nested(compute_nested), **in_out_options
+    end
 
     #@ nested_activity and top activity cannot see things from decider.
-    assert_invoke activity, **options, visible_in_decider: []
+    lib_ctx, _ = assert_run activity, target_ctx: {**options, visible_in_decider: []}, seq: nil, terminus: :success
+    assert_equal lib_ctx[:target_ctx], options.merge(expected_ctx_variables)
   end
 end

@@ -1,6 +1,9 @@
 # 3.0.0
 
 IDs in Pundit/Guard are now "policy.guard.default" etc
+yield in Wrap needs explicit arguments
+Nested decider now sees same ctx as the nested OP.
+
 
 # 2.2.0
 
