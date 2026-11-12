@@ -1,38 +1,55 @@
 module Trailblazer
   module Macro
-    # {Nested} macro.
-    def self.Nested(callable, id: Macro.id_for(callable, macro: :Nested, hint: callable), auto_wire: [], static: auto_wire) # TODO: remove {:auto_wire} in 2.3.
-      Activity::Deprecate.warn caller_locations[1], "The `:auto_wire` option in `Nested()` has been renamed to `:static`." if auto_wire.any?
 
-      task =
-        if static.any?
-          Nested.Static(callable, id: id, static: static)
-        else # no {static}
-          Nested.Dynamic(callable, id: id)
+    class Nested
+      module Helper
+        # {Nested} macro.
+        def Nested(decider, id: Macro.id_for(decider, macro: :Nested, hint: decider), static: [])
+          Atom.new({decider: decider, id: id, static: static})
+        end
+      end
+
+      class Atom < DSL::Atom
+        def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # FIXME: move this to Atom.
+          build_node(exec_context: exec_context, **options)
         end
 
-      # |-- Nested.compute_nested_activity...Trailblazer::Macro::Nested::Decider
-      # `-- task_wrap.call_task..............Method
-      merge = [
-        [Nested::Decider.new(callable), id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
-      ]
+        def build_node(exec_context:, decider:, static:, id:, **)
+          task =
+            if static.any?
+              Nested.Static(decider, id: id, static: static, exec_context: exec_context)
+            else
+              Nested.Dynamic(decider, id: id)
+            end
 
-      # DISCUSS: we could use fields{task_wrap_extensions} from the Nested activity here?
-      task_wrap_extension = Activity::TaskWrap.Extension(*merge)
-
-      Activity::Railway.Subprocess(task)
-        .merge( # FIXME: allow this directly in Subprocess
-          id: id,
-          Activity::Railway.Extension() => task_wrap_extension,
-        )
+          return task
+        end
+      end
     end
+
+
+    #   # |-- Nested.compute_nested_activity...Trailblazer::Macro::Nested::Decider
+    #   # `-- task_wrap.call_task..............Method
+    #   merge = [
+    #     [Nested::Decider.new(callable), id: "Nested.compute_nested_activity", prepend: "task_wrap.call_task"],
+    #   ]
+
+    #   # DISCUSS: we could use fields{task_wrap_extensions} from the Nested activity here?
+    #   task_wrap_extension = Activity::TaskWrap.Extension(*merge)
+
+    #   Activity::Railway.Subprocess(task)
+    #     .merge( # FIXME: allow this directly in Subprocess
+    #       id: id,
+    #       Activity::Railway.Extension() => task_wrap_extension,
+    #     )
+    # end
 
     # @private
     # @api private The internals here are considered private and might change in the near future.
     #
     # We don't need to override {Strategy.call} here to prevent {:exec_context} from being changed.
     # The decider is run in the taskWrap before the {Nested} subclass is actually called.
-    class Nested < Trailblazer::Activity::Railway
+    class Nested# < Trailblazer::Activity::Railway
       # TaskWrap step to run the decider.
       # It's part of the API that the decider sees the original ctx.
       # So this has to be placed in tW because we this step needs to be run *before* In() filters
@@ -92,17 +109,6 @@ module Trailblazer
           actual_semantic  = return_signal.to_h[:semantic]
           applied_signal   = SUCCESS_SEMANTICS.include?(actual_semantic) ? Activity::Right : Activity::Left # TODO: we could also provide PassFast/FailFast.
         end
-
-        # This is used in Nested and Each where some tasks don't have a corresponding, hard-wired
-        # activity. This is needed for {TaskWrap.invoke} and the Debugging API in tracing.
-        # @private
-        def self.host_activity_for(activity:)
-          Activity::TaskWrap.container_activity_for(
-            activity,
-            id: activity.to_s
-          )
-        end
-
       end
 
       # Code to handle [:static]. This is called "static" as you configure the possible activities at
@@ -111,51 +117,42 @@ module Trailblazer
       # TODO: allow configuring Output of Nested per internal nested activity, e.g.
       #         step Nested(.., Id3Tag => {Output(:invalid_metadata) => ...}
       #       this will help when semantics overlap.
-      #
-      # We create two "abstract" steps, the step evaluating the decision that then routes to the concrete
-      # Subprocess, which is the nested activity.
-      def self.Static(decider, id:, static:)
-        decider_connectors = static.collect do |activity|
-          [Activity::Railway.Output(activity, "decision:#{activity}"), Activity::Railway.Track(activity)]
-        end.to_h
+      def self.Static(decider, id:, static:, exec_context:)
+        decider_node = Activity::Step.build(decider, exec_context: exec_context, binary: false) # TODO: we could allow {:lib_interface}.
 
-        _task = Class.new(Macro::Nested) do
-          step(
-            {
-              task: Static.method(:return_route_signal),
-              id:   :route_to_nested_activity, # returns the {nested_activity} signal
-            }.merge(decider_connectors)
-          )
+        # Some mapping work necessary for the signals we return.
+        id_2_activity = static.collect { |activity| [activity.to_s , activity]  }
 
-          static.each do |activity|
-            activity_step = Subprocess(activity)
+        semantic_2_outputs = static.flat_map { |activity| Activity::Railway.Subprocess(activity)[:outputs].to_a }
 
-            outputs = activity_step[:outputs]
+        all_semantics = semantic_2_outputs.map(&:first).uniq
+        public_outputs = all_semantics.collect { |semantic| [semantic, Activity::Output.new(semantic, semantic)] }.to_h
 
-            # TODO: detect if we have two identical "special" termini.
-            output_wirings = outputs.collect do |semantic, output|
-              [Output(semantic), End(semantic)] # this will add a new termins to this activity.
-            end.to_h
+        nested_signal_2_public_signal = semantic_2_outputs.collect { |semantic, output| [output.signal, public_outputs.fetch(semantic).signal] }.to_h
+        # DISCUSS: this hash is smaller than all the signals we have since Signal < Struct, and Struct thinks two termini with identical semantic are alike.
 
-            # Each nested activity is a Subprocess.
-            # They have Output(semantic) => End(semantic) for each of their termini.
-            step activity_step,
-              {magnetic_to: activity}.merge(output_wirings)
-              # failure and success are wired to respective termini of {nesting_activity}.
+
+        node = Circuit::Builder.Node(
+          *[
+            [:decider, node: decider_node,
+              connections: id_2_activity.collect { |id, activity| [activity, [id, activity]] }.to_h
+            ],
+            *id_2_activity.collect { |id, activity| [id, activity, Circuit::Processor, connections: Circuit::Resolver::Fixed.new(:translate_signal)] },
+            # DISCUSS: translate_signal could be a separate step (easier to follow), or a resolver?
+            [:translate_signal, Runtime::TranslateSignal.new(nested_signal_2_public_signal)]
+          ]
+        )
+
+        return {node_for_call_task: node, outputs: public_outputs, id: id}
+      end
+
+      module Runtime
+        class TranslateSignal < Struct.new(:signal_map)
+          def call(lib_ctx, flow_options, signal_from_nested, **)
+            return lib_ctx, flow_options, signal_map.fetch(signal_from_nested)
           end
         end
       end
-
-      module Static
-        def self.return_route_signal(ctx, flow_options, circuit_options)
-          nested_activity = flow_options[:decision] # we use the decision class as a signal.
-
-          original_flow_options = flow_options.slice(*(flow_options.keys - [:decision]))
-
-          return ctx, original_flow_options, nested_activity
-        end
-      end
-
     end # Nested
   end
 end
