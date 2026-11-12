@@ -2,7 +2,6 @@ require "trailblazer/activity/dsl"
 require "trailblazer/activity/variable_mapping"
 
 require "trailblazer/macro/dsl"
-require "trailblazer/macro/strategy"
 require "trailblazer/macro/model"
 require "trailblazer/macro/model/find"
 require "trailblazer/macro/policy"
@@ -61,7 +60,7 @@ module Trailblazer
       module_function
 
       def call(user_proc, macro:, hint: nil, id: from_callable(user_proc, hint: hint))
-        [macro, id].join("/")
+        [macro, id].join("/").to_sym
       end
 
       def from_callable(user_proc, hint: nil)
