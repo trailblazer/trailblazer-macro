@@ -190,17 +190,17 @@ class DocsNestedStaticTest < Minitest::Spec
 
   it "handle {InvalidMetadata}" do
     #@ Id3Tag with valid metadata
-    assert_invoke B::Song::Activity::Create, seq: %{[:model, :parse, :encode_id3, :save]}, params: {type: "mp3", is_valid: true}, terminus: :success
+    assert_run B::Song::Activity::Create, seq: [:model, :parse, :encode_id3, :save], target_ctx: {seq: [], params: {type: "mp3", is_valid: true}}, terminus: :success
 
     #@ InvalidMetadata returned from Id3Tag#parse
-    assert_invoke B::Song::Activity::Create, seq: %{[:model]}, params: {type: "mp3", is_valid: false}, terminus: :failure
+    assert_run B::Song::Activity::Create, seq: [:model], target_ctx: {seq: [], params: {type: "mp3", is_valid: false}}, terminus: :failure
   end
 
   it "handle {failure} from VorbisComment" do
-    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
+    assert_run C::Song::Activity::Create, seq: [:model, :prepare_metadata], target_ctx: {seq: [], params: {type: "vorbis"}, prepare_metadata: false}, terminus: :failure
 
     #@ UnsupportedFileFormat
-    assert_invoke C::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, terminus: :internal_error, encode_cover: false
+    assert_run C::Song::Activity::Create, seq: [:model, :prepare_metadata, :encode_cover], target_ctx: {seq: [], params: {type: "vorbis"}, encode_cover: false}, terminus: :internal_error
   end
 
   module D
@@ -237,7 +237,7 @@ class DocsNestedStaticTest < Minitest::Spec
   end
 
   it "Id3Tag's invalid_metadata goes to {End.failure}" do
-    assert_invoke D::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, terminus: :failure, prepare_metadata: false
+    assert_run D::Song::Activity::Create, seq: [:model, :prepare_metadata], target_ctx: {params: {type: "vorbis"}, prepare_metadata: false, seq: []}, terminus: :failure
   end
 
 
@@ -280,14 +280,14 @@ class DocsNestedStaticTest < Minitest::Spec
 
   it "FastTrack from nested_activity are mapped to respective tracks" do
     #@ {End.pass_fast} goes success for Id3Tag
-    assert_invoke E::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, terminus: :pass_fast
+    assert_run E::Song::Activity::Create, seq: [:model, :parse], target_ctx: {seq: [], params: {type: "mp3"}}, terminus: :pass_fast
     #@ {End.fail_fast} goes failure for Id3Tag
-    assert_invoke E::Song::Activity::Create, seq: %{[:model, :parse]}, params: {type: "mp3"}, parse: false, terminus: :fail_fast
+    assert_run E::Song::Activity::Create, seq: [:model, :parse], target_ctx: {seq: [], params: {type: "mp3"}, parse: false}, terminus: :fail_fast
 
-    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover, :save]}, params: {type: "vorbis"}
-    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata]}, params: {type: "vorbis"}, prepare_metadata: false, terminus: :failure
+    assert_run E::Song::Activity::Create, seq: [:model, :prepare_metadata, :encode_cover, :save], target_ctx: {seq: [], params: {type: "vorbis"}}, terminus: :success
+    assert_run E::Song::Activity::Create, seq: [:model, :prepare_metadata], target_ctx: {seq: [], params: {type: "vorbis"}, prepare_metadata: false}, terminus: :failure
     #@ VorbisComment :unsupported_file_format is mapped to :failure
-    assert_invoke E::Song::Activity::Create, seq: %{[:model, :prepare_metadata, :encode_cover]}, params: {type: "vorbis"}, encode_cover: false, terminus: :unsupported_file_format
+    assert_run E::Song::Activity::Create, seq: [:model, :prepare_metadata, :encode_cover], target_ctx: {seq: [], params: {type: "vorbis"}, encode_cover: false}, terminus: :unsupported_file_format
   end
 end
 
