@@ -6,7 +6,10 @@ require "trailblazer/core"
 require "trailblazer/operation"
 
 # FIXME: who loads the macros where?
-[Trailblazer::Operation].each do |topology|
+# [Trailblazer::Operation].each do |topology|
+[Trailblazer::Activity::FastTrack,  # DISCUSS: remove?
+  Trailblazer::Operation # we need to add this because we're using :adds, so both normalizers get updated.
+].each do |topology|
   _, _, builder, helpers_module = Trailblazer::Activity::DSL::Topology.build(
     builder: topology.config.builder,
     default_options: {},
@@ -34,8 +37,6 @@ module Rehash
   end
 end
 
-CU = Trailblazer::Core::Utils
-
 Minitest::Spec.class_eval do
   include Trailblazer::Core::Utils::AssertRun
   include Trailblazer::Core::Utils::AssertEqual
@@ -50,9 +51,5 @@ Minitest::Spec.class_eval do
     end.gsub(/:\d+/, "")
 
     return output, signal, ctx
-  end
-
-  def assert_equal(asserted, expected, *args)
-    super(expected, asserted, *args)
   end
 end
