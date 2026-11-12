@@ -4,14 +4,8 @@ module Trailblazer
 
     module Rescue
       class Atom < DSL::Atom
-        def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **)
-          build_node(**options, exec_context: exec_context)
-        end
-
         def build_node(exceptions:, handler:, id:, lib_interface:, exec_context:, **options)
-          exceptions = [StandardError] unless exceptions.any?
-
-          node_for_handler =
+          node_for_rescue_handler =
             if lib_interface
               Circuit::Node[handler, Circuit::Task::Adapter::LibInterface]
             else
@@ -26,6 +20,8 @@ module Trailblazer
               Circuit::Node[circuit, Circuit::Processor]
             end
 
+          exceptions = [StandardError] unless exceptions.any?
+
           wrap_options = Wrap.build_node(handler_for_wrap: Runtime.new(exceptions), id: id, exec_context: exec_context, **options)
 
           node = wrap_options[:node_for_call_task]
@@ -33,7 +29,7 @@ module Trailblazer
 
           new_resolver_for_invoke_handler = Circuit::Resolver::Conditional.new([Runtime::Rescued], :handle_rescue, :translate_signal)
           circuit = Circuit::Adds.(circuit,
-            [:handle_rescue, node_for_handler, :before, :translate_signal],
+            [:handle_rescue, node_for_rescue_handler, :before, :translate_signal],
             [:invoke_handler, circuit.nodes[:invoke_handler], :replace, :invoke_handler, resolver: new_resolver_for_invoke_handler],
           ) # DISCUSS: patch? grabbing the original invoke_handler node is a contract breach.
 

@@ -1,7 +1,11 @@
 module Trailblazer
   module Macro
     module DSL
+      # You need to implement Atom#build_node.
       class Atom < Struct.new(:options)
+        def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) #
+          build_node(exec_context: exec_context, **options) # FIXME: test merging order here.
+        end
       end
 
       module Normalizer

@@ -20,11 +20,7 @@ module Trailblazer
 
         class Atom < DSL::Atom
           # Build the policy node via the normalizer.
-          def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # called via Normalizer.evaluate_macro
-            name = options.fetch(:name)
-            provider = options.fetch(:provider)
-            # the remaining code should be independent of the "Atom".
-
+          def build_node(exec_context:, name:, provider:, **) # called via Normalizer.evaluate_macro
             guard = Trailblazer::Activity::Step.build(provider, binary: false, exec_context: exec_context)
 
             policy_context = Context.new(name)

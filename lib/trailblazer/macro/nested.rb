@@ -9,10 +9,6 @@ module Trailblazer
       end
 
       class Atom < DSL::Atom
-        def call(*, default_options:, exec_context: default_options.fetch(:exec_context), **) # FIXME: move this to Atom.
-          build_node(exec_context: exec_context, **options)
-        end
-
         def build_node(exec_context:, decider:, static:, id:, **)
           decider_node = Activity::Step.build(decider, exec_context: exec_context, binary: false) # TODO: we could allow {:lib_interface}.
 
