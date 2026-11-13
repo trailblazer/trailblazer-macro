@@ -16,11 +16,11 @@ class PolicyTest < Minitest::Spec
   #---
   # Instance-level: Only policy, no model
   class Create < Trailblazer::Operation
-    step Policy::Pundit( Auth, :only_user? )
+    step Policy::Pundit(Auth, :only_user?)
     step :process
 
-    def process(options, **)
-      options[:process] = true
+    def process(ctx, **)
+      ctx[:process] = true
     end
   end
 
@@ -50,7 +50,7 @@ class PolicyTest < Minitest::Spec
   #---
   # inheritance, adding Model
   class Show < Create
-    step Model( Song, :new ), before: :"policy.default.eval"
+    step Model( Song, :new ), before: :"policy.pundit.default"
   end
 
   it { assert_equal Trailblazer::Developer.railway(Show), %{[>model.build,>policy.default.eval,>process]} }
@@ -81,8 +81,8 @@ class PolicyTest < Minitest::Spec
     step Policy::Pundit( Auth, :user_and_model? )
     step :process
 
-    def process(options, **)
-      options[:process] = true
+    def process(ctx, **)
+      ctx[:process] = true
     end
   end
 

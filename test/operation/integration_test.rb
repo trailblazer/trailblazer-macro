@@ -30,8 +30,8 @@ class IntegrationTest < Minitest::Spec
   end
 
   class SongSpecialCreate < Trailblazer::Operation
-    step Subprocess(ArtistCreate)
-    step Subprocess(SongCreate)
+    step Subprocess(ArtistCreate), id: :a
+    step Subprocess(SongCreate), id: :b # FIXME: ID must be automatic.
   end
 
   it "create Artist and Song" do
