@@ -33,10 +33,11 @@ module Trailblazer
       # Dynamic is without static where we don't even know what *could* be the actual
       # nested activity until it's runtime.
       def self.Dynamic(decider_node)
-        node = Circuit::Builder.Node(
+        circuit = Circuit::Builder.Pipeline(
           [:decider, node: decider_node],
           [:invoke_dynamic_activity, node: Dynamic::Node.new]
         )
+        node = Circuit::Node[circuit, Circuit::Processor]
 
         {
           node_for_call_task: node,
@@ -72,7 +73,7 @@ module Trailblazer
         nested_signal_2_public_signal = semantic_2_outputs.collect { |semantic, output| [output.signal, public_outputs.fetch(semantic).signal] }.to_h
         # DISCUSS: this hash is smaller than all the signals we have since Signal < Struct, and Struct thinks two termini with identical semantic are alike.
 
-        node = Circuit::Builder.Node(
+        circuit = Circuit::Builder.Pipeline(
           *[
             [:decider, node: decider_node,
               connections: id_2_activity.collect { |id, activity| [activity, [id, activity]] }.to_h
@@ -82,6 +83,7 @@ module Trailblazer
             [:translate_signal, Runtime::TranslateSignal.new(nested_signal_2_public_signal)]
           ]
         )
+        node = Circuit::Node[circuit, Circuit::Processor]
 
         return {node_for_call_task: node, outputs: public_outputs}
       end
