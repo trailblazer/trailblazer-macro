@@ -27,8 +27,10 @@ module Trailblazer
       end
     end
 
-    def self.task_adapter_for_decider(decider_with_step_interface, variable_name:)
-      invoke_provider_step = Activity::Step.build(decider_with_step_interface, binary: false) # FIXME: we cannot deviate to Left here
+    # FIXME: name it decider ==> provider ???
+    # FIXME: test, also {exec_context: self}
+    def self.task_adapter_for_decider(decider_with_step_interface, variable_name:, **options_for_step)
+      invoke_provider_step = Activity::Step.build(decider_with_step_interface, binary: false, **options_for_step) # FIXME: we cannot deviate to Left here
       assign_variable_step = AssignVariable.new(variable_name: variable_name)
 
       extract_id = Circuit::Builder.Pipeline(
