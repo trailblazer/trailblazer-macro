@@ -1061,17 +1061,17 @@ end
 class EachWithArrayBugTest < Minitest::Spec
   it "what" do
     activity = Class.new(Trailblazer::Operation) do
-      step Each(item_key: :outer) {
+      step Each(item_key: :outer, Out() => [:seq]) {
         step :capture_outer
       }
 
-      def capture_outer(ctx, outer:, **)
-        ctx[:seq] << outer
+      def capture_outer(ctx, outer:, seq:, **)
+        ctx[:seq] = seq + [outer]
       end
     end
 
-    lib_ctx, _ = assert_run activity, target_ctx: {dataset: [[1,2],[3,4],[5,6]],
-      seq: [[1, 2], [3, 4], [5, 6]]}
+    lib_ctx, _ = assert_run activity, target_ctx: {dataset: [[1,2],[3,4],[5,6]], seq: []},
+      seq: [[1, 2], [3, 4], [5, 6]], terminus: :success
   end
 end
 

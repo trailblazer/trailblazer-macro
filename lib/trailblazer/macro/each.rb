@@ -1,7 +1,13 @@
 module Trailblazer
   module Macro
     module Each
-      module Step
+      class Atom < DSL::Atom
+        def build_node(**options)
+          Each.build_node(**options)
+        end
+      end
+
+      module Runtime
         def self.init(lib_ctx, flow_options, signal, target_ctx:, **)
           dataset = target_ctx.fetch(:dataset)
 
@@ -28,74 +34,75 @@ module Trailblazer
           Activity::Railway.Inject(:dataset, override: true) => dataset_from, # {ctx[:dataset]} is private to {each_activity}.
         }
       end
-
+# FIXME: make easier to read, structural behavior and "features" such as {:collect}.
       module Helper
         # TODO: explain termini routing, Inject usage for "block activity", Out() => []
         #       BLOG: Each() is a perfect example of how versatile the TRB mechanics are
 
         # @api private The internals here are considered private and might change at some point.
-        def Each(block_activity=nil, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, **variable_mapping_options_for_iterated, &block)
-          exec_context = self.new # FIXME: how do we guarantee this is the OP?
-
-
-          block_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, exec_context: exec_context, &block)
-          failing_termini_signals = outputs_from_block_activity.collect { |_, output| output.signal.is_a?(Activity::Terminus::Failure) ? output.signal : nil }.compact
-
-          iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor,
-            merge_to_circuit_options: {exec_context: exec_context}
-          ]
-
-          item_and_index_filter = Item_and_index_filterBuilder.new(item_key: item_key)
-
-      options_for_each = {} # the top level Each thingy.
-
-      collect_value_node_builder = {}
-      if collect
-        # "per iteration":
-        collect_filter = ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
-        collect_value_node_builder = {Activity::VariableMapping::DSL.Out() => collect_filter}
-
-        options_for_each.merge!(Activity::Railway.Inject(:collected_from_each) => ->(*) { [] })
-        options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
+        def Each(block_activity = nil, **options, &block)
+          Atom.new(options.merge(block_activity: block_activity, block: block))
+        end
       end
 
-          in_node, out_node = Each.input_and_output_nodes_for_iterated(item_and_index_filter, collect_value_node_builder, variable_mapping_options_for_iterated)
+      def self.build_node(block_activity: nil, exec_context:, dataset_from: nil, item_key: :item, id: Macro.id_for(block_activity, macro: :Each, hint: dataset_from), collect: false, block:, **variable_mapping_options_for_iterated)
+        block_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, exec_context: exec_context, &block)
+        failing_termini_signals = outputs_from_block_activity.collect { |_, output| output.signal.is_a?(Activity::Terminus::Failure) ? output.signal : nil }.compact
 
-          circuit = Circuit::Builder.Pipeline(
-            [:init, Step.method(:init)],
-            [:fetch_value_from_dataset, Step.method(:fetch_value_from_dataset),
-              connections: Circuit::Resolver::Conditional.new(["next"], :vm_input, nil)
-            ],
-            [:vm_input, node: in_node],
-            [:user_logic, node: iterated_node],
-            [:vm_output, node: out_node, connections: Circuit::Resolver::Conditional.new(failing_termini_signals, nil, :fetch_value_from_dataset)], # DISCUSS: vmin/user_logic/vm_out could be separate, nested activity.
-          )
+        iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor,
+          merge_to_circuit_options: {exec_context: exec_context}
+        ]
 
-          # TODO: explicit test that :value and :enumerator etc don't leak to the outside.
-          each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
+        item_and_index_filter = Item_and_index_filterBuilder.new(item_key: item_key)
 
-          options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
+    options_for_each = {} # the top level Each thingy.
 
-          options = {
-            node_for_call_task: each_node,
-            outputs: outputs_from_block_activity,
-            id: id,
-            **options_for_dataset_from,
-            **options_for_each,
-          }
+    collect_value_node_builder = {}
+    if collect
+      # "per iteration":
+      collect_filter = ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+      collect_value_node_builder = {Activity::VariableMapping::DSL.Out() => collect_filter}
 
-          return options
-        end
+      options_for_each.merge!(Activity::Railway.Inject(:collected_from_each) => ->(*) { [] })
+      options_for_each.merge!(Activity::Railway.Out() => [:collected_from_each])
+    end
 
-         # DSL options added to {block_activity} to implement {collect: true}.
-        def self.options_for_collect(collect:)
-          return {} unless collect
+        in_node, out_node = Each.input_and_output_nodes_for_iterated(item_and_index_filter, collect_value_node_builder, variable_mapping_options_for_iterated)
 
-          {
-            Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
-            Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
-          }
-        end
+        circuit = Circuit::Builder.Pipeline(
+          [:init, Runtime.method(:init)],
+          [:fetch_value_from_dataset, Runtime.method(:fetch_value_from_dataset),
+            connections: Circuit::Resolver::Conditional.new(["next"], :vm_input, nil)
+          ],
+          [:vm_input, node: in_node],
+          [:user_logic, node: iterated_node],
+          [:vm_output, node: out_node, connections: Circuit::Resolver::Conditional.new(failing_termini_signals, nil, :fetch_value_from_dataset)], # DISCUSS: vmin/user_logic/vm_out could be separate, nested activity.
+        )
+
+        # TODO: explicit test that :value and :enumerator etc don't leak to the outside.
+        each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
+
+        options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
+
+        options = {
+          node_for_call_task: each_node,
+          outputs: outputs_from_block_activity,
+          id: id,
+          **options_for_dataset_from,
+          **options_for_each,
+        }
+
+        return options
+      end
+
+       # DSL options added to {block_activity} to implement {collect: true}.
+      def self.options_for_collect(collect:)
+        return {} unless collect
+
+        {
+          Activity::Railway.Inject(:collected_from_each) => ->(ctx, **) { [] }, # this is called only once.
+          Activity::Railway.Out() => ->(ctx, collected_from_each:, **) { {collected_from_each: collected_from_each += [ctx[:value]] } }
+        }
       end
 
       # Mimick the i/o DSL for the iterated activity, and return the in and out nodes.
