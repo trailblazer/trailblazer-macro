@@ -49,9 +49,7 @@ module Trailblazer
         block_activity, outputs_from_block_activity = Trailblazer::Macro.block_activity_for(block_activity, exec_context: exec_context, &block)
         failing_termini_signals = outputs_from_block_activity.collect { |_, output| output.signal.is_a?(Activity::Terminus::Failure) ? output.signal : nil }.compact
 
-        iterated_node = Circuit::Node::MergeToCircuitOptions[block_activity, Circuit::Processor,
-          merge_to_circuit_options: {exec_context: exec_context}
-        ]
+        iterated_node = Circuit::Builder.Node(block_activity, Circuit::Processor, exec_context: exec_context)
 
         item_and_index_filter = Item_and_index_filterBuilder.new(item_key: item_key)
 
@@ -69,7 +67,7 @@ module Trailblazer
 
         in_node, out_node = Each.input_and_output_nodes_for_iterated(item_and_index_filter, collect_value_node_builder, variable_mapping_options_for_iterated)
 
-        circuit = Circuit::Builder.Pipeline(
+        each_node = Circuit.Builder(
           [:init, Runtime.method(:init)],
           [:fetch_value_from_dataset, Runtime.method(:fetch_value_from_dataset),
             connections: Circuit::Resolver::Conditional.new(["next"], :vm_input, nil)
@@ -77,10 +75,11 @@ module Trailblazer
           [:vm_input, node: in_node],
           [:user_logic, node: iterated_node],
           [:vm_output, node: out_node, connections: Circuit::Resolver::Conditional.new(failing_termini_signals, nil, :fetch_value_from_dataset)], # DISCUSS: vmin/user_logic/vm_out could be separate, nested activity.
+
+          copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx], scoped: true
         )
 
         # TODO: explicit test that :value and :enumerator etc don't leak to the outside.
-        each_node = Circuit::Node::Scoped[circuit, Circuit::Processor, copy_from_outer_ctx: [:target_ctx], copy_to_outer_ctx: [:target_ctx]]
 
         options_for_dataset_from = Each.options_for_dataset_from(dataset_from: dataset_from)
 

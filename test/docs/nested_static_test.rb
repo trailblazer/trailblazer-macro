@@ -314,7 +314,7 @@ Song::Activity::Create
 #:create-trace end
 }
 
-Trailblazer::Developer.wtf?(Song::Activity::Create, {params: {type: "vorbis"}, seq: []})
+Trailblazer::Developer.wtf?(Song::Activity::Create, {params: {type: "vorbis"}, seq: []}, id: :Create)
 
     output, _ = trace Song::Activity::Create, params: {type: "vorbis"}, seq: []
 

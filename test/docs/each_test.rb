@@ -759,7 +759,9 @@ node, _ = Trailblazer::Developer::Introspect.find_path(
       #~meths
       seq: []
       #~meths end
-    })
+    },
+    id: :Create,
+    )
     #:wtf end
   end
 end
@@ -847,7 +849,7 @@ class DocsEachUnitTest < Minitest::Spec
 # `-- End.success}
 
     # TODO: how do we "present" the index?
-    assert_equal output.gsub(/\d\d\d+/, "").gsub(/0x\w+/, ""), %(\e[30m#<Class:>\e[0m
+    assert_equal output.gsub(/(\.\d)+/, "").gsub(/0x\w+/, ""), %(\e[30m#<Class:>\e[0m
 |-- \e[32ma\e[0m
 |-- \e[30mEach/0.\e[0m
 |   |-- \e[32mcompute_item\e[0m
@@ -1007,7 +1009,7 @@ class DocsEachUnitTest < Minitest::Spec
     lib_ctx, _ = assert_run activity, target_ctx: ctx={dataset: [1,2], seq: []},
       seq: [:a], terminus: :success
 
-    assert_equal lib_ctx, {target_ctx: {**ctx, collected_from_each: ["1", "2"]},}
+    assert_equal lib_ctx, {target_ctx: {**ctx, seq: [:a], collected_from_each: ["1", "2"]},}
 
     #@ fail at 3 but still collect 3rd iteration!
     # Trailblazer::Developer.wtf?(activity, {{dataset: [1,2,3]}, seq: []})

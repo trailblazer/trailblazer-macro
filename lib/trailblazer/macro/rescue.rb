@@ -11,13 +11,11 @@ module Trailblazer
             else
               in_node, out_node = input_and_output_nodes_for_rescue_handler
 
-              circuit = Circuit::Builder.Pipeline(
+              node = Circuit.Builder(
                 [:in, node: in_node],
                 [:handler, node: Activity::Step.build(handler, binary: true, exec_context: exec_context)],
                 [:out, node: out_node],
               )
-
-              Circuit::Node[circuit, Circuit::Processor]
             end
 
           exceptions = [StandardError] unless exceptions.any?
@@ -34,7 +32,7 @@ module Trailblazer
           ) # DISCUSS: patch? grabbing the original invoke_handler node is a contract breach.
 
           return wrap_options.merge(
-            node_for_call_task: node.class[circuit, node.interface, copy_to_outer_ctx: node.copy_to_outer_ctx] # FIXME: better way to "clonstumize" node
+            node_for_call_task: node.class[circuit, node.adapter, copy_to_outer_ctx: node.copy_to_outer_ctx] # FIXME: better way to "clonstumize" node
           )
         end
 

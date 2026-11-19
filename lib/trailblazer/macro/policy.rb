@@ -9,9 +9,10 @@ module Trailblazer
           ]
         ]
 
-        circuit = Circuit::Builder.Pipeline(*rows)
-
-        Circuit::Node::MergeToCircuitOptions[circuit, Circuit::Processor, merge_to_circuit_options: {exec_context: policy_context}]
+        node = Circuit.Builder(
+          *rows,
+          exec_context: policy_context
+        )
       end
 
       module Context # DISCUSS: there are other ways to share this behavior with Pundit and Guard.
