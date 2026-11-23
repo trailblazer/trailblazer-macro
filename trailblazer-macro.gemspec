@@ -27,5 +27,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "trailblazer-activity-dsl"#, ">= 2.0.0", "< 2.1.0"
   spec.add_dependency "trailblazer-activity-variable-mapping"#, ">= 2.0.0", "< 2.1.0"
 
-  spec.required_ruby_version = ">= 2.5.0"
+  spec.required_ruby_version = ">= 3.3.0"
 end
