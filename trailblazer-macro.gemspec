@@ -24,8 +24,8 @@ Gem::Specification.new do |spec|
   # spec.add_dependency "trailblazer-operation", ">= 0.11.0" # TODO: this dependency will be removed. currently needed for tests and for Guard::Result
   spec.add_development_dependency "trailblazer-core-utils"
 
-  spec.add_dependency "trailblazer-activity-dsl"#, ">= 2.0.0", "< 2.1.0"
+  spec.add_dependency "trailblazer-activity-dsl", "~> 3.0"
   spec.add_dependency "trailblazer-activity-variable-mapping"#, ">= 2.0.0", "< 2.1.0"
 
-  spec.required_ruby_version = ">= 3.3.0"
+  spec.required_ruby_version = ">= 3.0.0"
 end
