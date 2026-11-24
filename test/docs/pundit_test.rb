@@ -1,17 +1,13 @@
 require "test_helper"
 
   #:policy
-  class MyPolicy
-    def initialize(user, model)
-      @user, @model = user, model
-    end
-
+  class MyPolicy < Struct.new(:user, :model)
     def create?
-      @user == Module && @model.id.nil?
+      user == Module && model.id.nil?
     end
 
     def new?
-      @user == Class
+      user == Class
     end
   end
   #:policy end
@@ -49,6 +45,13 @@ class DocsPunditProcTest < Minitest::Spec
   #:pundit-result end
     assert_equal result[:"result.policy.default"].success?, true
     assert_equal result[:"result.policy.default"][:policy].is_a?(MyPolicy), true
+
+  end
+
+  it "{ctx[:policy.default]} keeps the Pundit instance" do
+    result = Create.(params: {}, current_user: Module)
+
+    assert_equal result[:"policy.default"], MyPolicy.new(Module, Song.new)
   end
 
   #---

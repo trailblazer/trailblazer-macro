@@ -19,8 +19,10 @@ module Trailblazer
           policy_context = Context.new(*args) # just like in VariableMapping, keep logic and configuration.
 
           Macro::Policy.build_node(
+            # Activity::Step.build(:build_policy, id: :build_policy, binary: false),
             [:build_policy, :build_policy, Circuit::Task::Adapter::StepInterface::InstanceMethod], # this is basically a Step.build(, binary: false).
             [:evaluate, :evaluate, Circuit::Task::Adapter::LibInterface::InstanceMethod],
+
             policy_context: policy_context,
           )
         end
