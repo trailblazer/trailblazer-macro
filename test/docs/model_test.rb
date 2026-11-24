@@ -18,7 +18,7 @@ class DocsModelTest < Minitest::Spec
   Trailblazer::Operation.config.args_compiler_for_invoke = Trailblazer::Circuit::Adds.(
     Trailblazer::Operation.config.args_compiler_for_invoke,
     [:add_seq,
-      Trailblazer::Circuit::Node[->(lib_ctx, *args) { lib_ctx[:target_ctx][:seq] = []; return lib_ctx, *args }, Trailblazer::Circuit::Task::Adapter::LibInterface],
+      Trailblazer::Circuit::Node[->(normalizer_ctx, _, (lib_ctx, runner), **) { lib_ctx[:target_ctx][:seq] = []; return normalizer_ctx, _, [lib_ctx, runner] }, Trailblazer::Circuit::Task::Adapter::LibInterface],
       :after
     ]
   )
