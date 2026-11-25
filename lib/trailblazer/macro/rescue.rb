@@ -3,6 +3,8 @@ module Trailblazer
     NoopHandler = lambda { |lib_ctx, flow_options, *| return lib_ctx, flow_options, Activity::Left }
 
     module Rescue
+      DEFAULT_EXCEPTIONS = [StandardError].freeze
+
       class Atom < DSL::Atom
         def build_node(exceptions:, handler:, id:, lib_interface:, exec_context:, **options)
           node_for_rescue_handler =
@@ -18,7 +20,7 @@ module Trailblazer
               )
             end
 
-          exceptions = [StandardError] unless exceptions.any?
+          exceptions = DEFAULT_EXCEPTIONS unless exceptions.any?
 
           wrap_options = Wrap.build_node(handler_for_wrap: Runtime.new(exceptions), id: id, exec_context: exec_context, **options)
 
